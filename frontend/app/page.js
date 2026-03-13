@@ -25,7 +25,7 @@ Perfect for product packaging, marketing campaigns, events, and inventory system
 <div className="mt-8 flex justify-center gap-4">
 
 <Link
-href="/app/upload"
+href="/upload"
 className="px-6 py-3 bg-black text-white rounded-lg"
 >
 Generate QR Codes
@@ -183,7 +183,7 @@ Start Generating QR Codes Today
 </h2>
 
 <Link
-href="/app/upload"
+href="/upload"
 className="inline-block mt-6 px-8 py-3 bg-black text-white rounded-lg"
 >
 Generate QR Codes
