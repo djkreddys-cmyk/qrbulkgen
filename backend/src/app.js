@@ -7,18 +7,41 @@ function createApp() {
   const app = express();
   const frontendUrl = loadEnv().frontendUrl.replace(/\/$/, "");
   const normalizedOrigin = new URL(frontendUrl).origin;
-  const allowedOrigins = new Set([
-    normalizedOrigin,
-    normalizedOrigin.replace("://www.", "://"),
-    normalizedOrigin.includes("://www.")
-      ? normalizedOrigin
-      : normalizedOrigin.replace("://", "://www."),
-  ]);
+  const allowedOrigins = new Set([normalizedOrigin]);
+
+  function isAllowedOrigin(origin) {
+    if (!origin) {
+      return false;
+    }
+
+    if (allowedOrigins.has(origin)) {
+      return true;
+    }
+
+    try {
+      const parsed = new URL(origin);
+      const host = parsed.hostname.toLowerCase();
+
+      // Allow apex + all subdomains for production domain.
+      if (host === "qrbulkgen.com" || host.endsWith(".qrbulkgen.com")) {
+        return true;
+      }
+
+      // Allow Vercel preview/prod domains when testing.
+      if (host.endsWith(".vercel.app")) {
+        return true;
+      }
+    } catch {
+      return false;
+    }
+
+    return false;
+  }
 
   app.use((req, res, next) => {
     const origin = req.headers.origin;
 
-    if (origin && allowedOrigins.has(origin)) {
+    if (origin && isAllowedOrigin(origin)) {
       res.setHeader("Access-Control-Allow-Origin", origin);
       res.setHeader("Vary", "Origin");
     }
