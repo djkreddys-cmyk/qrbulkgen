@@ -1,4 +1,3 @@
-const cors = require("cors");
 const express = require("express");
 
 const { loadEnv } = require("./config/env");
@@ -8,30 +7,33 @@ function createApp() {
   const app = express();
   const frontendUrl = loadEnv().frontendUrl.replace(/\/$/, "");
   const normalizedOrigin = new URL(frontendUrl).origin;
-  const wwwOrigin = normalizedOrigin.replace("://", "://www.");
-  const apexOrigin = normalizedOrigin.replace("://www.", "://");
-  const allowedOrigins = new Set([normalizedOrigin, wwwOrigin, apexOrigin]);
-  const corsOptions = {
-    origin(origin, callback) {
-      // Allow server-to-server and health checks without an Origin header.
-      if (!origin) {
-        callback(null, true);
-        return;
-      }
+  const allowedOrigins = new Set([
+    normalizedOrigin,
+    normalizedOrigin.replace("://www.", "://"),
+    normalizedOrigin.includes("://www.")
+      ? normalizedOrigin
+      : normalizedOrigin.replace("://", "://www."),
+  ]);
 
-      if (allowedOrigins.has(origin)) {
-        callback(null, true);
-        return;
-      }
+  app.use((req, res, next) => {
+    const origin = req.headers.origin;
 
-      callback(new Error("CORS origin not allowed"));
-    },
-    credentials: true,
-    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
-  };
+    if (origin && allowedOrigins.has(origin)) {
+      res.setHeader("Access-Control-Allow-Origin", origin);
+      res.setHeader("Vary", "Origin");
+    }
 
-  app.use(cors(corsOptions));
+    res.setHeader("Access-Control-Allow-Credentials", "true");
+    res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+
+    if (req.method === "OPTIONS") {
+      res.status(204).end();
+      return;
+    }
+
+    next();
+  });
   app.use(express.json());
 
   app.get("/api/health", (_req, res) => {
