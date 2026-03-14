@@ -92,11 +92,11 @@ function previewFromSampleType(qrType) {
 export default function UploadPage() {
   const previewRef = useRef(null)
   const qrCodeRef = useRef(null)
+  const size = 512
+  const margin = 2
 
   const [file, setFile] = useState(null)
   const [qrType, setQrType] = useState("URL")
-  const [size, setSize] = useState(512)
-  const [margin, setMargin] = useState(2)
   const [format, setFormat] = useState("png")
   const [errorCorrectionLevel, setErrorCorrectionLevel] = useState("M")
   const [filenamePrefix, setFilenamePrefix] = useState("qr")
@@ -177,7 +177,8 @@ export default function UploadPage() {
       height: downloadResolution,
     })
     const name = (filenamePrefix || "bulk-preview").replace(/[^a-zA-Z0-9-_]/g, "") || "bulk-preview"
-    qrCodeRef.current.download({ name, extension: "png" })
+    const downloadExtension = format === "jpg" ? "jpeg" : format
+    qrCodeRef.current.download({ name, extension: downloadExtension })
     qrCodeRef.current.update({ width: 340, height: 340 })
   }
 
@@ -198,7 +199,7 @@ export default function UploadPage() {
       formData.append("qrType", qrType)
       formData.append("size", String(size))
       formData.append("margin", String(margin))
-      formData.append("format", format)
+      formData.append("format", format === "jpg" ? "png" : format)
       formData.append("errorCorrectionLevel", errorCorrectionLevel)
       formData.append("filenamePrefix", filenamePrefix)
       formData.append("foregroundColor", foregroundColor)
@@ -356,13 +357,10 @@ export default function UploadPage() {
             {!previewContent.trim() && <p className="mt-4 text-gray-600">Add preview content to generate QR instantly.</p>}
             <div ref={previewRef} className="mt-4 flex justify-center" />
             <div className="mt-4">
-              <label className="block mb-1">Size</label>
-              <input type="number" min={128} max={2048} value={size} onChange={(e) => setSize(Number(e.target.value || 512))} className="w-full border p-2 mb-3" />
-              <label className="block mb-1">Margin</label>
-              <input type="number" min={0} max={16} value={margin} onChange={(e) => setMargin(Number(e.target.value || 2))} className="w-full border p-2 mb-3" />
               <label className="block mb-1">Format</label>
               <select value={format} onChange={(e) => setFormat(e.target.value)} className="w-full border p-2 mb-3">
                 <option value="png">PNG</option>
+                <option value="jpg">JPG</option>
                 <option value="svg">SVG</option>
               </select>
               <label className="block mb-1">Download Resolution</label>
