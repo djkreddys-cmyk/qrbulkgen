@@ -3,9 +3,9 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 
-import Navbar from "../../../../components/Navbar"
-import { apiRequest } from "../../../../lib/api"
-import { loadAuthSession } from "../../../../lib/auth"
+import Navbar from "../../../components/Navbar"
+import { apiRequest } from "../../../lib/api"
+import { loadAuthSession } from "../../../lib/auth"
 
 export default function SingleGeneratePage() {
   const router = useRouter()
