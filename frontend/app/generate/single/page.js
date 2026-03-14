@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import QRCodeStyling from "qr-code-styling"
 import Navbar from "../../../components/Navbar"
 import { apiRequest } from "../../../lib/api"
-import { loadAuthSession } from "../../../lib/auth"
+import { getAuthToken } from "../../../lib/auth"
 
 const QR_TYPES = [
   "URL",
@@ -260,8 +260,33 @@ export default function SingleGeneratePage() {
     )
   }
 
+  function getAvailableSocialPlatforms(index) {
+    const current = socialLinks[index]?.platform
+    const used = new Set(
+      socialLinks
+        .filter((_, i) => i !== index)
+        .map((item) => item.platform)
+        .filter((platform) => platform && platform !== "Custom"),
+    )
+
+    return SOCIAL_PLATFORM_OPTIONS.filter((platform) => {
+      if (platform === "Custom") return true
+      if (platform === current) return true
+      return !used.has(platform)
+    })
+  }
+
   function addSocialLink() {
-    setSocialLinks((prev) => [...prev, { platform: "Instagram", customPlatform: "", url: "" }])
+    setSocialLinks((prev) => {
+      const used = new Set(prev.map((item) => item.platform).filter((platform) => platform && platform !== "Custom"))
+      const firstAvailable = SOCIAL_PLATFORM_OPTIONS.find(
+        (platform) => platform === "Custom" || !used.has(platform),
+      )
+      return [
+        ...prev,
+        { platform: firstAvailable || "Custom", customPlatform: "", url: "" },
+      ]
+    })
   }
 
   function removeSocialLink(index) {
@@ -269,7 +294,7 @@ export default function SingleGeneratePage() {
   }
 
   function getAuthHeader() {
-    const token = loadAuthSession()?.session?.token
+    const token = getAuthToken()
     if (!token) throw new Error("Please login first to upload files.")
     return { Authorization: `Bearer ${token}` }
   }
@@ -387,11 +412,11 @@ export default function SingleGeneratePage() {
                 {socialLinks.map((item, index) => (
                   <div key={index} className="grid grid-cols-1 md:grid-cols-12 gap-2">
                     <select
-                      className="border p-2 md:col-span-4"
+                      className="border p-2 md:col-span-3"
                       value={item.platform}
                       onChange={(e) => updateSocialLink(index, "platform", e.target.value)}
                     >
-                      {SOCIAL_PLATFORM_OPTIONS.map((platform) => (
+                      {getAvailableSocialPlatforms(index).map((platform) => (
                         <option key={platform} value={platform}>
                           {platform}
                         </option>
@@ -413,7 +438,7 @@ export default function SingleGeneratePage() {
                     />
                     <button
                       type="button"
-                      className="border px-3 py-2 md:col-span-1"
+                      className="border px-2 py-2 md:col-span-2 whitespace-nowrap text-sm"
                       onClick={() => removeSocialLink(index)}
                       disabled={socialLinks.length === 1}
                     >

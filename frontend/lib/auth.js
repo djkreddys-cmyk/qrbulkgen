@@ -33,3 +33,20 @@ export function clearAuthSession() {
 
   window.localStorage.removeItem(AUTH_STORAGE_KEY);
 }
+
+export function getAuthToken() {
+  const session = loadAuthSession();
+  if (!session) {
+    return "";
+  }
+
+  if (typeof session.token === "string" && session.token) {
+    return session.token;
+  }
+
+  if (typeof session?.session?.token === "string" && session.session.token) {
+    return session.session.token;
+  }
+
+  return "";
+}

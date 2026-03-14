@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation"
 
 import Navbar from "../../components/Navbar"
 import { apiRequest } from "../../lib/api"
-import { clearAuthSession, loadAuthSession } from "../../lib/auth"
+import { clearAuthSession, getAuthToken } from "../../lib/auth"
 
 export default function Dashboard() {
   const router = useRouter()
@@ -15,9 +15,9 @@ export default function Dashboard() {
 
   useEffect(() => {
     async function loadUser() {
-      const session = loadAuthSession()
+      const token = getAuthToken()
 
-      if (!session?.token) {
+      if (!token) {
         router.replace("/login")
         return
       }
@@ -25,7 +25,7 @@ export default function Dashboard() {
       try {
         const data = await apiRequest("/auth/me", {
           headers: {
-            Authorization: `Bearer ${session.token}`,
+            Authorization: `Bearer ${token}`,
           },
         })
 
