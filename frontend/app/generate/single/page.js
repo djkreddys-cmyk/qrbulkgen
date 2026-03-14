@@ -1,7 +1,8 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
+import QRCodeStyling from "qr-code-styling"
 
 import Navbar from "../../../components/Navbar"
 import { apiRequest } from "../../../lib/api"
@@ -175,12 +176,19 @@ function hasRequiredFields(type, fields) {
 
 export default function SingleGeneratePage() {
   const router = useRouter()
+  const previewRef = useRef(null)
+  const qrCodeRef = useRef(null)
+
   const [qrType, setQrType] = useState("URL")
   const [foregroundColor, setForegroundColor] = useState("#000000")
   const [backgroundColor, setBackgroundColor] = useState("#ffffff")
   const [errorCorrectionLevel, setErrorCorrectionLevel] = useState("M")
   const [filenamePrefix, setFilenamePrefix] = useState("qr")
-  const [artifact, setArtifact] = useState(null)
+  const [dotStyle, setDotStyle] = useState("rounded")
+  const [cornerSquareStyle, setCornerSquareStyle] = useState("extra-rounded")
+  const [cornerDotStyle, setCornerDotStyle] = useState("dot")
+  const [logoDataUrl, setLogoDataUrl] = useState("")
+  const [generatedContent, setGeneratedContent] = useState("")
   const [error, setError] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [fields, setFields] = useState({
@@ -236,6 +244,17 @@ export default function SingleGeneratePage() {
     setFields((prev) => ({ ...prev, [name]: value }))
   }
 
+  async function handleLogoUpload(event) {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    const reader = new FileReader()
+    reader.onload = () => {
+      setLogoDataUrl(String(reader.result || ""))
+    }
+    reader.readAsDataURL(file)
+  }
+
   async function handleGenerate(event) {
     event.preventDefault()
     setError("")
@@ -254,7 +273,7 @@ export default function SingleGeneratePage() {
         throw new Error("Please fill required fields for selected QR type")
       }
 
-      const data = await apiRequest("/qr/single", {
+      await apiRequest("/qr/single", {
         method: "POST",
         headers: {
           Authorization: `Bearer ${session.token}`,
@@ -268,12 +287,74 @@ export default function SingleGeneratePage() {
         }),
       })
 
-      setArtifact(data.artifact)
+      setGeneratedContent(content)
     } catch (submitError) {
       setError(submitError.message)
     } finally {
       setIsSubmitting(false)
     }
+  }
+
+  useEffect(() => {
+    if (!generatedContent || !previewRef.current) {
+      return
+    }
+
+    const options = {
+      width: 340,
+      height: 340,
+      type: "canvas",
+      data: generatedContent,
+      image: logoDataUrl || undefined,
+      dotsOptions: {
+        color: foregroundColor,
+        type: dotStyle,
+      },
+      backgroundOptions: {
+        color: backgroundColor,
+      },
+      cornersSquareOptions: {
+        color: foregroundColor,
+        type: cornerSquareStyle,
+      },
+      cornersDotOptions: {
+        color: foregroundColor,
+        type: cornerDotStyle,
+      },
+      qrOptions: {
+        errorCorrectionLevel,
+      },
+      imageOptions: {
+        hideBackgroundDots: true,
+        imageSize: 0.35,
+        margin: 4,
+        crossOrigin: "anonymous",
+      },
+    }
+
+    if (!qrCodeRef.current) {
+      qrCodeRef.current = new QRCodeStyling(options)
+      previewRef.current.innerHTML = ""
+      qrCodeRef.current.append(previewRef.current)
+      return
+    }
+
+    qrCodeRef.current.update(options)
+  }, [
+    generatedContent,
+    logoDataUrl,
+    foregroundColor,
+    backgroundColor,
+    dotStyle,
+    cornerSquareStyle,
+    cornerDotStyle,
+    errorCorrectionLevel,
+  ])
+
+  function handleDownload() {
+    if (!qrCodeRef.current) return
+    const name = (filenamePrefix || "qr").replace(/[^a-zA-Z0-9-_]/g, "") || "qr"
+    qrCodeRef.current.download({ name, extension: "png" })
   }
 
   return (
@@ -283,7 +364,7 @@ export default function SingleGeneratePage() {
       <main className="max-w-6xl mx-auto px-6 py-10">
         <h1 className="text-3xl font-bold">Single QR Generator</h1>
         <p className="mt-2 text-gray-600">
-          Generate dynamic QR codes with customizable content and branding colors.
+          Generate dynamic QR codes with custom content types, dot styles, and logo embedding.
         </p>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mt-8">
@@ -429,6 +510,35 @@ export default function SingleGeneratePage() {
 
             <div className="grid grid-cols-2 gap-4">
               <div>
+                <label className="block mb-1">Dot Style</label>
+                <select value={dotStyle} onChange={(e) => setDotStyle(e.target.value)} className="w-full border p-2">
+                  <option value="square">Square</option>
+                  <option value="dots">Dots</option>
+                  <option value="rounded">Rounded</option>
+                  <option value="classy">Classy</option>
+                  <option value="classy-rounded">Classy Rounded</option>
+                  <option value="extra-rounded">Extra Rounded</option>
+                </select>
+              </div>
+              <div>
+                <label className="block mb-1">Corner Square</label>
+                <select value={cornerSquareStyle} onChange={(e) => setCornerSquareStyle(e.target.value)} className="w-full border p-2">
+                  <option value="square">Square</option>
+                  <option value="dot">Dot</option>
+                  <option value="extra-rounded">Extra Rounded</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block mb-1">Corner Dot</label>
+                <select value={cornerDotStyle} onChange={(e) => setCornerDotStyle(e.target.value)} className="w-full border p-2">
+                  <option value="square">Square</option>
+                  <option value="dot">Dot</option>
+                </select>
+              </div>
+              <div>
                 <label className="block mb-1">Error Correction</label>
                 <select
                   value={errorCorrectionLevel}
@@ -440,6 +550,13 @@ export default function SingleGeneratePage() {
                   <option value="Q">Q</option>
                   <option value="H">H</option>
                 </select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block mb-1">Logo (optional)</label>
+                <input type="file" accept="image/*" onChange={handleLogoUpload} className="w-full border p-2" />
               </div>
               <div>
                 <label className="block mb-1">Filename Prefix</label>
@@ -456,15 +573,14 @@ export default function SingleGeneratePage() {
 
           <section className="border rounded-lg p-6 bg-white">
             <h2 className="text-xl font-semibold">Preview</h2>
-            {!artifact && <p className="mt-4 text-gray-600">Generate a QR code to preview and download.</p>}
+            {!generatedContent && <p className="mt-4 text-gray-600">Generate a QR code to preview and download.</p>}
 
-            {artifact && (
-              <div className="mt-4">
-                <img src={artifact.dataUrl} alt="Generated QR Code" className="max-w-full h-auto border p-2 bg-white" />
-                <a href={artifact.dataUrl} download={artifact.fileName} className="inline-block mt-4 px-4 py-2 bg-black text-white rounded">
-                  Download {artifact.fileName}
-                </a>
-              </div>
+            <div ref={previewRef} className="mt-4 flex justify-center" />
+
+            {generatedContent && (
+              <button type="button" onClick={handleDownload} className="inline-block mt-4 px-4 py-2 bg-black text-white rounded">
+                Download QR
+              </button>
             )}
           </section>
         </div>
