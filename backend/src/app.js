@@ -2,6 +2,7 @@ const express = require("express");
 
 const { loadEnv } = require("./config/env");
 const { authRouter } = require("./routes/auth");
+const { qrRouter } = require("./routes/qr");
 
 function createApp() {
   const app = express();
@@ -64,6 +65,7 @@ function createApp() {
   });
 
   app.use("/api/auth", authRouter);
+  app.use("/api/qr", qrRouter);
 
   app.use((err, _req, res, _next) => {
     console.error(err);

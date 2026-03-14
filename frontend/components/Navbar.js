@@ -26,6 +26,7 @@ export default function Navbar() {
 
       <div className="flex items-center gap-6 text-gray-700">
         <Link href="/">Home</Link>
+        <Link href="/generate/single">Generate</Link>
         <Link href="/blog">Blog</Link>
         <Link href="/pricing">Pricing</Link>
         <Link href="/dashboard">Dashboard</Link>
