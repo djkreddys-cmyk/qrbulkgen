@@ -15,8 +15,6 @@ const QR_TYPES = [
   "WhatsApp",
   "vCard",
   "Location",
-  "Facebook",
-  "Twitter",
   "Youtube",
   "WIFI",
   "Event",
@@ -27,6 +25,19 @@ const QR_TYPES = [
   "Image Gallery",
   "Rating",
   "Feedback",
+]
+
+const SOCIAL_PLATFORM_OPTIONS = [
+  "Instagram",
+  "Facebook",
+  "Twitter",
+  "LinkedIn",
+  "YouTube",
+  "WhatsApp",
+  "Telegram",
+  "Snapchat",
+  "Pinterest",
+  "Custom",
 ]
 
 const DOWNLOAD_RESOLUTIONS = [512, 768, 1024, 1536, 2048]
@@ -59,7 +70,7 @@ function normalizeSiteOrigin(value, fallbackOrigin) {
   }
 }
 
-function buildQrContent(type, fields, appOrigin, ids) {
+function buildQrContent(type, fields, appOrigin, ids, socialLinks) {
   switch (type) {
     case "URL":
       return fields.url.trim()
@@ -92,10 +103,6 @@ function buildQrContent(type, fields, appOrigin, ids) {
       ].join("\n")
     case "Location":
       return `geo:${fields.latitude.trim()},${fields.longitude.trim()}`
-    case "Facebook":
-      return fields.facebookUrl.trim()
-    case "Twitter":
-      return fields.twitterUrl.trim()
     case "Youtube":
       return fields.youtubeUrl.trim()
     case "WIFI":
@@ -118,7 +125,16 @@ function buildQrContent(type, fields, appOrigin, ids) {
     case "PDF":
       return ids.pdfLinkId ? `${appOrigin}/pdf/${ids.pdfLinkId}` : fields.pdfUrl.trim()
     case "Social Media":
-      return [fields.instagramUrl, fields.linkedinUrl, fields.socialFacebookUrl, fields.socialTwitterUrl, fields.socialYoutubeUrl].filter(Boolean).join("\n")
+      return socialLinks
+        .map((item) => {
+          const platform = item.platform === "Custom" ? item.customPlatform : item.platform
+          const label = String(platform || "").trim()
+          const url = String(item.url || "").trim()
+          if (!label || !url) return ""
+          return `${label}: ${url}`
+        })
+        .filter(Boolean)
+        .join("\n")
     case "App Store":
       return fields.appStoreUrl.trim()
     case "Image Gallery":
@@ -138,7 +154,7 @@ function buildQrContent(type, fields, appOrigin, ids) {
   }
 }
 
-function hasRequiredFields(type, fields, ids, modes) {
+function hasRequiredFields(type, fields, ids, modes, socialLinks) {
   if (type === "PDF") return modes.pdfMode === "url" ? !!fields.pdfUrl.trim() : !!ids.pdfLinkId
   if (type === "Image Gallery") return modes.galleryMode === "url" ? !!fields.galleryUrl.trim() : !!ids.galleryLinkId
   if (type === "WhatsApp") return !!String(fields.whatsappPhone || "").replace(/[^\d]/g, "")
@@ -148,8 +164,6 @@ function hasRequiredFields(type, fields, ids, modes) {
     Email: fields.email.trim(),
     Phone: fields.phone.trim(),
     SMS: fields.smsPhone.trim(),
-    Facebook: fields.facebookUrl.trim(),
-    Twitter: fields.twitterUrl.trim(),
     Youtube: fields.youtubeUrl.trim(),
     WIFI: fields.wifiSsid.trim(),
     Event: fields.eventTitle.trim() && fields.eventStart.trim() && fields.eventEnd.trim(),
@@ -158,7 +172,10 @@ function hasRequiredFields(type, fields, ids, modes) {
     vCard: fields.firstName.trim(),
   }
   if (type === "Social Media") {
-    return !!(fields.instagramUrl || fields.linkedinUrl || fields.socialFacebookUrl || fields.socialTwitterUrl || fields.socialYoutubeUrl)
+    return socialLinks.some((item) => {
+      const platform = item.platform === "Custom" ? item.customPlatform : item.platform
+      return String(platform || "").trim() && String(item.url || "").trim()
+    })
   }
   if (type === "Rating") return true
   if (type === "Feedback") return (fields.feedbackQuestions || []).some((q) => q.trim())
@@ -192,15 +209,17 @@ export default function SingleGeneratePage() {
   const [uploadingPdf, setUploadingPdf] = useState(false)
   const [uploadError, setUploadError] = useState("")
   const [uploadMessage, setUploadMessage] = useState("")
+  const [socialLinks, setSocialLinks] = useState([
+    { platform: "Instagram", customPlatform: "", url: "" },
+  ])
 
   const [fields, setFields] = useState({
     url: "", text: "", email: "", subject: "", body: "", phone: "", smsPhone: "", smsMessage: "",
     whatsappPhone: "", whatsappMessage: "", firstName: "", lastName: "", organization: "", jobTitle: "",
-    vcardPhone: "", vcardEmail: "", vcardUrl: "", address: "", latitude: "", longitude: "", facebookUrl: "",
-    twitterUrl: "", youtubeUrl: "", wifiType: "WPA", wifiSsid: "", wifiPassword: "", wifiHidden: false,
+    vcardPhone: "", vcardEmail: "", vcardUrl: "", address: "", latitude: "", longitude: "",
+    youtubeUrl: "", wifiType: "WPA", wifiSsid: "", wifiPassword: "", wifiHidden: false,
     eventTitle: "", eventStart: "", eventEnd: "", eventLocation: "", eventDescription: "", bitcoinAddress: "",
-    pdfUrl: "", instagramUrl: "", linkedinUrl: "", socialFacebookUrl: "", socialTwitterUrl: "",
-    socialYoutubeUrl: "", appStoreUrl: "", galleryUrl: "", ratingTitle: "Rate your experience",
+    pdfUrl: "", appStoreUrl: "", galleryUrl: "", ratingTitle: "Rate your experience",
     ratingStyle: "stars", ratingScale: "5", feedbackTitle: "Share your feedback",
     feedbackQuestions: ["How was your experience?"],
   })
@@ -210,16 +229,43 @@ export default function SingleGeneratePage() {
   }, [])
 
   const canGenerate = useMemo(
-    () => hasRequiredFields(qrType, fields, { galleryLinkId, pdfLinkId }, { galleryMode, pdfMode }),
-    [qrType, fields, galleryLinkId, pdfLinkId, galleryMode, pdfMode],
+    () =>
+      hasRequiredFields(
+        qrType,
+        fields,
+        { galleryLinkId, pdfLinkId },
+        { galleryMode, pdfMode },
+        socialLinks,
+      ),
+    [qrType, fields, galleryLinkId, pdfLinkId, galleryMode, pdfMode, socialLinks],
   )
   const generatedContent = useMemo(
-    () => (canGenerate && appOrigin ? buildQrContent(qrType, fields, appOrigin, { galleryLinkId, pdfLinkId }) : ""),
-    [canGenerate, appOrigin, qrType, fields, galleryLinkId, pdfLinkId],
+    () =>
+      canGenerate && appOrigin
+        ? buildQrContent(qrType, fields, appOrigin, { galleryLinkId, pdfLinkId }, socialLinks)
+        : "",
+    [canGenerate, appOrigin, qrType, fields, galleryLinkId, pdfLinkId, socialLinks],
   )
 
   function setField(name, value) {
     setFields((prev) => ({ ...prev, [name]: value }))
+  }
+
+  function updateSocialLink(index, key, value) {
+    setSocialLinks((prev) =>
+      prev.map((item, i) => {
+        if (i !== index) return item
+        return { ...item, [key]: value }
+      }),
+    )
+  }
+
+  function addSocialLink() {
+    setSocialLinks((prev) => [...prev, { platform: "Instagram", customPlatform: "", url: "" }])
+  }
+
+  function removeSocialLink(index) {
+    setSocialLinks((prev) => prev.filter((_, i) => i !== index))
   }
 
   function getAuthHeader() {
@@ -324,13 +370,61 @@ export default function SingleGeneratePage() {
                 <textarea className="w-full border p-2" rows={3} placeholder="Message (optional)" value={fields.whatsappMessage} onChange={(e) => setField("whatsappMessage", e.target.value)} />
               </div>
             )}
-            {["Facebook", "Twitter", "Youtube", "App Store"].includes(qrType) && (
-              <input className="w-full border p-2" placeholder="Paste URL" value={qrType === "Facebook" ? fields.facebookUrl : qrType === "Twitter" ? fields.twitterUrl : qrType === "Youtube" ? fields.youtubeUrl : fields.appStoreUrl} onChange={(e) => {
-                if (qrType === "Facebook") setField("facebookUrl", e.target.value)
-                if (qrType === "Twitter") setField("twitterUrl", e.target.value)
-                if (qrType === "Youtube") setField("youtubeUrl", e.target.value)
-                if (qrType === "App Store") setField("appStoreUrl", e.target.value)
-              }} />
+            {["Youtube", "App Store"].includes(qrType) && (
+              <input
+                className="w-full border p-2"
+                placeholder="Paste URL"
+                value={qrType === "Youtube" ? fields.youtubeUrl : fields.appStoreUrl}
+                onChange={(e) => {
+                  if (qrType === "Youtube") setField("youtubeUrl", e.target.value)
+                  if (qrType === "App Store") setField("appStoreUrl", e.target.value)
+                }}
+              />
+            )}
+
+            {qrType === "Social Media" && (
+              <div className="space-y-3 border p-3 rounded">
+                {socialLinks.map((item, index) => (
+                  <div key={index} className="grid grid-cols-1 md:grid-cols-12 gap-2">
+                    <select
+                      className="border p-2 md:col-span-4"
+                      value={item.platform}
+                      onChange={(e) => updateSocialLink(index, "platform", e.target.value)}
+                    >
+                      {SOCIAL_PLATFORM_OPTIONS.map((platform) => (
+                        <option key={platform} value={platform}>
+                          {platform}
+                        </option>
+                      ))}
+                    </select>
+                    {item.platform === "Custom" && (
+                      <input
+                        className="border p-2 md:col-span-3"
+                        placeholder="Platform name"
+                        value={item.customPlatform}
+                        onChange={(e) => updateSocialLink(index, "customPlatform", e.target.value)}
+                      />
+                    )}
+                    <input
+                      className={`border p-2 ${item.platform === "Custom" ? "md:col-span-4" : "md:col-span-7"}`}
+                      placeholder="https://..."
+                      value={item.url}
+                      onChange={(e) => updateSocialLink(index, "url", e.target.value)}
+                    />
+                    <button
+                      type="button"
+                      className="border px-3 py-2 md:col-span-1"
+                      onClick={() => removeSocialLink(index)}
+                      disabled={socialLinks.length === 1}
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ))}
+                <button type="button" className="border px-3 py-2" onClick={addSocialLink}>
+                  Add Social Link
+                </button>
+              </div>
             )}
 
             {qrType === "PDF" && (
