@@ -11,6 +11,47 @@ const { enqueueBulkQrJob } = require("../services/queue");
 const { normalizeSingleQrPayload } = require("../services/qr-single");
 
 const bulkRouter = express.Router();
+const BULK_QR_TYPES = new Set([
+  "URL",
+  "Text",
+  "Email",
+  "Phone",
+  "SMS",
+  "WhatsApp",
+  "vCard",
+  "Location",
+  "Youtube",
+  "WIFI",
+  "Event",
+  "Bitcoin",
+  "PDF",
+  "Social Media",
+  "App Store",
+  "Image Gallery",
+  "Rating",
+  "Feedback",
+]);
+
+const REQUIRED_HEADERS_BY_TYPE = {
+  URL: ["content"],
+  Text: ["content"],
+  Email: ["email"],
+  Phone: ["phone"],
+  SMS: ["phone"],
+  WhatsApp: ["phone"],
+  vCard: ["firstName"],
+  Location: ["latitude", "longitude"],
+  Youtube: ["url"],
+  WIFI: ["ssid"],
+  Event: ["title"],
+  Bitcoin: ["address"],
+  PDF: ["url"],
+  "Social Media": ["content"],
+  "App Store": ["url"],
+  "Image Gallery": ["url"],
+  Rating: ["title"],
+  Feedback: ["title", "questions"],
+};
 
 const uploadsRoot = path.join(process.cwd(), "uploads");
 const bulkSourceRoot = path.join(uploadsRoot, "bulk", "source");
@@ -57,7 +98,14 @@ function normalizeBulkOptions(body) {
   };
 
   const normalized = normalizeSingleQrPayload(fakePayload);
+  const qrType = String(body.qrType || "URL").trim();
+
+  if (!BULK_QR_TYPES.has(qrType)) {
+    throw createHttpError(400, "VALIDATION_ERROR", "Unsupported qrType for bulk job");
+  }
+
   return {
+    qrType,
     size: normalized.size,
     margin: normalized.margin,
     format: normalized.format,
@@ -70,22 +118,19 @@ function normalizeBulkOptions(body) {
 
 async function inspectCsv(csvPath) {
   return new Promise((resolve, reject) => {
-    let hasContent = false;
     let rowCount = 0;
     let seenHeaders = [];
 
     fs.createReadStream(csvPath)
       .pipe(csvParser())
       .on("headers", (headers) => {
-        seenHeaders = headers || [];
-        hasContent = seenHeaders.some((header) => String(header).trim().toLowerCase() === "content");
+        seenHeaders = (headers || []).map((header) => String(header || "").trim());
       })
       .on("data", () => {
         rowCount += 1;
       })
       .on("end", () => {
         resolve({
-          hasContent,
           rowCount,
           headers: seenHeaders,
         });
@@ -108,8 +153,15 @@ bulkRouter.post("/bulk/upload", requireAuth, upload.single("file"), async (req, 
     const options = normalizeBulkOptions(req.body || {});
     const csvInfo = await inspectCsv(file.path);
 
-    if (!csvInfo.hasContent) {
-      throw createHttpError(400, "VALIDATION_ERROR", "CSV must include a 'content' column");
+    const actualHeaders = new Set((csvInfo.headers || []).map((h) => h.toLowerCase()));
+    const required = REQUIRED_HEADERS_BY_TYPE[options.qrType] || ["content"];
+    const missing = required.filter((header) => !actualHeaders.has(header.toLowerCase()));
+    if (missing.length) {
+      throw createHttpError(
+        400,
+        "VALIDATION_ERROR",
+        `CSV missing required column(s) for ${options.qrType}: ${missing.join(", ")}`,
+      );
     }
 
     if (csvInfo.rowCount <= 0) {
@@ -120,20 +172,23 @@ bulkRouter.post("/bulk/upload", requireAuth, upload.single("file"), async (req, 
       `INSERT INTO qr_jobs (
         user_id, job_type, status, source_file_name, source_file_path,
         total_count, success_count, failure_count,
+        bulk_qr_type,
         qr_size, foreground_color, background_color, qr_margin, output_format,
         error_correction_level, filename_prefix
       ) VALUES (
         $1, 'bulk', 'queued', $2, $3,
         $4, 0, 0,
-        $5, $6, $7, $8, $9,
-        $10, $11
+        $5,
+        $6, $7, $8, $9, $10,
+        $11, $12
       )
-      RETURNING id, status, total_count, created_at`,
+      RETURNING id, status, total_count, bulk_qr_type, created_at`,
       [
         req.user.id,
         file.originalname,
         file.path,
         csvInfo.rowCount,
+        options.qrType,
         options.size,
         options.foregroundColor,
         options.backgroundColor,
@@ -162,6 +217,7 @@ bulkRouter.post("/bulk/upload", requireAuth, upload.single("file"), async (req, 
       job: {
         id: job.id,
         status: job.status,
+        qrType: job.bulk_qr_type,
         totalCount: job.total_count,
         createdAt: job.created_at,
       },
@@ -205,7 +261,7 @@ bulkRouter.get("/jobs", requireAuth, async (req, res, next) => {
 
     const result = await query(
       `SELECT
-         j.id, j.status, j.source_file_name, j.total_count, j.success_count, j.failure_count,
+         j.id, j.status, j.bulk_qr_type, j.source_file_name, j.total_count, j.success_count, j.failure_count,
          j.error_message, j.created_at, j.started_at, j.completed_at,
          a.file_name AS artifact_file_name, a.file_path AS artifact_file_path, a.mime_type AS artifact_mime_type
        FROM qr_jobs j
@@ -227,6 +283,7 @@ bulkRouter.get("/jobs", requireAuth, async (req, res, next) => {
       jobs: result.rows.map((row) => ({
         id: row.id,
         status: row.status,
+        qrType: row.bulk_qr_type,
         sourceFileName: row.source_file_name,
         totalCount: row.total_count,
         successCount: row.success_count,
@@ -258,7 +315,7 @@ bulkRouter.get("/jobs/:id", requireAuth, async (req, res, next) => {
 
     const result = await query(
       `SELECT
-         j.id, j.status, j.source_file_name, j.total_count, j.success_count, j.failure_count,
+         j.id, j.status, j.bulk_qr_type, j.source_file_name, j.total_count, j.success_count, j.failure_count,
          j.error_message, j.created_at, j.started_at, j.completed_at,
          a.file_name AS artifact_file_name, a.file_path AS artifact_file_path, a.mime_type AS artifact_mime_type
        FROM qr_jobs j
@@ -285,6 +342,7 @@ bulkRouter.get("/jobs/:id", requireAuth, async (req, res, next) => {
       job: {
         id: row.id,
         status: row.status,
+        qrType: row.bulk_qr_type,
         sourceFileName: row.source_file_name,
         totalCount: row.total_count,
         successCount: row.success_count,

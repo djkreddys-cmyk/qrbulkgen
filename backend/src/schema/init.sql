@@ -39,6 +39,7 @@ CREATE TABLE IF NOT EXISTS qr_jobs (
   success_count INTEGER NOT NULL DEFAULT 0,
   failure_count INTEGER NOT NULL DEFAULT 0,
   qr_content TEXT,
+  bulk_qr_type VARCHAR(32) NOT NULL DEFAULT 'URL',
   qr_size INTEGER NOT NULL DEFAULT 512,
   foreground_color VARCHAR(32) NOT NULL DEFAULT '#000000',
   background_color VARCHAR(32) NOT NULL DEFAULT '#ffffff',
@@ -52,6 +53,9 @@ CREATE TABLE IF NOT EXISTS qr_jobs (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+ALTER TABLE qr_jobs
+  ADD COLUMN IF NOT EXISTS bulk_qr_type VARCHAR(32) NOT NULL DEFAULT 'URL';
 
 CREATE TABLE IF NOT EXISTS job_artifacts (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

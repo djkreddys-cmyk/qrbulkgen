@@ -98,6 +98,7 @@ export default function Dashboard() {
                         <span className="text-sm uppercase">{job.status}</span>
                       </div>
                       <p className="text-sm mt-1">File: {job.sourceFileName || "-"}</p>
+                      <p className="text-sm">Type: {job.qrType || "-"}</p>
                       <p className="text-sm">
                         Rows: {job.totalCount} | Success: {job.successCount} | Failure:{" "}
                         {job.failureCount}

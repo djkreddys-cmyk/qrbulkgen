@@ -23,6 +23,7 @@ const repoRoot = path.resolve(__dirname, "..");
 const uploadsRoot = process.env.BULK_STORAGE_DIR
   ? path.resolve(process.env.BULK_STORAGE_DIR)
   : path.join(repoRoot, "backend", "uploads");
+const frontendBaseUrl = String(process.env.FRONTEND_URL || "http://localhost:3000").replace(/\/$/, "");
 
 function parseCsvLine(line) {
   const fields = [];
@@ -55,26 +56,151 @@ function parseCsvLine(line) {
   return fields.map((v) => v.trim());
 }
 
-async function readCsvContents(filePath) {
+function getCell(row, name) {
+  return String(row?.[String(name).toLowerCase()] || "").trim();
+}
+
+function toUtcDateTime(value) {
+  if (!value) return "";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "";
+  const yyyy = d.getUTCFullYear();
+  const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const dd = String(d.getUTCDate()).padStart(2, "0");
+  const hh = String(d.getUTCHours()).padStart(2, "0");
+  const mi = String(d.getUTCMinutes()).padStart(2, "0");
+  const ss = String(d.getUTCSeconds()).padStart(2, "0");
+  return `${yyyy}${mm}${dd}T${hh}${mi}${ss}Z`;
+}
+
+function encodeFeedbackPayload(payload) {
+  return Buffer.from(JSON.stringify(payload), "utf8").toString("base64");
+}
+
+function buildBulkContent(qrType, row) {
+  switch (qrType) {
+    case "URL":
+    case "Text":
+      return getCell(row, "content");
+    case "Email": {
+      const email = getCell(row, "email");
+      const subject = encodeURIComponent(getCell(row, "subject"));
+      const body = encodeURIComponent(getCell(row, "body"));
+      return `mailto:${email}?subject=${subject}&body=${body}`;
+    }
+    case "Phone":
+      return `tel:${getCell(row, "phone")}`;
+    case "SMS":
+      return `SMSTO:${getCell(row, "phone")}:${getCell(row, "message")}`;
+    case "WhatsApp": {
+      const phone = getCell(row, "phone").replace(/[^\d]/g, "");
+      const text = getCell(row, "message");
+      return `https://wa.me/${phone}${text ? `?text=${encodeURIComponent(text)}` : ""}`;
+    }
+    case "vCard":
+      return [
+        "BEGIN:VCARD",
+        "VERSION:3.0",
+        `N:${getCell(row, "lastName")};${getCell(row, "firstName")}`,
+        `FN:${getCell(row, "firstName")} ${getCell(row, "lastName")}`.trim(),
+        `ORG:${getCell(row, "organization")}`,
+        `TITLE:${getCell(row, "jobTitle")}`,
+        `TEL:${getCell(row, "phone")}`,
+        `EMAIL:${getCell(row, "email")}`,
+        `URL:${getCell(row, "url")}`,
+        `ADR:;;${getCell(row, "address")}`,
+        "END:VCARD",
+      ].join("\n");
+    case "Location":
+      return `geo:${getCell(row, "latitude")},${getCell(row, "longitude")}`;
+    case "Youtube":
+    case "PDF":
+    case "App Store":
+    case "Image Gallery":
+      return getCell(row, "url");
+    case "WIFI": {
+      const wifiType = getCell(row, "wifiType") || "WPA";
+      const ssid = getCell(row, "ssid");
+      const password = getCell(row, "password");
+      const hidden = String(getCell(row, "hidden")).toLowerCase() === "true";
+      return `WIFI:T:${wifiType};S:${ssid};P:${password};H:${hidden ? "true" : "false"};;`;
+    }
+    case "Event": {
+      const start = toUtcDateTime(getCell(row, "start")) || toUtcDateTime(new Date().toISOString());
+      const end =
+        toUtcDateTime(getCell(row, "end")) ||
+        toUtcDateTime(new Date(Date.now() + 60 * 60 * 1000).toISOString());
+      return [
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        "BEGIN:VEVENT",
+        `SUMMARY:${getCell(row, "title")}`,
+        `DTSTART:${start}`,
+        `DTEND:${end}`,
+        `LOCATION:${getCell(row, "location")}`,
+        `DESCRIPTION:${getCell(row, "description")}`,
+        "END:VEVENT",
+        "END:VCALENDAR",
+      ].join("\n");
+    }
+    case "Bitcoin": {
+      const address = getCell(row, "address");
+      const amount = getCell(row, "amount");
+      const label = getCell(row, "label");
+      const message = getCell(row, "message");
+      const amountPart = amount ? `?amount=${amount}` : "";
+      const labelPart = label ? `${amountPart ? "&" : "?"}label=${encodeURIComponent(label)}` : "";
+      const messagePart = message
+        ? `${amountPart || labelPart ? "&" : "?"}message=${encodeURIComponent(message)}`
+        : "";
+      return `bitcoin:${address}${amountPart}${labelPart}${messagePart}`;
+    }
+    case "Social Media":
+      return getCell(row, "content");
+    case "Rating": {
+      const title = encodeURIComponent(getCell(row, "title") || "Rate your experience");
+      const style = getCell(row, "style") === "numbers" ? "numbers" : "stars";
+      const scale = style === "numbers" ? (getCell(row, "scale") === "10" ? "10" : "5") : "5";
+      return `${frontendBaseUrl}/rate?title=${title}&style=${style}&scale=${scale}`;
+    }
+    case "Feedback": {
+      const title = getCell(row, "title") || "Share your feedback";
+      const questions = getCell(row, "questions")
+        .split("|")
+        .map((q) => q.trim())
+        .filter(Boolean);
+      const encoded = encodeURIComponent(
+        encodeFeedbackPayload({
+          title,
+          questions: questions.length ? questions : ["How was your experience?"],
+        }),
+      );
+      return `${frontendBaseUrl}/feedback?f=${encoded}`;
+    }
+    default:
+      return getCell(row, "content");
+  }
+}
+
+async function readCsvRows(filePath) {
   const raw = await fsp.readFile(filePath, "utf8");
   const lines = raw.split(/\r?\n/).filter((line) => line.trim().length > 0);
   if (lines.length < 2) {
-    return { values: [], headers: [] };
+    return { rows: [], headers: [] };
   }
 
-  const headers = parseCsvLine(lines[0]).map((h) => h.toLowerCase());
-  const contentIdx = headers.indexOf("content");
-  if (contentIdx < 0) {
-    throw new Error("CSV missing required content column");
-  }
-
-  const values = [];
+  const headers = parseCsvLine(lines[0]).map((h) => String(h || "").toLowerCase());
+  const rows = [];
   for (let i = 1; i < lines.length; i += 1) {
     const cols = parseCsvLine(lines[i]);
-    values.push(String(cols[contentIdx] || "").trim());
+    const row = {};
+    headers.forEach((header, idx) => {
+      row[header] = String(cols[idx] || "").trim();
+    });
+    rows.push(row);
   }
 
-  return { values, headers };
+  return { rows, headers };
 }
 
 async function createZipFromDir(sourceDir, zipPath) {
@@ -108,7 +234,7 @@ async function markFailed(jobId, message) {
 async function processBulkJob(jobId) {
   const result = await db.query(
     `SELECT
-       id, user_id, source_file_name, source_file_path,
+       id, user_id, source_file_name, source_file_path, bulk_qr_type,
        qr_size, foreground_color, background_color, qr_margin, output_format,
        error_correction_level, filename_prefix
      FROM qr_jobs
@@ -135,15 +261,15 @@ async function processBulkJob(jobId) {
     throw new Error("Source CSV file not found on worker");
   }
 
-  const { values } = await readCsvContents(sourceFilePath);
+  const { rows } = await readCsvRows(sourceFilePath);
   const outputDir = path.join(uploadsRoot, "bulk", "jobs", jobId, "files");
   await fsp.mkdir(outputDir, { recursive: true });
 
   let successCount = 0;
   let failureCount = 0;
 
-  for (let i = 0; i < values.length; i += 1) {
-    const content = String(values[i] || "").trim();
+  for (let i = 0; i < rows.length; i += 1) {
+    const content = buildBulkContent(job.bulk_qr_type || "URL", rows[i]);
     if (!content) {
       failureCount += 1;
       continue;

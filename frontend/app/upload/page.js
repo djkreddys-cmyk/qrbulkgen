@@ -6,6 +6,62 @@ import { apiRequest, API_BASE_URL } from "../../lib/api"
 import { getAuthToken } from "../../lib/auth"
 
 const STATUS_POLL_INTERVAL_MS = 3000
+const BULK_QR_TYPES = [
+  "URL",
+  "Text",
+  "Email",
+  "Phone",
+  "SMS",
+  "WhatsApp",
+  "vCard",
+  "Location",
+  "Youtube",
+  "WIFI",
+  "Event",
+  "Bitcoin",
+  "PDF",
+  "Social Media",
+  "App Store",
+  "Image Gallery",
+  "Rating",
+  "Feedback",
+]
+
+const SAMPLE_ROWS_BY_TYPE = {
+  URL: { content: "https://example.com" },
+  Text: { content: "Hello from bulk QR" },
+  Email: { email: "hello@example.com", subject: "Hello", body: "Message body" },
+  Phone: { phone: "+919876543210" },
+  SMS: { phone: "+919876543210", message: "Your SMS text" },
+  WhatsApp: { phone: "919876543210", message: "Hello on WhatsApp" },
+  vCard: {
+    firstName: "John",
+    lastName: "Doe",
+    organization: "QRBulkGen",
+    jobTitle: "Manager",
+    phone: "+919876543210",
+    email: "john@example.com",
+    url: "https://example.com",
+    address: "Bengaluru",
+  },
+  Location: { latitude: "12.9716", longitude: "77.5946" },
+  Youtube: { url: "https://youtube.com/watch?v=abc123" },
+  WIFI: { ssid: "MyWifi", password: "secret123", wifiType: "WPA", hidden: "false" },
+  Event: {
+    title: "Launch Event",
+    start: "2026-03-20T10:00:00Z",
+    end: "2026-03-20T12:00:00Z",
+    location: "Bengaluru",
+    description: "Product launch",
+  },
+  Bitcoin: { address: "1BoatSLRHtKNngkdXEeobR76b53LETtpyT", amount: "0.001", label: "Payment", message: "Order123" },
+  PDF: { url: "https://example.com/file.pdf" },
+  "Social Media": { content: "Instagram: https://instagram.com/yourbrand\nTwitter: https://x.com/yourbrand" },
+  "App Store": { url: "https://apps.apple.com/app/id000000" },
+  "Image Gallery": { url: "https://example.com/gallery" },
+  Rating: { title: "Rate your experience", style: "stars", scale: "5" },
+  Feedback: { title: "Share your feedback", questions: "How was your experience?|Any suggestions?" },
+}
 
 function withAuthHeader() {
   const token = getAuthToken()
@@ -24,6 +80,7 @@ function toAbsoluteDownloadUrl(filePath) {
 
 export default function UploadPage() {
   const [file, setFile] = useState(null)
+  const [qrType, setQrType] = useState("URL")
   const [size, setSize] = useState(512)
   const [margin, setMargin] = useState(2)
   const [format, setFormat] = useState("png")
@@ -84,6 +141,7 @@ export default function UploadPage() {
       setIsSubmitting(true)
       const formData = new FormData()
       formData.append("file", file)
+      formData.append("qrType", qrType)
       formData.append("size", String(size))
       formData.append("margin", String(margin))
       formData.append("format", format)
@@ -108,6 +166,28 @@ export default function UploadPage() {
     }
   }
 
+  function downloadSampleCsv() {
+    const row = SAMPLE_ROWS_BY_TYPE[qrType] || SAMPLE_ROWS_BY_TYPE.URL
+    const headers = Object.keys(row)
+    const values = headers.map((header) => {
+      const value = String(row[header] ?? "")
+      if (value.includes(",") || value.includes('"') || value.includes("\n")) {
+        return `"${value.replace(/"/g, '""')}"`
+      }
+      return value
+    })
+    const csv = `${headers.join(",")}\n${values.join(",")}\n`
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement("a")
+    link.href = url
+    link.setAttribute("download", `bulk-sample-${qrType.toLowerCase().replace(/\s+/g, "-")}.csv`)
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+  }
+
   return (
     <div>
       <Navbar />
@@ -129,6 +209,21 @@ export default function UploadPage() {
           <h2 className="text-xl font-semibold mb-4">Create Bulk Job</h2>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
+              <label className="block mb-1 text-sm">QR Type</label>
+              <select
+                value={qrType}
+                onChange={(e) => setQrType(e.target.value)}
+                className="w-full border p-2"
+              >
+                {BULK_QR_TYPES.map((type) => (
+                  <option key={type} value={type}>
+                    {type}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
               <label className="block mb-1 text-sm">CSV File</label>
               <input
                 type="file"
@@ -136,7 +231,16 @@ export default function UploadPage() {
                 onChange={(e) => setFile(e.target.files?.[0] || null)}
                 className="w-full border p-2"
               />
-              <p className="text-xs text-gray-600 mt-1">CSV must include `content` column header.</p>
+              <p className="text-xs text-gray-600 mt-1">
+                Download sample CSV for selected type and upload after filling your data.
+              </p>
+              <button
+                type="button"
+                className="mt-2 border px-3 py-2"
+                onClick={downloadSampleCsv}
+              >
+                Download Sample CSV
+              </button>
             </div>
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -206,6 +310,7 @@ export default function UploadPage() {
                     <span className="text-sm uppercase">{job.status}</span>
                   </div>
                   <p className="text-sm mt-1">File: {job.sourceFileName || "-"}</p>
+                  <p className="text-sm">Type: {job.qrType || "-"}</p>
                   <p className="text-sm">Rows: {job.totalCount} | Success: {job.successCount} | Failure: {job.failureCount}</p>
                   {job.errorMessage && <p className="text-sm text-red-600 mt-1">{job.errorMessage}</p>}
                   {job.artifact?.filePath && (
