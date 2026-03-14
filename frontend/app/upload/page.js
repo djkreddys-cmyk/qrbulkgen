@@ -98,6 +98,10 @@ export default function UploadPage() {
   const [filenamePrefix, setFilenamePrefix] = useState("qr")
   const [foregroundColor, setForegroundColor] = useState("#000000")
   const [backgroundColor, setBackgroundColor] = useState("#ffffff")
+  const [dotStyle, setDotStyle] = useState("rounded")
+  const [cornerSquareStyle, setCornerSquareStyle] = useState("extra-rounded")
+  const [cornerDotStyle, setCornerDotStyle] = useState("dot")
+  const [logoDataUrl, setLogoDataUrl] = useState("")
   const [downloadResolution, setDownloadResolution] = useState(1024)
   const [previewContent, setPreviewContent] = useState(previewFromSampleType("URL"))
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -119,11 +123,18 @@ export default function UploadPage() {
       height: 340,
       type: "canvas",
       data: previewContent.trim(),
-      dotsOptions: { color: foregroundColor, type: "rounded" },
+      image: logoDataUrl || undefined,
+      dotsOptions: { color: foregroundColor, type: dotStyle },
       backgroundOptions: { color: backgroundColor },
-      cornersSquareOptions: { color: foregroundColor, type: "extra-rounded" },
-      cornersDotOptions: { color: foregroundColor, type: "dot" },
+      cornersSquareOptions: { color: foregroundColor, type: cornerSquareStyle },
+      cornersDotOptions: { color: foregroundColor, type: cornerDotStyle },
       qrOptions: { errorCorrectionLevel },
+      imageOptions: {
+        hideBackgroundDots: true,
+        imageSize: 0.35,
+        margin: 4,
+        crossOrigin: "anonymous",
+      },
     }
 
     if (!qrCodeRef.current) {
@@ -134,7 +145,26 @@ export default function UploadPage() {
     }
 
     qrCodeRef.current.update(options)
-  }, [previewContent, foregroundColor, backgroundColor, errorCorrectionLevel])
+  }, [
+    previewContent,
+    foregroundColor,
+    backgroundColor,
+    errorCorrectionLevel,
+    dotStyle,
+    cornerSquareStyle,
+    cornerDotStyle,
+    logoDataUrl,
+  ])
+
+  async function handleLogoUpload(event) {
+    const file = event.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = () => {
+      setLogoDataUrl(String(reader.result || ""))
+    }
+    reader.readAsDataURL(file)
+  }
 
   function handleDownloadPreview() {
     if (!qrCodeRef.current || !previewContent.trim()) return
@@ -281,6 +311,42 @@ export default function UploadPage() {
               <div>
                 <label className="block mb-1 text-sm">Filename Prefix</label>
                 <input value={filenamePrefix} onChange={(e) => setFilenamePrefix(e.target.value)} className="w-full border p-2" />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block mb-1 text-sm">Dot Style</label>
+                <select value={dotStyle} onChange={(e) => setDotStyle(e.target.value)} className="w-full border p-2">
+                  <option value="square">Square</option>
+                  <option value="dots">Dots</option>
+                  <option value="rounded">Rounded</option>
+                  <option value="classy">Classy</option>
+                  <option value="classy-rounded">Classy Rounded</option>
+                  <option value="extra-rounded">Extra Rounded</option>
+                </select>
+              </div>
+              <div>
+                <label className="block mb-1 text-sm">Corner Square</label>
+                <select value={cornerSquareStyle} onChange={(e) => setCornerSquareStyle(e.target.value)} className="w-full border p-2">
+                  <option value="square">Square</option>
+                  <option value="dot">Dot</option>
+                  <option value="extra-rounded">Extra Rounded</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block mb-1 text-sm">Corner Dot</label>
+                <select value={cornerDotStyle} onChange={(e) => setCornerDotStyle(e.target.value)} className="w-full border p-2">
+                  <option value="square">Square</option>
+                  <option value="dot">Dot</option>
+                </select>
+              </div>
+              <div>
+                <label className="block mb-1 text-sm">Logo (optional)</label>
+                <input type="file" accept="image/*" onChange={handleLogoUpload} className="w-full border p-2" />
               </div>
             </div>
 
