@@ -50,7 +50,7 @@ export default function Dashboard() {
 
         {isLoading && <p className="mt-4">Loading account...</p>}
         {!isLoading && error && <p className="mt-4 text-red-600">{error}</p>}
-        {!isLoading && user && <p className="mt-4">Welcome {user.email}</p>}
+        {!isLoading && user && <p className="mt-4">Welcome {user.name || user.email}</p>}
       </div>
     </div>
   )

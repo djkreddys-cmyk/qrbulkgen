@@ -9,6 +9,7 @@ import { saveAuthSession } from "../../lib/auth"
 
 export default function Register() {
   const router = useRouter()
+  const [name, setName] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState("")
@@ -22,7 +23,7 @@ export default function Register() {
     try {
       const data = await apiRequest("/auth/register", {
         method: "POST",
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ name, email, password }),
       })
 
       saveAuthSession(data)
@@ -38,6 +39,14 @@ export default function Register() {
     <div className="flex justify-center mt-32 px-6">
       <form onSubmit={handleSubmit} className="w-full max-w-md border p-6 rounded bg-white">
         <h1 className="text-2xl font-bold mb-4">Create Account</h1>
+
+        <input
+          placeholder="Name"
+          type="text"
+          value={name}
+          onChange={(event) => setName(event.target.value)}
+          className="border p-2 w-full mb-3"
+        />
 
         <input
           placeholder="Email"

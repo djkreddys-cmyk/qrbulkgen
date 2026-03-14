@@ -12,6 +12,7 @@ const authRouter = express.Router();
 const SESSION_TTL_DAYS = 30;
 
 function validateAuthPayload(body) {
+  const name = String(body.name || "").trim();
   const email = String(body.email || "").trim().toLowerCase();
   const password = String(body.password || "");
 
@@ -19,11 +20,19 @@ function validateAuthPayload(body) {
     throw createHttpError(400, "VALIDATION_ERROR", "Email and password are required");
   }
 
+  if (body.name !== undefined && !name) {
+    throw createHttpError(400, "VALIDATION_ERROR", "Name is required");
+  }
+
+  if (name.length > 120) {
+    throw createHttpError(400, "VALIDATION_ERROR", "Name must be at most 120 characters");
+  }
+
   if (password.length < 8) {
     throw createHttpError(400, "VALIDATION_ERROR", "Password must be at least 8 characters long");
   }
 
-  return { email, password };
+  return { name, email, password };
 }
 
 async function createSession(userId, db = { query }) {
@@ -46,7 +55,7 @@ function buildResetPasswordUrl(token) {
 
 authRouter.post("/register", async (req, res, next) => {
   try {
-    const { email, password } = validateAuthPayload(req.body);
+    const { name, email, password } = validateAuthPayload(req.body);
 
     const result = await withTransaction(async (client) => {
       const existingUser = await client.query("SELECT id FROM users WHERE email = $1 LIMIT 1", [email]);
@@ -56,10 +65,10 @@ authRouter.post("/register", async (req, res, next) => {
       }
 
       const insertedUser = await client.query(
-        `INSERT INTO users (email, password_hash)
-         VALUES ($1, $2)
-         RETURNING id, email`,
-        [email, hashPassword(password)],
+        `INSERT INTO users (name, email, password_hash)
+         VALUES ($1, $2, $3)
+         RETURNING id, name, email`,
+        [name, email, hashPassword(password)],
       );
 
       const user = insertedUser.rows[0];
@@ -79,7 +88,7 @@ authRouter.post("/login", async (req, res, next) => {
     const { email, password } = validateAuthPayload(req.body);
 
     const result = await query(
-      "SELECT id, email, password_hash FROM users WHERE email = $1 LIMIT 1",
+      "SELECT id, name, email, password_hash FROM users WHERE email = $1 LIMIT 1",
       [email],
     );
 
@@ -94,6 +103,7 @@ authRouter.post("/login", async (req, res, next) => {
     res.json({
       user: {
         id: user.id,
+        name: user.name,
         email: user.email,
       },
       token,
@@ -107,6 +117,7 @@ authRouter.get("/me", requireAuth, async (req, res) => {
   res.json({
     user: {
       id: req.user.id,
+      name: req.user.name,
       email: req.user.email,
     },
   });
