@@ -186,7 +186,7 @@ bulkRouter.post("/bulk/upload", requireAuth, upload.single("file"), async (req, 
       [
         req.user.id,
         file.originalname,
-        file.path,
+        path.relative(uploadsRoot, file.path).replace(/\\/g, "/"),
         csvInfo.rowCount,
         options.qrType,
         options.size,

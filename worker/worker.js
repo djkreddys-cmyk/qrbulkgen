@@ -66,6 +66,29 @@ function sanitizeFileBaseName(value, fallback) {
   return (safe || fallback).slice(0, 120);
 }
 
+function resolveSourceCsvPath(storedPath) {
+  const raw = String(storedPath || "").trim();
+  if (!raw) return "";
+
+  const normalized = raw.replace(/\\/g, "/");
+  const candidates = [];
+
+  if (path.isAbsolute(raw)) {
+    candidates.push(raw);
+  }
+
+  candidates.push(path.join(uploadsRoot, normalized.replace(/^\/+/, "")));
+
+  const uploadsMarker = "/uploads/";
+  const markerIndex = normalized.toLowerCase().lastIndexOf(uploadsMarker);
+  if (markerIndex >= 0) {
+    const relativeFromUploads = normalized.slice(markerIndex + uploadsMarker.length);
+    candidates.push(path.join(uploadsRoot, relativeFromUploads));
+  }
+
+  return candidates.find((candidate) => candidate && fs.existsSync(candidate)) || "";
+}
+
 function toUtcDateTime(value) {
   if (!value) return "";
   const d = new Date(value);
@@ -262,7 +285,7 @@ async function processBulkJob(jobId) {
     [jobId],
   );
 
-  const sourceFilePath = String(job.source_file_path || "").trim();
+  const sourceFilePath = resolveSourceCsvPath(job.source_file_path);
   if (!sourceFilePath || !fs.existsSync(sourceFilePath)) {
     throw new Error("Source CSV file not found on worker");
   }
