@@ -128,9 +128,10 @@ function buildQrContent(type, fields, appOrigin) {
     case "Rating": {
       const title = encodeURIComponent(fields.ratingTitle || "Rate your experience")
       const style = encodeURIComponent(fields.ratingStyle || "stars")
-      const scale = encodeURIComponent(fields.ratingScale || "5")
-      const next = fields.ratingRedirectUrl ? `&next=${encodeURIComponent(fields.ratingRedirectUrl)}` : ""
-      return `${appOrigin}/rate?title=${title}&style=${style}&scale=${scale}${next}`
+      const scale = encodeURIComponent(
+        (fields.ratingStyle || "stars") === "stars" ? "5" : fields.ratingScale || "5",
+      )
+      return `${appOrigin}/rate?title=${title}&style=${style}&scale=${scale}`
     }
     case "Feedback": {
       const nonEmptyQuestions = (fields.feedbackQuestions || []).map((q) => q.trim()).filter(Boolean)
@@ -258,7 +259,6 @@ export default function SingleGeneratePage() {
     ratingTitle: "Rate your experience",
     ratingStyle: "stars",
     ratingScale: "5",
-    ratingRedirectUrl: "",
     feedbackTitle: "Share your feedback",
     feedbackQuestions: ["How was your experience?"],
   })
@@ -519,12 +519,15 @@ export default function SingleGeneratePage() {
                     <option value="stars">5 Star Rating</option>
                     <option value="numbers">Number Rating</option>
                   </select>
-                  <select className="w-full border p-2" value={fields.ratingScale} onChange={(e) => setField("ratingScale", e.target.value)}>
-                    <option value="5">1-5</option>
-                    <option value="10">1-10</option>
-                  </select>
+                  {fields.ratingStyle === "numbers" ? (
+                    <select className="w-full border p-2" value={fields.ratingScale} onChange={(e) => setField("ratingScale", e.target.value)}>
+                      <option value="5">1-5</option>
+                      <option value="10">1-10</option>
+                    </select>
+                  ) : (
+                    <input className="w-full border p-2 bg-gray-50 text-gray-600" value="1-5 (fixed for stars)" readOnly />
+                  )}
                 </div>
-                <input className="w-full border p-2" placeholder="Redirect URL after submit (optional)" value={fields.ratingRedirectUrl} onChange={(e) => setField("ratingRedirectUrl", e.target.value)} />
               </div>
             )}
             {qrType === "Feedback" && (

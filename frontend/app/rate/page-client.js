@@ -19,17 +19,11 @@ export default function RateClientPage() {
   const title = searchParams.get("title") || "Rate your experience"
   const style = searchParams.get("style") === "numbers" ? "numbers" : "stars"
   const scale = searchParams.get("scale") === "10" ? 10 : 5
-  const nextUrl = searchParams.get("next") || ""
 
   const options = useMemo(() => Array.from({ length: scale }, (_, i) => i + 1), [scale])
 
   function submitRating() {
     setSubmitted(true)
-    if (nextUrl) {
-      setTimeout(() => {
-        window.location.href = nextUrl
-      }, 900)
-    }
   }
 
   return (
@@ -65,9 +59,11 @@ export default function RateClientPage() {
             </button>
           </>
         ) : (
-          <p className="mt-4 text-green-700">
-            Thanks for your rating{rating ? `: ${rating}/${scale}` : ""}.
-          </p>
+          <div className="mt-6 border rounded p-4 bg-green-50 text-green-700">
+            <p className="text-3xl">✓</p>
+            <p className="mt-2 font-medium">Thanks for your feedback.</p>
+            {rating ? <p className="text-sm mt-1">Rating submitted: {rating}/{scale}</p> : null}
+          </div>
         )}
       </section>
     </main>
