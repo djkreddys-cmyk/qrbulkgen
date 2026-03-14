@@ -452,6 +452,43 @@ export default function SingleGeneratePage() {
               </div>
             )}
 
+            {qrType === "Rating" && (
+              <div className="space-y-2 border p-3 rounded">
+                <input
+                  className="w-full border p-2"
+                  placeholder="Rating page title"
+                  value={fields.ratingTitle}
+                  onChange={(e) => setField("ratingTitle", e.target.value)}
+                />
+                <div className="grid grid-cols-2 gap-2">
+                  <select
+                    className="w-full border p-2"
+                    value={fields.ratingStyle}
+                    onChange={(e) => setField("ratingStyle", e.target.value)}
+                  >
+                    <option value="stars">5 Star Rating</option>
+                    <option value="numbers">Number Rating</option>
+                  </select>
+                  {fields.ratingStyle === "numbers" ? (
+                    <select
+                      className="w-full border p-2"
+                      value={fields.ratingScale}
+                      onChange={(e) => setField("ratingScale", e.target.value)}
+                    >
+                      <option value="5">1-5</option>
+                      <option value="10">1-10</option>
+                    </select>
+                  ) : (
+                    <input
+                      className="w-full border p-2 bg-gray-50 text-gray-600"
+                      value="1-5 (stars)"
+                      readOnly
+                    />
+                  )}
+                </div>
+              </div>
+            )}
+
             {qrType === "PDF" && (
               <div className="space-y-2 border p-3 rounded">
                 <div className="flex gap-2">
