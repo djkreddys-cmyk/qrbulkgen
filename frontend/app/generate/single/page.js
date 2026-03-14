@@ -270,6 +270,28 @@ export default function SingleGeneratePage() {
     setFields((prev) => ({ ...prev, [name]: value }))
   }
 
+  function updateFeedbackQuestion(index, value) {
+    setFields((prev) => {
+      const next = [...prev.feedbackQuestions]
+      next[index] = value
+      return { ...prev, feedbackQuestions: next }
+    })
+  }
+
+  function addFeedbackQuestion() {
+    setFields((prev) => ({
+      ...prev,
+      feedbackQuestions: [...prev.feedbackQuestions, ""],
+    }))
+  }
+
+  function removeFeedbackQuestion(index) {
+    setFields((prev) => ({
+      ...prev,
+      feedbackQuestions: prev.feedbackQuestions.filter((_, i) => i !== index),
+    }))
+  }
+
   function handleQrTypeChange(nextType) {
     setQrType(nextType)
     setUploadError("")
@@ -564,6 +586,39 @@ export default function SingleGeneratePage() {
                     />
                   )}
                 </div>
+              </div>
+            )}
+
+            {qrType === "Feedback" && (
+              <div className="space-y-2 border p-3 rounded">
+                <input
+                  className="w-full border p-2"
+                  placeholder="Feedback form title"
+                  value={fields.feedbackTitle}
+                  onChange={(e) => setField("feedbackTitle", e.target.value)}
+                />
+                {fields.feedbackQuestions.map((question, index) => (
+                  <div key={index} className="flex gap-2">
+                    <input
+                      className="w-full border p-2"
+                      placeholder={`Question ${index + 1}`}
+                      value={question}
+                      onChange={(e) => updateFeedbackQuestion(index, e.target.value)}
+                    />
+                    {fields.feedbackQuestions.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removeFeedbackQuestion(index)}
+                        className="border px-3"
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </div>
+                ))}
+                <button type="button" onClick={addFeedbackQuestion} className="border px-3 py-2">
+                  Add Question
+                </button>
               </div>
             )}
 
