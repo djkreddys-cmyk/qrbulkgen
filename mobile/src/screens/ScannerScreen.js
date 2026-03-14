@@ -75,8 +75,8 @@ export function ScannerScreen() {
       <Card>
         <Text style={{ fontSize: 24, fontWeight: "700", color: "#0f172a" }}>QR Scanner</Text>
         <Text style={{ color: "#64748b", lineHeight: 22 }}>
-          Scan any QR code and either open it directly or move the scanned content into the single
-          generator to restyle or regenerate it.
+          Scan any QR code and web links will open immediately. You can also move the scanned content
+          into the single generator to restyle or regenerate it.
         </Text>
       </Card>
 
@@ -92,6 +92,9 @@ export function ScannerScreen() {
                 : ({ data }) => {
                     setScannedValue(data || "");
                     setIsLocked(true);
+                    if (looksLikeUrl(data)) {
+                      Linking.openURL(data).catch(() => {});
+                    }
                   }
             }
           />

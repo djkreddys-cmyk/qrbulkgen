@@ -78,8 +78,6 @@ export function SingleGenerateScreen() {
   const [filenamePrefix, setFilenamePrefix] = useState("mobile-qr");
   const [foregroundColor, setForegroundColor] = useState("#000000");
   const [backgroundColor, setBackgroundColor] = useState("#ffffff");
-  const [size, setSize] = useState("512");
-  const [margin, setMargin] = useState("2");
   const [format, setFormat] = useState("png");
   const [errorCorrectionLevel, setErrorCorrectionLevel] = useState("M");
   const [artifact, setArtifact] = useState(null);
@@ -90,7 +88,7 @@ export function SingleGenerateScreen() {
 
   const previewSource = useMemo(() => {
     if (!artifact?.dataUrl) return null;
-    if (artifact.mimeType === "image/png" || artifact.mimeType === "image/svg+xml") {
+    if ((artifact.mimeType || "").startsWith("image/") || String(artifact.dataUrl).startsWith("data:image/")) {
       return { uri: artifact.dataUrl };
     }
     return null;
@@ -123,8 +121,8 @@ export function SingleGenerateScreen() {
           filenamePrefix,
           foregroundColor,
           backgroundColor,
-          size: Number(size || 512),
-          margin: Number(margin || 2),
+          size: 512,
+          margin: 2,
           format,
           errorCorrectionLevel,
         }),
@@ -200,55 +198,21 @@ export function SingleGenerateScreen() {
           />
         </View>
 
-        <View style={{ flexDirection: "row", gap: 12 }}>
-          <View style={{ flex: 1, gap: 6 }}>
-            <FieldLabel>FILE NAME</FieldLabel>
-            <TextInput
-              value={filenamePrefix}
-              onChangeText={setFilenamePrefix}
-              placeholder="mobile-qr"
-              style={{
-                borderWidth: 1,
-                borderColor: "#cbd5e1",
-                borderRadius: 16,
-                paddingHorizontal: 14,
-                paddingVertical: 12,
-                color: "#0f172a",
-              }}
-            />
-          </View>
-          <View style={{ width: 96, gap: 6 }}>
-            <FieldLabel>SIZE</FieldLabel>
-            <TextInput
-              value={size}
-              onChangeText={setSize}
-              keyboardType="numeric"
-              style={{
-                borderWidth: 1,
-                borderColor: "#cbd5e1",
-                borderRadius: 16,
-                paddingHorizontal: 14,
-                paddingVertical: 12,
-                color: "#0f172a",
-              }}
-            />
-          </View>
-          <View style={{ width: 96, gap: 6 }}>
-            <FieldLabel>MARGIN</FieldLabel>
-            <TextInput
-              value={margin}
-              onChangeText={setMargin}
-              keyboardType="numeric"
-              style={{
-                borderWidth: 1,
-                borderColor: "#cbd5e1",
-                borderRadius: 16,
-                paddingHorizontal: 14,
-                paddingVertical: 12,
-                color: "#0f172a",
-              }}
-            />
-          </View>
+        <View style={{ gap: 6 }}>
+          <FieldLabel>FILE NAME</FieldLabel>
+          <TextInput
+            value={filenamePrefix}
+            onChangeText={setFilenamePrefix}
+            placeholder="mobile-qr"
+            style={{
+              borderWidth: 1,
+              borderColor: "#cbd5e1",
+              borderRadius: 16,
+              paddingHorizontal: 14,
+              paddingVertical: 12,
+              color: "#0f172a",
+            }}
+          />
         </View>
 
         <View style={{ flexDirection: "row", gap: 12 }}>

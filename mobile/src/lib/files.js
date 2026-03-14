@@ -32,7 +32,7 @@ export async function shareDataUrlFile({ dataUrl, fileName }) {
   const targetPath = `${FileSystem.cacheDirectory}${safeFileName}`;
 
   await FileSystem.writeAsStringAsync(targetPath, base64, {
-    encoding: FileSystem.EncodingType.Base64,
+    encoding: "base64",
   });
 
   await Sharing.shareAsync(targetPath, {
