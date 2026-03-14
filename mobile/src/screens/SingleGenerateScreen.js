@@ -107,6 +107,14 @@ export function SingleGenerateScreen() {
     setSingleDraft(null);
   }, [singleDraft, setSingleDraft]);
 
+  useEffect(() => {
+    setArtifact(null);
+    setJob(null);
+    setError("");
+    setShareMessage("");
+    setContent("");
+  }, [qrType]);
+
   async function handleGenerate() {
     setBusy(true);
     setError("");
@@ -306,7 +314,8 @@ export function SingleGenerateScreen() {
             }}
           >
             <Text style={{ color: "#64748b" }}>
-              PNG previews appear here. SVG files can still be generated and shared after creation.
+              Preview will appear here after generation. PNG shows inline, while SVG can still be shared
+              after creation.
             </Text>
           </View>
         )}

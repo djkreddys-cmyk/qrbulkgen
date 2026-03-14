@@ -1,5 +1,6 @@
 import React from "react";
-import { SafeAreaView, ScrollView, Text, TouchableOpacity, View } from "react-native";
+import { ScrollView, Text, TouchableOpacity, View } from "react-native";
+import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 
 import { AuthProvider, useAuth } from "./src/context/AuthContext";
 import { BulkJobsScreen } from "./src/screens/BulkJobsScreen";
@@ -73,7 +74,7 @@ function MobileShell() {
             />
           </View>
           <View style={{ flexDirection: "row", gap: 12 }}>
-            <TabButton label="Bulk Jobs" route="bulk-jobs" activeRoute={activeRoute} navigate={navigate} />
+            <TabButton label="Bulk QR" route="bulk-jobs" activeRoute={activeRoute} navigate={navigate} />
           </View>
           {screenContent}
           <TouchableOpacity
@@ -131,8 +132,10 @@ function MobileShell() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <MobileShell />
-    </AuthProvider>
+    <SafeAreaProvider>
+      <AuthProvider>
+        <MobileShell />
+      </AuthProvider>
+    </SafeAreaProvider>
   );
 }

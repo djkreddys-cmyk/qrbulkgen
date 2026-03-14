@@ -26,7 +26,7 @@ export function ScannerScreen() {
   const { navigate, setSingleDraft } = useAuth();
   const [permission, requestPermission] = useCameraPermissions();
   const [scannedValue, setScannedValue] = useState("");
-  const [isLocked, setIsLocked] = useState(false);
+  const [lastScanAt, setLastScanAt] = useState(0);
 
   async function handleOpen() {
     if (!looksLikeUrl(scannedValue)) return;
@@ -86,23 +86,23 @@ export function ScannerScreen() {
             style={{ height: 320 }}
             facing="back"
             barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
-            onBarcodeScanned={
-              isLocked
-                ? undefined
-                : ({ data }) => {
-                    setScannedValue(data || "");
-                    setIsLocked(true);
-                    if (looksLikeUrl(data)) {
-                      Linking.openURL(data).catch(() => {});
-                    }
-                  }
-            }
+            onBarcodeScanned={({ data }) => {
+              const now = Date.now();
+              if (now - lastScanAt < 1800) {
+                return;
+              }
+              setLastScanAt(now);
+              setScannedValue(data || "");
+              if (looksLikeUrl(data)) {
+                Linking.openURL(data).catch(() => {});
+              }
+            }}
           />
         </View>
         <TouchableOpacity
           onPress={() => {
             setScannedValue("");
-            setIsLocked(false);
+            setLastScanAt(0);
           }}
           style={{ backgroundColor: "#e2e8f0", paddingVertical: 14, borderRadius: 16 }}
         >

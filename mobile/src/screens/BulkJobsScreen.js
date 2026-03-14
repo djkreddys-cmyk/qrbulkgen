@@ -163,10 +163,10 @@ export function BulkJobsScreen() {
   return (
     <ScrollView contentContainerStyle={{ gap: 16, paddingBottom: 36 }}>
       <Card>
-        <Text style={{ fontSize: 24, fontWeight: "700", color: "#0f172a" }}>Bulk Jobs</Text>
+        <Text style={{ fontSize: 24, fontWeight: "700", color: "#0f172a" }}>Bulk QR</Text>
         <Text style={{ color: "#64748b", lineHeight: 22 }}>
-          Mobile focuses on monitoring bulk jobs reliably. Upload CSV on web, then track progress and
-          share the finished ZIP from here.
+          Choose the same QR type set as web, then monitor matching bulk jobs here. CSV upload stays on
+          web, while mobile focuses on tracking status and sharing completed ZIP files.
         </Text>
       </Card>
 
@@ -182,7 +182,7 @@ export function BulkJobsScreen() {
       )}
 
       <Card>
-        <Text style={{ fontSize: 20, fontWeight: "700", color: "#0f172a" }}>Recent Bulk Jobs</Text>
+        <Text style={{ fontSize: 20, fontWeight: "700", color: "#0f172a" }}>QR Type</Text>
         <View
           style={{
             borderWidth: 1,
@@ -198,6 +198,15 @@ export function BulkJobsScreen() {
             ))}
           </Picker>
         </View>
+        <Text style={{ color: "#64748b" }}>
+          {qrTypeFilter === "All"
+            ? "Showing every bulk job in your account."
+            : `Showing ${qrTypeFilter} bulk jobs only.`}
+        </Text>
+      </Card>
+
+      <Card>
+        <Text style={{ fontSize: 20, fontWeight: "700", color: "#0f172a" }}>Recent Bulk Jobs</Text>
         {busy ? (
           <Text style={{ color: "#64748b" }}>Loading jobs...</Text>
         ) : filteredJobs.length ? (
