@@ -2,9 +2,12 @@ const API_BASE_URL = "https://qrbulkgen-production.up.railway.app/api";
 
 export async function apiRequest(path, options = {}) {
   const headers = {
-    "Content-Type": "application/json",
     ...(options.headers || {}),
   };
+
+  if (!(options.body instanceof FormData) && !headers["Content-Type"]) {
+    headers["Content-Type"] = "application/json";
+  }
 
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...options,
@@ -18,6 +21,10 @@ export async function apiRequest(path, options = {}) {
   }
 
   return data;
+}
+
+export function createAuthHeaders(token) {
+  return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
 export { API_BASE_URL };

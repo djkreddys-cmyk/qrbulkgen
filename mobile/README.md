@@ -12,4 +12,5 @@ Included:
 This is intentionally a minimal Expo/React Native auth structure:
 - login/register call the backend auth API
 - auth state is held in React context
-- persistence and full navigation are deferred to later mobile work
+- session persistence is handled with AsyncStorage
+- protected navigation tabs exist for dashboard, single generate, and bulk jobs

@@ -1,15 +1,54 @@
-import React, { createContext, useContext, useMemo, useState } from "react";
+import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 
-import { apiRequest } from "../lib/api";
+import { apiRequest, createAuthHeaders } from "../lib/api";
+import { clearStoredSession, loadStoredSession, saveStoredSession } from "../lib/storage";
 
 const AuthContext = createContext(null);
+const PROTECTED_ROUTES = ["dashboard", "single-generate", "bulk-jobs"];
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState("");
   const [screen, setScreen] = useState("login");
+  const [activeRoute, setActiveRoute] = useState("dashboard");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isBootstrapping, setIsBootstrapping] = useState(true);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function bootstrap() {
+      try {
+        const stored = await loadStoredSession();
+        if (!stored?.token) {
+          return;
+        }
+
+        const data = await apiRequest("/auth/me", {
+          headers: createAuthHeaders(stored.token),
+        });
+
+        if (!mounted) return;
+        setToken(stored.token);
+        setUser(data.user || stored.user || null);
+        setScreen("app");
+        setActiveRoute("dashboard");
+      } catch {
+        await clearStoredSession();
+      } finally {
+        if (mounted) {
+          setIsBootstrapping(false);
+        }
+      }
+    }
+
+    bootstrap();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   async function login({ email, password }) {
     setError("");
@@ -21,6 +60,12 @@ export function AuthProvider({ children }) {
       });
       setUser(data.user || null);
       setToken(data.token || "");
+      setScreen("app");
+      setActiveRoute("dashboard");
+      await saveStoredSession({
+        token: data.token || "",
+        user: data.user || null,
+      });
       return data;
     } catch (requestError) {
       setError(requestError.message || "Login failed");
@@ -40,6 +85,12 @@ export function AuthProvider({ children }) {
       });
       setUser(data.user || null);
       setToken(data.token || "");
+      setScreen("app");
+      setActiveRoute("dashboard");
+      await saveStoredSession({
+        token: data.token || "",
+        user: data.user || null,
+      });
       return data;
     } catch (requestError) {
       setError(requestError.message || "Register failed");
@@ -49,11 +100,37 @@ export function AuthProvider({ children }) {
     }
   }
 
-  function logout() {
+  async function refreshSession() {
+    if (!token) return null;
+    const data = await apiRequest("/auth/me", {
+      headers: createAuthHeaders(token),
+    });
+    setUser(data.user || null);
+    await saveStoredSession({
+      token,
+      user: data.user || null,
+    });
+    return data.user || null;
+  }
+
+  function navigate(nextRoute) {
+    if (PROTECTED_ROUTES.includes(nextRoute) && !token) {
+      setScreen("login");
+      return;
+    }
+    setScreen(PROTECTED_ROUTES.includes(nextRoute) ? "app" : nextRoute);
+    if (PROTECTED_ROUTES.includes(nextRoute)) {
+      setActiveRoute(nextRoute);
+    }
+  }
+
+  async function logout() {
     setUser(null);
     setToken("");
     setScreen("login");
+    setActiveRoute("dashboard");
     setError("");
+    await clearStoredSession();
   }
 
   const value = useMemo(
@@ -62,14 +139,19 @@ export function AuthProvider({ children }) {
       token,
       screen,
       setScreen,
+      activeRoute,
+      setActiveRoute,
+      navigate,
       isSubmitting,
+      isBootstrapping,
       error,
       setError,
       login,
       register,
+      refreshSession,
       logout,
     }),
-    [user, token, screen, isSubmitting, error],
+    [user, token, screen, activeRoute, isSubmitting, isBootstrapping, error],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
