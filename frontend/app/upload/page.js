@@ -75,6 +75,27 @@ const SAMPLE_ROWS_BY_TYPE = {
   Feedback: { title: "Share your feedback", questions: "How was your experience?|Any suggestions?", filename: "qr-feedback-1" },
 }
 
+const REQUIRED_COLUMNS_BY_TYPE = {
+  URL: ["content", "filename"],
+  Text: ["content", "filename"],
+  Email: ["email", "subject", "body", "filename"],
+  Phone: ["phone", "filename"],
+  SMS: ["phone", "message", "filename"],
+  WhatsApp: ["phone", "message", "filename"],
+  vCard: ["firstName", "lastName", "organization", "jobTitle", "phone", "email", "url", "address", "filename"],
+  Location: ["latitude", "longitude", "filename"],
+  Youtube: ["url", "filename"],
+  WIFI: ["ssid", "password", "wifiType", "hidden", "filename"],
+  Event: ["title", "start", "end", "location", "description", "filename"],
+  Bitcoin: ["address", "amount", "label", "message", "filename"],
+  PDF: ["url", "filename"],
+  "Social Media": ["content", "filename"],
+  "App Store": ["url", "filename"],
+  "Image Gallery": ["url", "filename"],
+  Rating: ["title", "style", "scale", "filename"],
+  Feedback: ["title", "questions", "filename"],
+}
+
 function withAuthHeader() {
   const token = getAuthToken()
   if (!token) {
@@ -92,6 +113,7 @@ function previewFromSampleType(qrType) {
 export function BulkGenerateContent({ embedded = false }) {
   const previewRef = useRef(null)
   const qrCodeRef = useRef(null)
+  const csvInputRef = useRef(null)
   const size = 512
   const margin = 2
 
@@ -116,6 +138,12 @@ export function BulkGenerateContent({ embedded = false }) {
 
   useEffect(() => {
     setPreviewContent(previewFromSampleType(qrType))
+    setFile(null)
+    setError("")
+    setSuccess("")
+    if (csvInputRef.current) {
+      csvInputRef.current.value = ""
+    }
   }, [qrType])
 
   function getBackendOrigin() {
@@ -324,11 +352,23 @@ export function BulkGenerateContent({ embedded = false }) {
 
             <div>
               <label className="block mb-1 text-sm">CSV File</label>
-              <input type="file" accept=".csv" onChange={(e) => setFile(e.target.files?.[0] || null)} className="w-full border p-2" />
+              <input
+                ref={csvInputRef}
+                type="file"
+                accept=".csv"
+                onChange={(e) => setFile(e.target.files?.[0] || null)}
+                className="w-full border p-2"
+              />
               <button type="button" className="mt-2 border px-3 py-2" onClick={downloadSampleCsv}>Download Sample CSV</button>
               <p className="mt-2 text-xs text-gray-600">
                 CSV must include a <code>filename</code> column. Each row uses that value as the downloaded QR file name.
               </p>
+              <div className="mt-3 p-3 border rounded bg-gray-50">
+                <p className="text-xs font-semibold text-gray-800">Required CSV columns for {qrType}</p>
+                <p className="text-xs text-gray-700 mt-1">
+                  {(REQUIRED_COLUMNS_BY_TYPE[qrType] || ["content", "filename"]).join(", ")}
+                </p>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
