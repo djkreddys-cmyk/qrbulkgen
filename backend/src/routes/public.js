@@ -88,6 +88,11 @@ function rewriteLegacyUrl(url, req) {
   }
 }
 
+function getRequestIp(req) {
+  const forwarded = String(req.headers["x-forwarded-for"] || "").split(",")[0].trim();
+  return forwarded || req.ip || "";
+}
+
 publicRouter.post(
   "/upload/gallery",
   requireAuth,
@@ -177,6 +182,88 @@ publicRouter.post("/upload/pdf", requireAuth, upload.single("pdf"), async (req, 
         title: row.title,
         payload: row.payload,
         createdAt: row.created_at,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+publicRouter.post("/rate-submit", async (req, res, next) => {
+  try {
+    const title = String(req.body.title || "").trim().slice(0, 255);
+    const style = String(req.body.style || "stars").trim() === "numbers" ? "numbers" : "stars";
+    const scale = Number(req.body.scale === 10 ? 10 : 5);
+    const rating = Number(req.body.rating);
+    const sourceUrl = String(req.body.sourceUrl || "").trim().slice(0, 2048);
+
+    if (!Number.isInteger(rating) || rating < 1 || rating > scale) {
+      throw createHttpError(400, "VALIDATION_ERROR", `rating must be between 1 and ${scale}`);
+    }
+
+    const result = await query(
+      `INSERT INTO rating_submissions (title, style, scale, rating, source_url, user_agent, ip_address)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       RETURNING id, created_at`,
+      [
+        title || null,
+        style,
+        scale,
+        rating,
+        sourceUrl || null,
+        String(req.headers["user-agent"] || "").slice(0, 1000),
+        getRequestIp(req).slice(0, 255),
+      ],
+    );
+
+    res.status(201).json({
+      submission: {
+        id: result.rows[0].id,
+        createdAt: result.rows[0].created_at,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+publicRouter.post("/feedback-submit", async (req, res, next) => {
+  try {
+    const title = String(req.body.title || "").trim().slice(0, 255);
+    const sourceUrl = String(req.body.sourceUrl || "").trim().slice(0, 2048);
+    const questions = Array.isArray(req.body.questions)
+      ? req.body.questions.map((q) => String(q || "").trim()).filter(Boolean)
+      : [];
+    const answers = Array.isArray(req.body.answers)
+      ? req.body.answers.map((a) => String(a || "").trim())
+      : [];
+
+    if (!questions.length) {
+      throw createHttpError(400, "VALIDATION_ERROR", "questions are required");
+    }
+
+    if (!answers.length || answers.length !== questions.length) {
+      throw createHttpError(400, "VALIDATION_ERROR", "answers must match questions length");
+    }
+
+    const result = await query(
+      `INSERT INTO feedback_submissions (title, questions, answers, source_url, user_agent, ip_address)
+       VALUES ($1, $2::jsonb, $3::jsonb, $4, $5, $6)
+       RETURNING id, created_at`,
+      [
+        title || null,
+        JSON.stringify(questions),
+        JSON.stringify(answers),
+        sourceUrl || null,
+        String(req.headers["user-agent"] || "").slice(0, 1000),
+        getRequestIp(req).slice(0, 255),
+      ],
+    );
+
+    res.status(201).json({
+      submission: {
+        id: result.rows[0].id,
+        createdAt: result.rows[0].created_at,
       },
     });
   } catch (error) {

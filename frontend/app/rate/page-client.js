@@ -2,11 +2,15 @@
 
 import { useMemo, useState } from "react"
 import { useSearchParams } from "next/navigation"
+import { apiRequest } from "../../lib/api"
 
 export default function RateClientPage() {
   const searchParams = useSearchParams()
   const [rating, setRating] = useState(0)
   const [submitted, setSubmitted] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [error, setError] = useState("")
+  const [submissionId, setSubmissionId] = useState("")
 
   const title = searchParams.get("title") || "Rate your experience"
   const style = searchParams.get("style") === "numbers" ? "numbers" : "stars"
@@ -14,8 +18,28 @@ export default function RateClientPage() {
 
   const options = useMemo(() => Array.from({ length: scale }, (_, i) => i + 1), [scale])
 
-  function submitRating() {
-    setSubmitted(true)
+  async function submitRating() {
+    if (!rating) return
+    try {
+      setIsSubmitting(true)
+      setError("")
+      const data = await apiRequest("/public/rate-submit", {
+        method: "POST",
+        body: JSON.stringify({
+          title,
+          style,
+          scale,
+          rating,
+          sourceUrl: typeof window !== "undefined" ? window.location.href : "",
+        }),
+      })
+      setSubmissionId(data?.submission?.id || "")
+      setSubmitted(true)
+    } catch (submitError) {
+      setError(submitError.message || "Failed to submit rating")
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   return (
@@ -36,12 +60,12 @@ export default function RateClientPage() {
                     className={value <= rating ? "text-yellow-500" : "text-gray-300"}
                     aria-label={`Rate ${value} out of ${scale}`}
                   >
-                    ★
+                    {"\u2605"}
                   </button>
                 ))}
               </div>
             ) : (
-              <div className={`mt-4 grid ${scale === 10 ? "grid-cols-5" : "grid-cols-5"} gap-2`}>
+              <div className="mt-4 grid grid-cols-5 gap-2">
                 {options.map((value) => (
                   <button
                     key={value}
@@ -60,17 +84,19 @@ export default function RateClientPage() {
             <button
               type="button"
               onClick={submitRating}
-              disabled={!rating}
+              disabled={!rating || isSubmitting}
               className="mt-6 w-full bg-black text-white py-2 rounded disabled:opacity-60"
             >
-              Submit Rating
+              {isSubmitting ? "Submitting..." : "Submit Rating"}
             </button>
+            {!!error && <p className="mt-2 text-red-600 text-sm">{error}</p>}
           </>
         ) : (
           <div className="mt-6 border rounded p-4 bg-green-50 text-green-700">
-            <p className="text-3xl">✓</p>
+            <p className="text-3xl">{"\u2713"}</p>
             <p className="mt-2 font-medium">Thanks for your feedback.</p>
-            {rating ? <p className="text-sm mt-1">Rating submitted: {rating}/{scale}</p> : null}
+            <p className="text-sm mt-1">Rating submitted: {rating}/{scale}</p>
+            {!!submissionId && <p className="text-xs mt-1">Ref: {submissionId}</p>}
           </div>
         )}
       </section>

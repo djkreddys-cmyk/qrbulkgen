@@ -73,6 +73,29 @@ CREATE TABLE IF NOT EXISTS public_links (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS rating_submissions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  title VARCHAR(255),
+  style VARCHAR(16) NOT NULL CHECK (style IN ('stars', 'numbers')),
+  scale INTEGER NOT NULL CHECK (scale IN (5, 10)),
+  rating INTEGER NOT NULL CHECK (rating >= 1 AND rating <= 10),
+  source_url TEXT,
+  user_agent TEXT,
+  ip_address TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS feedback_submissions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  title VARCHAR(255),
+  questions JSONB NOT NULL,
+  answers JSONB NOT NULL,
+  source_url TEXT,
+  user_agent TEXT,
+  ip_address TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id);
 CREATE INDEX IF NOT EXISTS idx_sessions_token_hash ON sessions(token_hash);
@@ -80,3 +103,5 @@ CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_user_id ON password_reset_t
 CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_token_hash ON password_reset_tokens(token_hash);
 CREATE INDEX IF NOT EXISTS idx_qr_jobs_user_created_at ON qr_jobs(user_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_public_links_user_created_at ON public_links(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_rating_submissions_created_at ON rating_submissions(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_feedback_submissions_created_at ON feedback_submissions(created_at DESC);

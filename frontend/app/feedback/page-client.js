@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react"
 import { useSearchParams } from "next/navigation"
+import { apiRequest } from "../../lib/api"
 
 function decodePayload(value) {
   try {
@@ -23,14 +24,35 @@ export default function FeedbackClientPage() {
 
   const [answers, setAnswers] = useState(() => questions.map(() => ""))
   const [submitted, setSubmitted] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [error, setError] = useState("")
+  const [submissionId, setSubmissionId] = useState("")
 
   function updateAnswer(index, value) {
     setAnswers((prev) => prev.map((item, i) => (i === index ? value : item)))
   }
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault()
-    setSubmitted(true)
+    try {
+      setIsSubmitting(true)
+      setError("")
+      const data = await apiRequest("/public/feedback-submit", {
+        method: "POST",
+        body: JSON.stringify({
+          title,
+          questions,
+          answers,
+          sourceUrl: typeof window !== "undefined" ? window.location.href : "",
+        }),
+      })
+      setSubmissionId(data?.submission?.id || "")
+      setSubmitted(true)
+    } catch (submitError) {
+      setError(submitError.message || "Failed to submit feedback")
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   return (
@@ -41,7 +63,7 @@ export default function FeedbackClientPage() {
         {!submitted ? (
           <form onSubmit={handleSubmit} className="mt-4 space-y-4">
             {questions.map((question, index) => (
-              <div key={`${index}-${question}`}>
+              <div key={index}>
                 <label className="block mb-1 font-medium">{question}</label>
                 <textarea
                   rows={3}
@@ -52,12 +74,20 @@ export default function FeedbackClientPage() {
                 />
               </div>
             ))}
-            <button type="submit" className="w-full bg-black text-white py-2 rounded">
-              Submit Feedback
+            <button
+              type="submit"
+              className="w-full bg-black text-white py-2 rounded disabled:opacity-60"
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? "Submitting..." : "Submit Feedback"}
             </button>
+            {!!error && <p className="text-red-600 text-sm">{error}</p>}
           </form>
         ) : (
-          <p className="mt-4 text-green-700">Thanks for your feedback.</p>
+          <div className="mt-4 text-green-700">
+            <p>Thanks for your feedback.</p>
+            {!!submissionId && <p className="text-xs mt-1">Ref: {submissionId}</p>}
+          </div>
         )}
       </section>
     </main>
