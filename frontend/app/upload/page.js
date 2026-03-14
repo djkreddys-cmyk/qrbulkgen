@@ -29,12 +29,12 @@ const BULK_QR_TYPES = [
 ]
 
 const SAMPLE_ROWS_BY_TYPE = {
-  URL: { content: "https://example.com" },
-  Text: { content: "Hello from bulk QR" },
-  Email: { email: "hello@example.com", subject: "Hello", body: "Message body" },
-  Phone: { phone: "+919876543210" },
-  SMS: { phone: "+919876543210", message: "Your SMS text" },
-  WhatsApp: { phone: "919876543210", message: "Hello on WhatsApp" },
+  URL: { content: "https://example.com", filename: "qr-url-1" },
+  Text: { content: "Hello from bulk QR", filename: "qr-text-1" },
+  Email: { email: "hello@example.com", subject: "Hello", body: "Message body", filename: "qr-email-1" },
+  Phone: { phone: "+919876543210", filename: "qr-phone-1" },
+  SMS: { phone: "+919876543210", message: "Your SMS text", filename: "qr-sms-1" },
+  WhatsApp: { phone: "919876543210", message: "Hello on WhatsApp", filename: "qr-whatsapp-1" },
   vCard: {
     firstName: "John",
     lastName: "Doe",
@@ -44,31 +44,35 @@ const SAMPLE_ROWS_BY_TYPE = {
     email: "john@example.com",
     url: "https://example.com",
     address: "Bengaluru",
+    filename: "qr-vcard-1",
   },
-  Location: { latitude: "12.9716", longitude: "77.5946" },
-  Youtube: { url: "https://youtube.com/watch?v=abc123" },
-  WIFI: { ssid: "MyWifi", password: "secret123", wifiType: "WPA", hidden: "false" },
+  Location: { latitude: "12.9716", longitude: "77.5946", filename: "qr-location-1" },
+  Youtube: { url: "https://youtube.com/watch?v=abc123", filename: "qr-youtube-1" },
+  WIFI: { ssid: "MyWifi", password: "secret123", wifiType: "WPA", hidden: "false", filename: "qr-wifi-1" },
   Event: {
     title: "Launch Event",
     start: "2026-03-20T10:00:00Z",
     end: "2026-03-20T12:00:00Z",
     location: "Bengaluru",
     description: "Product launch",
+    filename: "qr-event-1",
   },
   Bitcoin: {
     address: "1BoatSLRHtKNngkdXEeobR76b53LETtpyT",
     amount: "0.001",
     label: "Payment",
     message: "Order123",
+    filename: "qr-bitcoin-1",
   },
-  PDF: { url: "https://example.com/file.pdf" },
+  PDF: { url: "https://example.com/file.pdf", filename: "qr-pdf-1" },
   "Social Media": {
     content: "Instagram: https://instagram.com/yourbrand\nTwitter: https://x.com/yourbrand",
+    filename: "qr-social-1",
   },
-  "App Store": { url: "https://apps.apple.com/app/id000000" },
-  "Image Gallery": { url: "https://example.com/gallery" },
-  Rating: { title: "Rate your experience", style: "stars", scale: "5" },
-  Feedback: { title: "Share your feedback", questions: "How was your experience?|Any suggestions?" },
+  "App Store": { url: "https://apps.apple.com/app/id000000", filename: "qr-appstore-1" },
+  "Image Gallery": { url: "https://example.com/gallery", filename: "qr-gallery-1" },
+  Rating: { title: "Rate your experience", style: "stars", scale: "5", filename: "qr-rating-1" },
+  Feedback: { title: "Share your feedback", questions: "How was your experience?|Any suggestions?", filename: "qr-feedback-1" },
 }
 
 function withAuthHeader() {
@@ -216,7 +220,8 @@ export default function UploadPage() {
   }
 
   function downloadSampleCsv() {
-    const row = SAMPLE_ROWS_BY_TYPE[qrType] || SAMPLE_ROWS_BY_TYPE.URL
+    const baseRow = SAMPLE_ROWS_BY_TYPE[qrType] || SAMPLE_ROWS_BY_TYPE.URL
+    const row = { ...baseRow, filename: baseRow.filename || `qr-${qrType.toLowerCase().replace(/\s+/g, "-")}-1` }
     const headers = Object.keys(row)
     const values = headers.map((header) => {
       const value = String(row[header] ?? "")
@@ -270,24 +275,12 @@ export default function UploadPage() {
               <label className="block mb-1 text-sm">CSV File</label>
               <input type="file" accept=".csv" onChange={(e) => setFile(e.target.files?.[0] || null)} className="w-full border p-2" />
               <button type="button" className="mt-2 border px-3 py-2" onClick={downloadSampleCsv}>Download Sample CSV</button>
+              <p className="mt-2 text-xs text-gray-600">
+                CSV must include a <code>filename</code> column. Each row uses that value as the downloaded QR file name.
+              </p>
             </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <div>
-                <label className="block mb-1 text-sm">Size</label>
-                <input type="number" min={128} max={2048} value={size} onChange={(e) => setSize(Number(e.target.value || 512))} className="w-full border p-2" />
-              </div>
-              <div>
-                <label className="block mb-1 text-sm">Margin</label>
-                <input type="number" min={0} max={16} value={margin} onChange={(e) => setMargin(Number(e.target.value || 2))} className="w-full border p-2" />
-              </div>
-              <div>
-                <label className="block mb-1 text-sm">Format</label>
-                <select value={format} onChange={(e) => setFormat(e.target.value)} className="w-full border p-2">
-                  <option value="png">PNG</option>
-                  <option value="svg">SVG</option>
-                </select>
-              </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
                 <label className="block mb-1 text-sm">Error Correction</label>
                 <select value={errorCorrectionLevel} onChange={(e) => setErrorCorrectionLevel(e.target.value)} className="w-full border p-2">
@@ -297,19 +290,19 @@ export default function UploadPage() {
                   <option value="H">H</option>
                 </select>
               </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               <div>
                 <label className="block mb-1 text-sm">Foreground</label>
                 <input type="color" value={foregroundColor} onChange={(e) => setForegroundColor(e.target.value)} className="w-full border h-10 p-1" />
               </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
                 <label className="block mb-1 text-sm">Background</label>
                 <input type="color" value={backgroundColor} onChange={(e) => setBackgroundColor(e.target.value)} className="w-full border h-10 p-1" />
               </div>
               <div>
-                <label className="block mb-1 text-sm">Filename Prefix</label>
+                <label className="block mb-1 text-sm">ZIP Filename Prefix</label>
                 <input value={filenamePrefix} onChange={(e) => setFilenamePrefix(e.target.value)} className="w-full border p-2" />
               </div>
             </div>
@@ -363,6 +356,15 @@ export default function UploadPage() {
             {!previewContent.trim() && <p className="mt-4 text-gray-600">Add preview content to generate QR instantly.</p>}
             <div ref={previewRef} className="mt-4 flex justify-center" />
             <div className="mt-4">
+              <label className="block mb-1">Size</label>
+              <input type="number" min={128} max={2048} value={size} onChange={(e) => setSize(Number(e.target.value || 512))} className="w-full border p-2 mb-3" />
+              <label className="block mb-1">Margin</label>
+              <input type="number" min={0} max={16} value={margin} onChange={(e) => setMargin(Number(e.target.value || 2))} className="w-full border p-2 mb-3" />
+              <label className="block mb-1">Format</label>
+              <select value={format} onChange={(e) => setFormat(e.target.value)} className="w-full border p-2 mb-3">
+                <option value="png">PNG</option>
+                <option value="svg">SVG</option>
+              </select>
               <label className="block mb-1">Download Resolution</label>
               <select value={downloadResolution} onChange={(e) => setDownloadResolution(Number(e.target.value))} className="w-full border p-2">
                 {DOWNLOAD_RESOLUTIONS.map((res) => (

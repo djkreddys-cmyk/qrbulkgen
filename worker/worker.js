@@ -60,6 +60,12 @@ function getCell(row, name) {
   return String(row?.[String(name).toLowerCase()] || "").trim();
 }
 
+function sanitizeFileBaseName(value, fallback) {
+  const raw = String(value || "").trim();
+  const safe = raw.replace(/[^a-zA-Z0-9-_]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
+  return (safe || fallback).slice(0, 120);
+}
+
 function toUtcDateTime(value) {
   if (!value) return "";
   const d = new Date(value);
@@ -275,7 +281,17 @@ async function processBulkJob(jobId) {
       continue;
     }
 
-    const fileName = `${job.filename_prefix || "qr"}-${i + 1}.${job.output_format || "png"}`;
+    const requestedFileName = getCell(rows[i], "filename") || getCell(rows[i], "file_name");
+    if (!requestedFileName) {
+      failureCount += 1;
+      continue;
+    }
+    const rowFileBase = sanitizeFileBaseName(requestedFileName, "");
+    if (!rowFileBase) {
+      failureCount += 1;
+      continue;
+    }
+    const fileName = `${rowFileBase}.${job.output_format || "png"}`;
     const filePath = path.join(outputDir, fileName);
 
     try {
