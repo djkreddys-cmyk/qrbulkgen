@@ -148,7 +148,10 @@ async function parseCsvRows(csvPath) {
       .on("data", (row) => {
         rows.push(
           Object.fromEntries(
-            Object.entries(row || {}).map(([key, value]) => [String(key || "").trim(), String(value || "").trim()]),
+            Object.entries(row || {}).map(([key, value]) => [
+              String(key || "").trim().toLowerCase(),
+              String(value || "").trim(),
+            ]),
           ),
         );
       })
