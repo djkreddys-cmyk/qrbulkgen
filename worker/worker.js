@@ -1,4 +1,3 @@
-const fs = require("fs");
 const fsp = require("fs/promises");
 const path = require("path");
 
@@ -19,42 +18,10 @@ const db = new Pool({
     process.env.POSTGRES_URL || "postgresql://postgres:postgres@localhost:5432/qrbulkgen",
 });
 
-const repoRoot = path.resolve(__dirname, "..");
 const uploadsRoot = process.env.BULK_STORAGE_DIR
   ? path.resolve(process.env.BULK_STORAGE_DIR)
-  : path.join(repoRoot, "backend", "uploads");
+  : path.join(path.resolve(__dirname, ".."), "backend", "uploads");
 const frontendBaseUrl = String(process.env.FRONTEND_URL || "http://localhost:3000").replace(/\/$/, "");
-
-function parseCsvLine(line) {
-  const fields = [];
-  let current = "";
-  let inQuotes = false;
-
-  for (let i = 0; i < line.length; i += 1) {
-    const ch = line[i];
-    if (ch === '"') {
-      const next = line[i + 1];
-      if (inQuotes && next === '"') {
-        current += '"';
-        i += 1;
-      } else {
-        inQuotes = !inQuotes;
-      }
-      continue;
-    }
-
-    if (ch === "," && !inQuotes) {
-      fields.push(current);
-      current = "";
-      continue;
-    }
-
-    current += ch;
-  }
-
-  fields.push(current);
-  return fields.map((v) => v.trim());
-}
 
 function getCell(row, name) {
   return String(row?.[String(name).toLowerCase()] || "").trim();
@@ -66,28 +33,6 @@ function sanitizeFileBaseName(value, fallback) {
   return (safe || fallback).slice(0, 120);
 }
 
-function resolveSourceCsvPath(storedPath) {
-  const raw = String(storedPath || "").trim();
-  if (!raw) return "";
-
-  const normalized = raw.replace(/\\/g, "/");
-  const candidates = [];
-
-  if (path.isAbsolute(raw)) {
-    candidates.push(raw);
-  }
-
-  candidates.push(path.join(uploadsRoot, normalized.replace(/^\/+/, "")));
-
-  const uploadsMarker = "/uploads/";
-  const markerIndex = normalized.toLowerCase().lastIndexOf(uploadsMarker);
-  if (markerIndex >= 0) {
-    const relativeFromUploads = normalized.slice(markerIndex + uploadsMarker.length);
-    candidates.push(path.join(uploadsRoot, relativeFromUploads));
-  }
-
-  return candidates.find((candidate) => candidate && fs.existsSync(candidate)) || "";
-}
 
 function toUtcDateTime(value) {
   if (!value) return "";
@@ -211,27 +156,6 @@ function buildBulkContent(qrType, row) {
   }
 }
 
-async function readCsvRows(filePath) {
-  const raw = await fsp.readFile(filePath, "utf8");
-  const lines = raw.split(/\r?\n/).filter((line) => line.trim().length > 0);
-  if (lines.length < 2) {
-    return { rows: [], headers: [] };
-  }
-
-  const headers = parseCsvLine(lines[0]).map((h) => String(h || "").toLowerCase());
-  const rows = [];
-  for (let i = 1; i < lines.length; i += 1) {
-    const cols = parseCsvLine(lines[i]);
-    const row = {};
-    headers.forEach((header, idx) => {
-      row[header] = String(cols[idx] || "").trim();
-    });
-    rows.push(row);
-  }
-
-  return { rows, headers };
-}
-
 async function createZipFromDir(sourceDir, zipPath) {
   await fsp.mkdir(path.dirname(zipPath), { recursive: true });
 
@@ -285,15 +209,9 @@ async function processBulkJob(jobId, queuedRows = null) {
     [jobId],
   );
 
-  let rows = Array.isArray(queuedRows) ? queuedRows : null;
+  const rows = Array.isArray(queuedRows) ? queuedRows : null;
   if (!rows || rows.length === 0) {
-    const sourceFilePath = resolveSourceCsvPath(job.source_file_path);
-    if (!sourceFilePath || !fs.existsSync(sourceFilePath)) {
-      throw new Error("Source CSV file not found on worker");
-    }
-
-    const parsed = await readCsvRows(sourceFilePath);
-    rows = parsed.rows;
+    throw new Error("Queued bulk rows missing from worker payload");
   }
   const outputDir = path.join(uploadsRoot, "bulk", "jobs", jobId, "files");
   await fsp.mkdir(outputDir, { recursive: true });
