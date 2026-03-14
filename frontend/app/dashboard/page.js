@@ -66,10 +66,18 @@ export default function Dashboard() {
             <p>Welcome {user.name || user.email}</p>
 
             {summary && (
-              <section className="grid grid-cols-1 md:grid-cols-4 gap-3">
+              <section className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-3">
                 <div className="border rounded p-4">
                   <p className="text-sm text-gray-600">Total Jobs</p>
                   <p className="text-2xl font-bold">{summary.totalJobs}</p>
+                </div>
+                <div className="border rounded p-4">
+                  <p className="text-sm text-gray-600">Single Jobs</p>
+                  <p className="text-2xl font-bold">{summary.singleJobs}</p>
+                </div>
+                <div className="border rounded p-4">
+                  <p className="text-sm text-gray-600">Bulk Jobs</p>
+                  <p className="text-2xl font-bold">{summary.bulkJobs}</p>
                 </div>
                 <div className="border rounded p-4">
                   <p className="text-sm text-gray-600">Requested</p>

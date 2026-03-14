@@ -269,6 +269,8 @@ bulkRouter.get("/jobs/summary", requireAuth, async (req, res, next) => {
     const result = await query(
       `SELECT
          COUNT(*)::int AS total_jobs,
+         COUNT(*) FILTER (WHERE job_type = 'single')::int AS single_jobs,
+         COUNT(*) FILTER (WHERE job_type = 'bulk')::int AS bulk_jobs,
          COALESCE(SUM(total_count), 0)::int AS total_requested,
          COALESCE(SUM(success_count), 0)::int AS total_success,
          COALESCE(SUM(failure_count), 0)::int AS total_failure
@@ -287,6 +289,8 @@ bulkRouter.get("/jobs/summary", requireAuth, async (req, res, next) => {
     res.json({
       summary: {
         totalJobs: row.total_jobs,
+        singleJobs: row.single_jobs,
+        bulkJobs: row.bulk_jobs,
         totalRequested: row.total_requested,
         totalSuccess: row.total_success,
         totalFailure: row.total_failure,
@@ -411,6 +415,52 @@ bulkRouter.get("/jobs/:id", requireAuth, async (req, res, next) => {
             }
           : null,
       },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+bulkRouter.get("/jobs/:id/items", requireAuth, async (req, res, next) => {
+  try {
+    const jobId = String(req.params.id || "").trim();
+    if (!jobId) {
+      throw createHttpError(400, "VALIDATION_ERROR", "job id is required");
+    }
+
+    const ownerCheck = await query(
+      `SELECT id
+       FROM qr_jobs
+       WHERE id = $1
+         AND user_id = $2
+         AND job_type = 'bulk'
+       LIMIT 1`,
+      [jobId, req.user.id],
+    );
+
+    if (!ownerCheck.rows[0]) {
+      throw createHttpError(404, "NOT_FOUND", "Bulk job not found");
+    }
+
+    const result = await query(
+      `SELECT row_index, content, status, output_file_name, output_path, error_message, created_at, updated_at
+       FROM qr_job_items
+       WHERE job_id = $1
+       ORDER BY row_index ASC`,
+      [jobId],
+    );
+
+    res.json({
+      items: result.rows.map((row) => ({
+        rowIndex: row.row_index,
+        content: row.content,
+        status: row.status,
+        outputFileName: row.output_file_name,
+        outputPath: row.output_path,
+        errorMessage: row.error_message,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+      })),
     });
   } catch (error) {
     next(error);

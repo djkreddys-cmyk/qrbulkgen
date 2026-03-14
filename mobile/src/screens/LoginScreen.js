@@ -1,15 +1,44 @@
-import React from "react";
-import { Text, TextInput, View } from "react-native";
+import React, { useState } from "react";
+import { Text, TextInput, TouchableOpacity, View } from "react-native";
+
+import { useAuth } from "../context/AuthContext";
 
 export function LoginScreen() {
+  const { login, error, isSubmitting } = useAuth();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+
+  async function handleLogin() {
+    await login({ email, password });
+  }
+
   return (
     <View style={{ borderWidth: 1, borderColor: "#ddd", borderRadius: 12, padding: 16, gap: 12 }}>
       <Text style={{ fontSize: 20, fontWeight: "600" }}>Login</Text>
-      <TextInput placeholder="Email" style={{ borderWidth: 1, borderColor: "#ccc", padding: 12, borderRadius: 8 }} />
-      <TextInput placeholder="Password" secureTextEntry style={{ borderWidth: 1, borderColor: "#ccc", padding: 12, borderRadius: 8 }} />
-      <Text style={{ color: "#666" }}>
-        Placeholder mobile login screen. Hook this into the backend auth API in the next mobile phase.
-      </Text>
+      <TextInput
+        placeholder="Email"
+        value={email}
+        onChangeText={setEmail}
+        autoCapitalize="none"
+        style={{ borderWidth: 1, borderColor: "#ccc", padding: 12, borderRadius: 8 }}
+      />
+      <TextInput
+        placeholder="Password"
+        value={password}
+        onChangeText={setPassword}
+        secureTextEntry
+        style={{ borderWidth: 1, borderColor: "#ccc", padding: 12, borderRadius: 8 }}
+      />
+      {!!error && <Text style={{ color: "#b00020" }}>{error}</Text>}
+      <TouchableOpacity
+        onPress={handleLogin}
+        disabled={isSubmitting}
+        style={{ backgroundColor: "#000", padding: 14, borderRadius: 10, opacity: isSubmitting ? 0.6 : 1 }}
+      >
+        <Text style={{ color: "#fff", textAlign: "center", fontWeight: "600" }}>
+          {isSubmitting ? "Logging in..." : "Login"}
+        </Text>
+      </TouchableOpacity>
     </View>
   );
 }
