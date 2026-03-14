@@ -1,11 +1,13 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
+import QRCodeStyling from "qr-code-styling"
 import Navbar from "../../components/Navbar"
 import { apiRequest, API_BASE_URL } from "../../lib/api"
 import { getAuthToken } from "../../lib/auth"
 
 const STATUS_POLL_INTERVAL_MS = 3000
+const DOWNLOAD_RESOLUTIONS = [512, 768, 1024, 1536, 2048]
 const BULK_QR_TYPES = [
   "URL",
   "Text",
@@ -54,9 +56,16 @@ const SAMPLE_ROWS_BY_TYPE = {
     location: "Bengaluru",
     description: "Product launch",
   },
-  Bitcoin: { address: "1BoatSLRHtKNngkdXEeobR76b53LETtpyT", amount: "0.001", label: "Payment", message: "Order123" },
+  Bitcoin: {
+    address: "1BoatSLRHtKNngkdXEeobR76b53LETtpyT",
+    amount: "0.001",
+    label: "Payment",
+    message: "Order123",
+  },
   PDF: { url: "https://example.com/file.pdf" },
-  "Social Media": { content: "Instagram: https://instagram.com/yourbrand\nTwitter: https://x.com/yourbrand" },
+  "Social Media": {
+    content: "Instagram: https://instagram.com/yourbrand\nTwitter: https://x.com/yourbrand",
+  },
   "App Store": { url: "https://apps.apple.com/app/id000000" },
   "Image Gallery": { url: "https://example.com/gallery" },
   Rating: { title: "Rate your experience", style: "stars", scale: "5" },
@@ -78,7 +87,16 @@ function toAbsoluteDownloadUrl(filePath) {
   return `${origin}${filePath}`
 }
 
+function previewFromSampleType(qrType) {
+  const row = SAMPLE_ROWS_BY_TYPE[qrType] || SAMPLE_ROWS_BY_TYPE.URL
+  const firstKey = Object.keys(row)[0]
+  return String(row[firstKey] || "https://example.com")
+}
+
 export default function UploadPage() {
+  const previewRef = useRef(null)
+  const qrCodeRef = useRef(null)
+
   const [file, setFile] = useState(null)
   const [qrType, setQrType] = useState("URL")
   const [size, setSize] = useState(512)
@@ -88,6 +106,9 @@ export default function UploadPage() {
   const [filenamePrefix, setFilenamePrefix] = useState("qr")
   const [foregroundColor, setForegroundColor] = useState("#000000")
   const [backgroundColor, setBackgroundColor] = useState("#ffffff")
+  const [downloadResolution, setDownloadResolution] = useState(1024)
+  const [previewContent, setPreviewContent] = useState(previewFromSampleType("URL"))
+
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState("")
   const [success, setSuccess] = useState("")
@@ -126,6 +147,51 @@ export default function UploadPage() {
     return () => clearInterval(interval)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeJobs.length])
+
+  useEffect(() => {
+    setPreviewContent(previewFromSampleType(qrType))
+  }, [qrType])
+
+  useEffect(() => {
+    if (!previewRef.current || !previewContent.trim()) {
+      if (previewRef.current) previewRef.current.innerHTML = ""
+      return
+    }
+
+    const options = {
+      width: 340,
+      height: 340,
+      type: "canvas",
+      data: previewContent.trim(),
+      dotsOptions: { color: foregroundColor, type: "rounded" },
+      backgroundOptions: { color: backgroundColor },
+      cornersSquareOptions: { color: foregroundColor, type: "extra-rounded" },
+      cornersDotOptions: { color: foregroundColor, type: "dot" },
+      qrOptions: {
+        errorCorrectionLevel,
+      },
+    }
+
+    if (!qrCodeRef.current) {
+      qrCodeRef.current = new QRCodeStyling(options)
+      previewRef.current.innerHTML = ""
+      qrCodeRef.current.append(previewRef.current)
+      return
+    }
+
+    qrCodeRef.current.update(options)
+  }, [previewContent, foregroundColor, backgroundColor, errorCorrectionLevel])
+
+  function handleDownloadPreview() {
+    if (!qrCodeRef.current || !previewContent.trim()) return
+    qrCodeRef.current.update({
+      width: downloadResolution,
+      height: downloadResolution,
+    })
+    const name = (filenamePrefix || "bulk-preview").replace(/[^a-zA-Z0-9-_]/g, "") || "bulk-preview"
+    qrCodeRef.current.download({ name, extension: "png" })
+    qrCodeRef.current.update({ width: 340, height: 340 })
+  }
 
   async function handleSubmit(event) {
     event.preventDefault()
@@ -194,7 +260,7 @@ export default function UploadPage() {
 
       <main className="max-w-6xl mx-auto p-6 space-y-6">
         <h1 className="text-3xl font-bold">Bulk QR Generator</h1>
-        <p className="text-gray-600">Upload CSV with a required `content` column to generate QR codes in batch.</p>
+        <p className="text-gray-600">Same workflow as single QR: configure on left, see live preview on right, then queue CSV bulk job.</p>
 
         {summary && (
           <section className="grid grid-cols-1 md:grid-cols-4 gap-3">
@@ -205,42 +271,32 @@ export default function UploadPage() {
           </section>
         )}
 
-        <section className="border rounded p-6 bg-white">
-          <h2 className="text-xl font-semibold mb-4">Create Bulk Job</h2>
-          <form onSubmit={handleSubmit} className="space-y-4">
+        <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <form onSubmit={handleSubmit} className="border rounded p-6 bg-white space-y-4">
+            <h2 className="text-xl font-semibold">Create Bulk Job</h2>
             <div>
               <label className="block mb-1 text-sm">QR Type</label>
-              <select
-                value={qrType}
-                onChange={(e) => setQrType(e.target.value)}
-                className="w-full border p-2"
-              >
+              <select value={qrType} onChange={(e) => setQrType(e.target.value)} className="w-full border p-2">
                 {BULK_QR_TYPES.map((type) => (
-                  <option key={type} value={type}>
-                    {type}
-                  </option>
+                  <option key={type} value={type}>{type}</option>
                 ))}
               </select>
             </div>
 
             <div>
-              <label className="block mb-1 text-sm">CSV File</label>
-              <input
-                type="file"
-                accept=".csv"
-                onChange={(e) => setFile(e.target.files?.[0] || null)}
+              <label className="block mb-1 text-sm">Preview Content (style check)</label>
+              <textarea
+                rows={3}
+                value={previewContent}
+                onChange={(e) => setPreviewContent(e.target.value)}
                 className="w-full border p-2"
               />
-              <p className="text-xs text-gray-600 mt-1">
-                Download sample CSV for selected type and upload after filling your data.
-              </p>
-              <button
-                type="button"
-                className="mt-2 border px-3 py-2"
-                onClick={downloadSampleCsv}
-              >
-                Download Sample CSV
-              </button>
+            </div>
+
+            <div>
+              <label className="block mb-1 text-sm">CSV File</label>
+              <input type="file" accept=".csv" onChange={(e) => setFile(e.target.files?.[0] || null)} className="w-full border p-2" />
+              <button type="button" className="mt-2 border px-3 py-2" onClick={downloadSampleCsv}>Download Sample CSV</button>
             </div>
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -288,14 +344,29 @@ export default function UploadPage() {
             {!!error && <p className="text-sm text-red-600">{error}</p>}
             {!!success && <p className="text-sm text-green-700">{success}</p>}
 
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="px-4 py-2 bg-black text-white rounded disabled:opacity-60"
-            >
+            <button type="submit" disabled={isSubmitting} className="px-4 py-2 bg-black text-white rounded disabled:opacity-60">
               {isSubmitting ? "Queuing..." : "Queue Bulk Job"}
             </button>
           </form>
+
+          <section className="border rounded p-6 bg-white">
+            <h2 className="text-xl font-semibold">Live Preview</h2>
+            {!previewContent.trim() && <p className="mt-4 text-gray-600">Add preview content to generate QR instantly.</p>}
+            <div ref={previewRef} className="mt-4 flex justify-center" />
+            <div className="mt-4">
+              <label className="block mb-1">Download Resolution</label>
+              <select value={downloadResolution} onChange={(e) => setDownloadResolution(Number(e.target.value))} className="w-full border p-2">
+                {DOWNLOAD_RESOLUTIONS.map((res) => (
+                  <option key={res} value={res}>{res} x {res}</option>
+                ))}
+              </select>
+            </div>
+            {!!previewContent.trim() && (
+              <button type="button" onClick={handleDownloadPreview} className="inline-block mt-4 px-4 py-2 bg-black text-white rounded">
+                Download QR
+              </button>
+            )}
+          </section>
         </section>
 
         <section className="border rounded p-6 bg-white">
@@ -314,12 +385,7 @@ export default function UploadPage() {
                   <p className="text-sm">Rows: {job.totalCount} | Success: {job.successCount} | Failure: {job.failureCount}</p>
                   {job.errorMessage && <p className="text-sm text-red-600 mt-1">{job.errorMessage}</p>}
                   {job.artifact?.filePath && (
-                    <a
-                      className="inline-block mt-2 underline"
-                      href={toAbsoluteDownloadUrl(job.artifact.filePath)}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
+                    <a className="inline-block mt-2 underline" href={toAbsoluteDownloadUrl(job.artifact.filePath)} target="_blank" rel="noreferrer">
                       Download ZIP
                     </a>
                   )}
