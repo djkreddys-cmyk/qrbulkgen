@@ -355,13 +355,13 @@ async function processBulkJob(jobId, queuedRows = null) {
   const zipAbsPath = path.join(uploadsRoot, "bulk", "jobs", jobId, zipFileName);
   await createZipFromDir(outputDir, zipAbsPath);
   const zipStat = await fsp.stat(zipAbsPath);
-
-  const zipWebPath = `/uploads/bulk/jobs/${jobId}/${zipFileName}`;
+  const zipBuffer = await fsp.readFile(zipAbsPath);
+  const zipDataUrl = `data:application/zip;base64,${zipBuffer.toString("base64")}`;
 
   await db.query(
     `INSERT INTO job_artifacts (job_id, artifact_type, file_name, file_path, mime_type, file_size_bytes)
      VALUES ($1, 'zip', $2, $3, 'application/zip', $4)`,
-    [jobId, zipFileName, zipWebPath, Number(zipStat.size || 0)],
+    [jobId, zipFileName, zipDataUrl, Number(zipStat.size || 0)],
   );
 
   await db.query(

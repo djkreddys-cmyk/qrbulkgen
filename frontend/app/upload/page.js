@@ -126,8 +126,24 @@ export function BulkGenerateContent({ embedded = false }) {
 
   function toArtifactUrl(filePath) {
     if (!filePath) return ""
-    if (/^https?:\/\//i.test(filePath)) return filePath
+    if (/^(https?:\/\/|data:)/i.test(filePath)) return filePath
     return `${getBackendOrigin()}${filePath.startsWith("/") ? filePath : `/${filePath}`}`
+  }
+
+  function handleArtifactDownload(job) {
+    const fileUrl = toArtifactUrl(job?.artifact?.filePath)
+    if (!fileUrl) return
+
+    const link = document.createElement("a")
+    link.href = fileUrl
+    link.download = job?.artifact?.fileName || `bulk-${job?.id || "job"}.zip`
+    if (!fileUrl.startsWith("data:")) {
+      link.target = "_blank"
+      link.rel = "noreferrer"
+    }
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
   }
 
   async function fetchRecentJobs() {
@@ -443,14 +459,13 @@ export function BulkGenerateContent({ embedded = false }) {
                         </td>
                         <td className="py-2 pr-3">
                           {job.status === "completed" && fileUrl ? (
-                            <a
-                              href={fileUrl}
-                              target="_blank"
-                              rel="noreferrer"
+                            <button
+                              type="button"
+                              onClick={() => handleArtifactDownload(job)}
                               className="inline-block px-3 py-1 bg-black text-white rounded"
                             >
                               Download ZIP
-                            </a>
+                            </button>
                           ) : (
                             <span className="text-gray-500">Not ready</span>
                           )}
