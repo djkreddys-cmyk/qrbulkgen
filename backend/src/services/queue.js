@@ -7,10 +7,10 @@ const bulkQrQueue = new Queue(BULK_QR_QUEUE, {
   connection: redis,
 });
 
-async function enqueueBulkQrJob(jobId) {
+async function enqueueBulkQrJob(jobId, payload = {}) {
   return bulkQrQueue.add(
     "bulk-generate",
-    { jobId },
+    { jobId, ...payload },
     {
       jobId,
       removeOnComplete: true,

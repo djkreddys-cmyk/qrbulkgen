@@ -139,6 +139,24 @@ async function inspectCsv(csvPath) {
   });
 }
 
+async function parseCsvRows(csvPath) {
+  return new Promise((resolve, reject) => {
+    const rows = [];
+
+    fs.createReadStream(csvPath)
+      .pipe(csvParser())
+      .on("data", (row) => {
+        rows.push(
+          Object.fromEntries(
+            Object.entries(row || {}).map(([key, value]) => [String(key || "").trim(), String(value || "").trim()]),
+          ),
+        );
+      })
+      .on("end", () => resolve(rows))
+      .on("error", reject);
+  });
+}
+
 bulkRouter.post("/bulk/upload", requireAuth, upload.single("file"), async (req, res, next) => {
   try {
     const file = req.file;
@@ -152,6 +170,7 @@ bulkRouter.post("/bulk/upload", requireAuth, upload.single("file"), async (req, 
 
     const options = normalizeBulkOptions(req.body || {});
     const csvInfo = await inspectCsv(file.path);
+    const csvRows = await parseCsvRows(file.path);
 
     const actualHeaders = new Set((csvInfo.headers || []).map((h) => h.toLowerCase()));
     const required = REQUIRED_HEADERS_BY_TYPE[options.qrType] || ["content"];
@@ -202,7 +221,7 @@ bulkRouter.post("/bulk/upload", requireAuth, upload.single("file"), async (req, 
     const job = created.rows[0];
 
     try {
-      await enqueueBulkQrJob(job.id);
+      await enqueueBulkQrJob(job.id, { rows: csvRows });
     } catch (enqueueError) {
       await query(
         `UPDATE qr_jobs

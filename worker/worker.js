@@ -86,15 +86,7 @@ function resolveSourceCsvPath(storedPath) {
     candidates.push(path.join(uploadsRoot, relativeFromUploads));
   }
 
-  const found = candidates.find((candidate) => candidate && fs.existsSync(candidate)) || "";
-  if (!found) {
-    console.error("CSV resolve failed", {
-      storedPath: raw,
-      uploadsRoot,
-      candidates,
-    });
-  }
-  return found;
+  return candidates.find((candidate) => candidate && fs.existsSync(candidate)) || "";
 }
 
 function toUtcDateTime(value) {
@@ -268,7 +260,7 @@ async function markFailed(jobId, message) {
   );
 }
 
-async function processBulkJob(jobId) {
+async function processBulkJob(jobId, queuedRows = null) {
   const result = await db.query(
     `SELECT
        id, user_id, source_file_name, source_file_path, bulk_qr_type,
@@ -293,12 +285,16 @@ async function processBulkJob(jobId) {
     [jobId],
   );
 
-  const sourceFilePath = resolveSourceCsvPath(job.source_file_path);
-  if (!sourceFilePath || !fs.existsSync(sourceFilePath)) {
-    throw new Error("Source CSV file not found on worker");
-  }
+  let rows = Array.isArray(queuedRows) ? queuedRows : null;
+  if (!rows || rows.length === 0) {
+    const sourceFilePath = resolveSourceCsvPath(job.source_file_path);
+    if (!sourceFilePath || !fs.existsSync(sourceFilePath)) {
+      throw new Error("Source CSV file not found on worker");
+    }
 
-  const { rows } = await readCsvRows(sourceFilePath);
+    const parsed = await readCsvRows(sourceFilePath);
+    rows = parsed.rows;
+  }
   const outputDir = path.join(uploadsRoot, "bulk", "jobs", jobId, "files");
   await fsp.mkdir(outputDir, { recursive: true });
 
@@ -389,7 +385,7 @@ const worker = new Worker(
     }
 
     try {
-      await processBulkJob(jobId);
+      await processBulkJob(jobId, job.data?.rows);
     } catch (error) {
       await markFailed(jobId, error.message);
       throw error;
