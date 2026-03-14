@@ -1,12 +1,11 @@
 "use client"
 
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import QRCodeStyling from "qr-code-styling"
 import Navbar from "../../components/Navbar"
-import { apiRequest, API_BASE_URL } from "../../lib/api"
+import { apiRequest } from "../../lib/api"
 import { getAuthToken } from "../../lib/auth"
 
-const STATUS_POLL_INTERVAL_MS = 3000
 const DOWNLOAD_RESOLUTIONS = [512, 768, 1024, 1536, 2048]
 const BULK_QR_TYPES = [
   "URL",
@@ -80,13 +79,6 @@ function withAuthHeader() {
   return { Authorization: `Bearer ${token}` }
 }
 
-function toAbsoluteDownloadUrl(filePath) {
-  if (!filePath) return ""
-  if (/^https?:\/\//i.test(filePath)) return filePath
-  const origin = API_BASE_URL.replace(/\/api\/?$/, "")
-  return `${origin}${filePath}`
-}
-
 function previewFromSampleType(qrType) {
   const row = SAMPLE_ROWS_BY_TYPE[qrType] || SAMPLE_ROWS_BY_TYPE.URL
   const firstKey = Object.keys(row)[0]
@@ -108,45 +100,9 @@ export default function UploadPage() {
   const [backgroundColor, setBackgroundColor] = useState("#ffffff")
   const [downloadResolution, setDownloadResolution] = useState(1024)
   const [previewContent, setPreviewContent] = useState(previewFromSampleType("URL"))
-
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState("")
   const [success, setSuccess] = useState("")
-  const [jobs, setJobs] = useState([])
-  const [summary, setSummary] = useState(null)
-
-  const activeJobs = useMemo(
-    () => jobs.filter((job) => ["queued", "processing"].includes(job.status)),
-    [jobs],
-  )
-
-  async function loadJobsAndSummary() {
-    try {
-      const headers = withAuthHeader()
-      const [jobsData, summaryData] = await Promise.all([
-        apiRequest("/qr/jobs?limit=20", { headers }),
-        apiRequest("/qr/jobs/summary", { headers }),
-      ])
-      setJobs(jobsData.jobs || [])
-      setSummary(summaryData.summary || null)
-    } catch (loadError) {
-      setError(loadError.message || "Failed to load bulk jobs")
-    }
-  }
-
-  useEffect(() => {
-    loadJobsAndSummary()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  useEffect(() => {
-    if (!activeJobs.length) return undefined
-    const interval = setInterval(() => {
-      loadJobsAndSummary()
-    }, STATUS_POLL_INTERVAL_MS)
-    return () => clearInterval(interval)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeJobs.length])
 
   useEffect(() => {
     setPreviewContent(previewFromSampleType(qrType))
@@ -167,9 +123,7 @@ export default function UploadPage() {
       backgroundOptions: { color: backgroundColor },
       cornersSquareOptions: { color: foregroundColor, type: "extra-rounded" },
       cornersDotOptions: { color: foregroundColor, type: "dot" },
-      qrOptions: {
-        errorCorrectionLevel,
-      },
+      qrOptions: { errorCorrectionLevel },
     }
 
     if (!qrCodeRef.current) {
@@ -224,7 +178,6 @@ export default function UploadPage() {
 
       setSuccess(`Bulk job queued: ${data?.job?.id || "created"}`)
       setFile(null)
-      await loadJobsAndSummary()
     } catch (submitError) {
       setError(submitError.message || "Failed to create bulk job")
     } finally {
@@ -257,23 +210,13 @@ export default function UploadPage() {
   return (
     <div>
       <Navbar />
-
-      <main className="max-w-6xl mx-auto p-6 space-y-6">
+      <main className="max-w-6xl mx-auto px-6 py-10">
         <h1 className="text-3xl font-bold">Bulk QR Generator</h1>
-        <p className="text-gray-600">Same workflow as single QR: configure on left, see live preview on right, then queue CSV bulk job.</p>
 
-        {summary && (
-          <section className="grid grid-cols-1 md:grid-cols-4 gap-3">
-            <div className="border rounded p-4"><p className="text-sm text-gray-600">Total Jobs</p><p className="text-2xl font-bold">{summary.totalJobs}</p></div>
-            <div className="border rounded p-4"><p className="text-sm text-gray-600">Requested</p><p className="text-2xl font-bold">{summary.totalRequested}</p></div>
-            <div className="border rounded p-4"><p className="text-sm text-gray-600">Success</p><p className="text-2xl font-bold text-green-700">{summary.totalSuccess}</p></div>
-            <div className="border rounded p-4"><p className="text-sm text-gray-600">Failure</p><p className="text-2xl font-bold text-red-700">{summary.totalFailure}</p></div>
-          </section>
-        )}
-
-        <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <form onSubmit={handleSubmit} className="border rounded p-6 bg-white space-y-4">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mt-8">
+          <form onSubmit={handleSubmit} className="border rounded-lg p-6 bg-white space-y-4">
             <h2 className="text-xl font-semibold">Create Bulk Job</h2>
+
             <div>
               <label className="block mb-1 text-sm">QR Type</label>
               <select value={qrType} onChange={(e) => setQrType(e.target.value)} className="w-full border p-2">
@@ -284,7 +227,7 @@ export default function UploadPage() {
             </div>
 
             <div>
-              <label className="block mb-1 text-sm">Preview Content (style check)</label>
+              <label className="block mb-1 text-sm">Preview Content</label>
               <textarea
                 rows={3}
                 value={previewContent}
@@ -349,7 +292,7 @@ export default function UploadPage() {
             </button>
           </form>
 
-          <section className="border rounded p-6 bg-white">
+          <section className="border rounded-lg p-6 bg-white">
             <h2 className="text-xl font-semibold">Live Preview</h2>
             {!previewContent.trim() && <p className="mt-4 text-gray-600">Add preview content to generate QR instantly.</p>}
             <div ref={previewRef} className="mt-4 flex justify-center" />
@@ -367,33 +310,7 @@ export default function UploadPage() {
               </button>
             )}
           </section>
-        </section>
-
-        <section className="border rounded p-6 bg-white">
-          <h2 className="text-xl font-semibold mb-4">Recent Bulk Jobs</h2>
-          {!jobs.length && <p className="text-gray-600">No jobs yet.</p>}
-          {!!jobs.length && (
-            <div className="space-y-3">
-              {jobs.map((job) => (
-                <article key={job.id} className="border rounded p-4">
-                  <div className="flex flex-wrap justify-between gap-2">
-                    <p className="font-mono text-sm">{job.id}</p>
-                    <span className="text-sm uppercase">{job.status}</span>
-                  </div>
-                  <p className="text-sm mt-1">File: {job.sourceFileName || "-"}</p>
-                  <p className="text-sm">Type: {job.qrType || "-"}</p>
-                  <p className="text-sm">Rows: {job.totalCount} | Success: {job.successCount} | Failure: {job.failureCount}</p>
-                  {job.errorMessage && <p className="text-sm text-red-600 mt-1">{job.errorMessage}</p>}
-                  {job.artifact?.filePath && (
-                    <a className="inline-block mt-2 underline" href={toAbsoluteDownloadUrl(job.artifact.filePath)} target="_blank" rel="noreferrer">
-                      Download ZIP
-                    </a>
-                  )}
-                </article>
-              ))}
-            </div>
-          )}
-        </section>
+        </div>
       </main>
     </div>
   )
