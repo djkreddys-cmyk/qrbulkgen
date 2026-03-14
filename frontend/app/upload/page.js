@@ -89,7 +89,7 @@ function previewFromSampleType(qrType) {
   return String(row[firstKey] || "https://example.com")
 }
 
-export default function UploadPage() {
+export function BulkGenerateContent({ embedded = false }) {
   const previewRef = useRef(null)
   const qrCodeRef = useRef(null)
   const size = 512
@@ -243,10 +243,8 @@ export default function UploadPage() {
     URL.revokeObjectURL(url)
   }
 
-  return (
-    <div>
-      <Navbar />
-      <main className="max-w-6xl mx-auto px-6 py-10">
+  const content = (
+    <main className="max-w-6xl mx-auto px-6 py-10">
         <h1 className="text-3xl font-bold">Bulk QR Generator</h1>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mt-8">
@@ -378,6 +376,20 @@ export default function UploadPage() {
           </section>
         </div>
       </main>
+  )
+
+  if (embedded) {
+    return content
+  }
+
+  return (
+    <div>
+      <Navbar />
+      {content}
     </div>
   )
+}
+
+export default function UploadPage() {
+  return <BulkGenerateContent />
 }

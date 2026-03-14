@@ -201,7 +201,7 @@ function hasRequiredFields(type, fields, ids, modes, socialLinks) {
   return !!map[type]
 }
 
-export default function SingleGeneratePage() {
+export function SingleGenerateContent({ embedded = false }) {
   const previewRef = useRef(null)
   const qrCodeRef = useRef(null)
 
@@ -425,10 +425,8 @@ export default function SingleGeneratePage() {
     qrCodeRef.current.update({ width: 340, height: 340 })
   }
 
-  return (
-    <div>
-      <Navbar />
-      <main className="max-w-6xl mx-auto px-6 py-10">
+  const content = (
+    <main className="max-w-6xl mx-auto px-6 py-10">
         <h1 className="text-3xl font-bold">Single QR Generator</h1>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mt-8">
           <section className="border rounded-lg p-6 bg-white space-y-4">
@@ -726,6 +724,20 @@ export default function SingleGeneratePage() {
           </section>
         </div>
       </main>
+  )
+
+  if (embedded) {
+    return content
+  }
+
+  return (
+    <div>
+      <Navbar />
+      {content}
     </div>
   )
+}
+
+export default function SingleGeneratePage() {
+  return <SingleGenerateContent />
 }
