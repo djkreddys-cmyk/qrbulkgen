@@ -1,9 +1,11 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { ScrollView, Text, TouchableOpacity, View } from "react-native";
+import { Picker } from "@react-native-picker/picker";
 
 import { useAuth } from "../context/AuthContext";
 import { apiRequest, createAuthHeaders } from "../lib/api";
 import { shareDataUrlFile } from "../lib/files";
+import { QR_TYPES } from "../lib/qr";
 
 function Card({ children }) {
   return (
@@ -43,6 +45,7 @@ function StatPill({ label, value, tone }) {
 export function BulkJobsScreen() {
   const { token } = useAuth();
   const [jobs, setJobs] = useState([]);
+  const [qrTypeFilter, setQrTypeFilter] = useState("All");
   const [selectedJobId, setSelectedJobId] = useState("");
   const [selectedJob, setSelectedJob] = useState(null);
   const [items, setItems] = useState([]);
@@ -83,6 +86,25 @@ export function BulkJobsScreen() {
       clearInterval(poll);
     };
   }, [token, selectedJobId]);
+
+  const filteredJobs = useMemo(() => {
+    if (qrTypeFilter === "All") {
+      return jobs;
+    }
+    return jobs.filter((job) => job.qrType === qrTypeFilter);
+  }, [jobs, qrTypeFilter]);
+
+  useEffect(() => {
+    if (!filteredJobs.length) {
+      setSelectedJobId("");
+      return;
+    }
+
+    const exists = filteredJobs.some((job) => job.id === selectedJobId);
+    if (!exists) {
+      setSelectedJobId(filteredJobs[0].id);
+    }
+  }, [filteredJobs, selectedJobId]);
 
   useEffect(() => {
     let mounted = true;
@@ -161,10 +183,25 @@ export function BulkJobsScreen() {
 
       <Card>
         <Text style={{ fontSize: 20, fontWeight: "700", color: "#0f172a" }}>Recent Bulk Jobs</Text>
+        <View
+          style={{
+            borderWidth: 1,
+            borderColor: "#cbd5e1",
+            borderRadius: 16,
+            overflow: "hidden",
+          }}
+        >
+          <Picker selectedValue={qrTypeFilter} onValueChange={setQrTypeFilter}>
+            <Picker.Item label="All QR Types" value="All" />
+            {QR_TYPES.map((option) => (
+              <Picker.Item key={option} label={option} value={option} />
+            ))}
+          </Picker>
+        </View>
         {busy ? (
           <Text style={{ color: "#64748b" }}>Loading jobs...</Text>
-        ) : jobs.length ? (
-          jobs.map((job) => {
+        ) : filteredJobs.length ? (
+          filteredJobs.map((job) => {
             const active = selectedJobId === job.id;
             return (
               <TouchableOpacity
@@ -191,7 +228,9 @@ export function BulkJobsScreen() {
             );
           })
         ) : (
-          <Text style={{ color: "#64748b" }}>No bulk jobs yet.</Text>
+          <Text style={{ color: "#64748b" }}>
+            {qrTypeFilter === "All" ? "No bulk jobs yet." : `No ${qrTypeFilter} bulk jobs yet.`}
+          </Text>
         )}
       </Card>
 

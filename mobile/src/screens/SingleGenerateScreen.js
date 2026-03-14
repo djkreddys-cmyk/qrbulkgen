@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   Image,
   ScrollView,
@@ -7,10 +7,12 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { Picker } from "@react-native-picker/picker";
 
 import { useAuth } from "../context/AuthContext";
 import { apiRequest, createAuthHeaders } from "../lib/api";
 import { shareDataUrlFile } from "../lib/files";
+import { getQrPlaceholder, QR_TYPES } from "../lib/qr";
 
 const FORMATS = ["png", "svg"];
 const EC_LEVELS = ["L", "M", "Q", "H"];
@@ -70,7 +72,8 @@ function SelectRow({ label, value, options, onChange }) {
 }
 
 export function SingleGenerateScreen() {
-  const { token } = useAuth();
+  const { token, singleDraft, setSingleDraft } = useAuth();
+  const [qrType, setQrType] = useState("URL");
   const [content, setContent] = useState("https://www.qrbulkgen.com");
   const [filenamePrefix, setFilenamePrefix] = useState("mobile-qr");
   const [foregroundColor, setForegroundColor] = useState("#000000");
@@ -93,6 +96,19 @@ export function SingleGenerateScreen() {
     return null;
   }, [artifact]);
 
+  useEffect(() => {
+    if (!singleDraft) {
+      return;
+    }
+    if (singleDraft.qrType) {
+      setQrType(singleDraft.qrType);
+    }
+    if (singleDraft.content) {
+      setContent(singleDraft.content);
+    }
+    setSingleDraft(null);
+  }, [singleDraft, setSingleDraft]);
+
   async function handleGenerate() {
     setBusy(true);
     setError("");
@@ -103,6 +119,7 @@ export function SingleGenerateScreen() {
         headers: createAuthHeaders(token),
         body: JSON.stringify({
           content,
+          qrType,
           filenamePrefix,
           foregroundColor,
           backgroundColor,
@@ -147,11 +164,29 @@ export function SingleGenerateScreen() {
 
       <Card>
         <View style={{ gap: 6 }}>
+          <FieldLabel>QR TYPE</FieldLabel>
+          <View
+            style={{
+              borderWidth: 1,
+              borderColor: "#cbd5e1",
+              borderRadius: 16,
+              overflow: "hidden",
+            }}
+          >
+            <Picker selectedValue={qrType} onValueChange={setQrType}>
+              {QR_TYPES.map((option) => (
+                <Picker.Item key={option} label={option} value={option} />
+              ))}
+            </Picker>
+          </View>
+        </View>
+
+        <View style={{ gap: 6 }}>
           <FieldLabel>CONTENT</FieldLabel>
           <TextInput
             value={content}
             onChangeText={setContent}
-            placeholder="Enter URL, text, phone, WiFi payload, or any QR-ready content"
+            placeholder={getQrPlaceholder(qrType)}
             multiline
             style={{
               minHeight: 96,

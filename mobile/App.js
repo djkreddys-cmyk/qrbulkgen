@@ -6,6 +6,7 @@ import { BulkJobsScreen } from "./src/screens/BulkJobsScreen";
 import { DashboardScreen } from "./src/screens/DashboardScreen";
 import { LoginScreen } from "./src/screens/LoginScreen";
 import { RegisterScreen } from "./src/screens/RegisterScreen";
+import { ScannerScreen } from "./src/screens/ScannerScreen";
 import { SingleGenerateScreen } from "./src/screens/SingleGenerateScreen";
 
 function TabButton({ label, route, activeRoute, navigate }) {
@@ -48,6 +49,8 @@ function MobileShell() {
 
     if (activeRoute === "single-generate") {
       screenContent = <SingleGenerateScreen />;
+    } else if (activeRoute === "scanner") {
+      screenContent = <ScannerScreen />;
     } else if (activeRoute === "bulk-jobs") {
       screenContent = <BulkJobsScreen />;
     }
@@ -61,12 +64,15 @@ function MobileShell() {
           </Text>
           <View style={{ flexDirection: "row", gap: 12 }}>
             <TabButton label="Dashboard" route="dashboard" activeRoute={activeRoute} navigate={navigate} />
+            <TabButton label="Scanner" route="scanner" activeRoute={activeRoute} navigate={navigate} />
             <TabButton
               label="Single QR"
               route="single-generate"
               activeRoute={activeRoute}
               navigate={navigate}
             />
+          </View>
+          <View style={{ flexDirection: "row", gap: 12 }}>
             <TabButton label="Bulk Jobs" route="bulk-jobs" activeRoute={activeRoute} navigate={navigate} />
           </View>
           {screenContent}

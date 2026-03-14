@@ -4,7 +4,7 @@ import { apiRequest, createAuthHeaders } from "../lib/api";
 import { clearStoredSession, loadStoredSession, saveStoredSession } from "../lib/storage";
 
 const AuthContext = createContext(null);
-const PROTECTED_ROUTES = ["dashboard", "single-generate", "bulk-jobs"];
+const PROTECTED_ROUTES = ["dashboard", "scanner", "single-generate", "bulk-jobs"];
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
@@ -14,6 +14,7 @@ export function AuthProvider({ children }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isBootstrapping, setIsBootstrapping] = useState(true);
   const [error, setError] = useState("");
+  const [singleDraft, setSingleDraft] = useState(null);
 
   useEffect(() => {
     let mounted = true;
@@ -30,10 +31,11 @@ export function AuthProvider({ children }) {
         });
 
         if (!mounted) return;
-        setToken(stored.token);
-        setUser(data.user || stored.user || null);
-        setScreen("app");
-        setActiveRoute("dashboard");
+      setToken(stored.token);
+      setUser(data.user || stored.user || null);
+      setScreen("app");
+      setActiveRoute("dashboard");
+      setSingleDraft(null);
       } catch {
         await clearStoredSession();
       } finally {
@@ -62,6 +64,7 @@ export function AuthProvider({ children }) {
       setToken(data.token || "");
       setScreen("app");
       setActiveRoute("dashboard");
+      setSingleDraft(null);
       await saveStoredSession({
         token: data.token || "",
         user: data.user || null,
@@ -87,6 +90,7 @@ export function AuthProvider({ children }) {
       setToken(data.token || "");
       setScreen("app");
       setActiveRoute("dashboard");
+      setSingleDraft(null);
       await saveStoredSession({
         token: data.token || "",
         user: data.user || null,
@@ -130,6 +134,7 @@ export function AuthProvider({ children }) {
     setScreen("login");
     setActiveRoute("dashboard");
     setError("");
+    setSingleDraft(null);
     await clearStoredSession();
   }
 
@@ -142,6 +147,8 @@ export function AuthProvider({ children }) {
       activeRoute,
       setActiveRoute,
       navigate,
+      singleDraft,
+      setSingleDraft,
       isSubmitting,
       isBootstrapping,
       error,
@@ -151,7 +158,7 @@ export function AuthProvider({ children }) {
       refreshSession,
       logout,
     }),
-    [user, token, screen, activeRoute, isSubmitting, isBootstrapping, error],
+    [user, token, screen, activeRoute, singleDraft, isSubmitting, isBootstrapping, error],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
