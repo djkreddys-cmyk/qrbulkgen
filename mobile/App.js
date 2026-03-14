@@ -1,5 +1,5 @@
 import React from "react";
-import { SafeAreaView, Text, TouchableOpacity, View } from "react-native";
+import { SafeAreaView, ScrollView, Text, TouchableOpacity, View } from "react-native";
 
 import { AuthProvider, useAuth } from "./src/context/AuthContext";
 import { BulkJobsScreen } from "./src/screens/BulkJobsScreen";
@@ -54,7 +54,7 @@ function MobileShell() {
 
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: "#fff" }}>
-        <View style={{ padding: 24, gap: 16 }}>
+        <ScrollView contentContainerStyle={{ padding: 24, gap: 16, paddingBottom: 36 }}>
           <Text style={{ fontSize: 28, fontWeight: "700" }}>QRBulkGen Mobile</Text>
           <Text style={{ fontSize: 18, fontWeight: "600" }}>
             Logged in as {user.name || user.email}
@@ -72,11 +72,11 @@ function MobileShell() {
           {screenContent}
           <TouchableOpacity
             onPress={logout}
-            style={{ backgroundColor: "#000", padding: 14, borderRadius: 10 }}
+            style={{ backgroundColor: "#000", padding: 14, borderRadius: 16 }}
           >
             <Text style={{ color: "#fff", textAlign: "center", fontWeight: "600" }}>Logout</Text>
           </TouchableOpacity>
-        </View>
+        </ScrollView>
       </SafeAreaView>
     );
   }

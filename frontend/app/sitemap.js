@@ -1,0 +1,38 @@
+import { blogPosts, landingPages, siteUrl } from "../lib/content"
+
+export default function sitemap() {
+  const staticRoutes = [
+    "",
+    "/pricing",
+    "/blog",
+    "/generate",
+    "/bulk-qr-codes",
+    "/single-qr-codes",
+    "/qr-codes-for-marketing",
+    "/qr-codes-for-events",
+    "/qr-codes-for-inventory-packaging",
+  ]
+
+  const pages = staticRoutes.map((route) => ({
+    url: `${siteUrl}${route}`,
+    lastModified: new Date(),
+    changeFrequency: route === "" ? "weekly" : "monthly",
+    priority: route === "" ? 1 : 0.7,
+  }))
+
+  const postRoutes = blogPosts.map((post) => ({
+    url: `${siteUrl}/blog/${post.slug}`,
+    lastModified: new Date("2026-03-25T10:00:00Z"),
+    changeFrequency: "monthly",
+    priority: 0.8,
+  }))
+
+  const landingRoutes = landingPages.map((page) => ({
+    url: `${siteUrl}${page.href}`,
+    lastModified: new Date("2026-03-24T10:00:00Z"),
+    changeFrequency: "monthly",
+    priority: 0.85,
+  }))
+
+  return [...pages, ...postRoutes, ...landingRoutes]
+}
