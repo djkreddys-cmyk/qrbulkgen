@@ -9,7 +9,7 @@ import { clearAuthSession, getAuthToken } from "../../lib/auth"
 
 function toAbsoluteDownloadUrl(filePath) {
   if (!filePath) return ""
-  if (/^https?:\/\//i.test(filePath)) return filePath
+  if (/^(https?:\/\/|data:)/i.test(filePath)) return filePath
   const origin = API_BASE_URL.replace(/\/api\/?$/, "")
   return `${origin}${filePath}`
 }
@@ -87,7 +87,7 @@ export default function Dashboard() {
             )}
 
             <section className="border rounded p-6 bg-white">
-              <h2 className="text-xl font-semibold mb-4">Recent Bulk Jobs</h2>
+              <h2 className="text-xl font-semibold mb-4">Recent Jobs</h2>
               {!jobs.length && <p className="text-gray-600">No jobs yet.</p>}
               {!!jobs.length && (
                 <div className="space-y-3">
@@ -97,8 +97,9 @@ export default function Dashboard() {
                         <p className="font-mono text-sm">{job.id}</p>
                         <span className="text-sm uppercase">{job.status}</span>
                       </div>
-                      <p className="text-sm mt-1">File: {job.sourceFileName || "-"}</p>
+                      <p className="text-sm mt-1">Flow: {job.jobType || "-"}</p>
                       <p className="text-sm">Type: {job.qrType || "-"}</p>
+                      <p className="text-sm">File: {job.sourceFileName || "-"}</p>
                       <p className="text-sm">
                         Rows: {job.totalCount} | Success: {job.successCount} | Failure:{" "}
                         {job.failureCount}
@@ -110,10 +111,11 @@ export default function Dashboard() {
                         <a
                           className="inline-block mt-2 underline"
                           href={toAbsoluteDownloadUrl(job.artifact.filePath)}
-                          target="_blank"
-                          rel="noreferrer"
+                          target={String(job.artifact.filePath).startsWith("data:") ? undefined : "_blank"}
+                          rel={String(job.artifact.filePath).startsWith("data:") ? undefined : "noreferrer"}
+                          download={job.artifact.fileName || undefined}
                         >
-                          Download ZIP
+                          Download Artifact
                         </a>
                       )}
                     </article>

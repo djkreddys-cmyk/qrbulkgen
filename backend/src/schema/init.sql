@@ -57,6 +57,19 @@ CREATE TABLE IF NOT EXISTS qr_jobs (
 ALTER TABLE qr_jobs
   ADD COLUMN IF NOT EXISTS bulk_qr_type VARCHAR(32) NOT NULL DEFAULT 'URL';
 
+CREATE TABLE IF NOT EXISTS qr_job_items (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  job_id UUID NOT NULL REFERENCES qr_jobs(id) ON DELETE CASCADE,
+  row_index INTEGER NOT NULL,
+  content TEXT,
+  status VARCHAR(16) NOT NULL CHECK (status IN ('queued', 'processing', 'completed', 'failed')),
+  output_file_name TEXT,
+  output_path TEXT,
+  error_message TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 CREATE TABLE IF NOT EXISTS job_artifacts (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   job_id UUID NOT NULL REFERENCES qr_jobs(id) ON DELETE CASCADE,
@@ -100,12 +113,25 @@ CREATE TABLE IF NOT EXISTS feedback_submissions (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS analytics_events (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  job_id UUID REFERENCES qr_jobs(id) ON DELETE SET NULL,
+  event_type VARCHAR(64) NOT NULL,
+  event_value INTEGER,
+  metadata JSONB,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id);
 CREATE INDEX IF NOT EXISTS idx_sessions_token_hash ON sessions(token_hash);
 CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_user_id ON password_reset_tokens(user_id);
 CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_token_hash ON password_reset_tokens(token_hash);
 CREATE INDEX IF NOT EXISTS idx_qr_jobs_user_created_at ON qr_jobs(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_qr_job_items_job_id ON qr_job_items(job_id);
 CREATE INDEX IF NOT EXISTS idx_public_links_user_created_at ON public_links(user_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_rating_submissions_created_at ON rating_submissions(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_feedback_submissions_created_at ON feedback_submissions(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_analytics_events_user_created_at ON analytics_events(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_analytics_events_job_created_at ON analytics_events(job_id, created_at DESC);

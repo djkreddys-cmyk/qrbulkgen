@@ -6,6 +6,7 @@ const { createHttpError } = require("../lib/http-error");
 const { hashPassword, verifyPassword } = require("../lib/password");
 const { generateOpaqueToken, hashToken } = require("../lib/token");
 const { requireAuth } = require("../middleware/auth");
+const { trackEvent } = require("../services/analytics");
 const { sendResetPasswordEmail } = require("../services/email");
 
 const authRouter = express.Router();
@@ -78,6 +79,10 @@ authRouter.post("/register", async (req, res, next) => {
     });
 
     res.status(201).json(result);
+    await trackEvent({
+      userId: result.user.id,
+      eventType: "auth.register",
+    });
   } catch (error) {
     next(error);
   }
@@ -107,6 +112,10 @@ authRouter.post("/login", async (req, res, next) => {
         email: user.email,
       },
       token,
+    });
+    await trackEvent({
+      userId: user.id,
+      eventType: "auth.login",
     });
   } catch (error) {
     next(error);

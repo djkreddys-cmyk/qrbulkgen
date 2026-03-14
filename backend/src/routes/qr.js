@@ -2,6 +2,7 @@ const express = require("express");
 
 const { query } = require("../db/postgres");
 const { requireAuth } = require("../middleware/auth");
+const { trackEvent } = require("../services/analytics");
 const { createSingleQrDataUrl, normalizeSingleQrPayload } = require("../services/qr-single");
 
 const qrRouter = express.Router();
@@ -11,6 +12,7 @@ qrRouter.post("/single", requireAuth, async (req, res, next) => {
     const payload = normalizeSingleQrPayload(req.body);
     const dataUrl = await createSingleQrDataUrl(payload);
     const fileName = `${payload.filenamePrefix}-${Date.now()}.${payload.format}`;
+    const payloadSizeBytes = Buffer.byteLength(dataUrl, "utf8");
 
     const jobResult = await query(
       `INSERT INTO qr_jobs (
@@ -37,6 +39,28 @@ qrRouter.post("/single", requireAuth, async (req, res, next) => {
     );
 
     const job = jobResult.rows[0];
+
+    await query(
+      `INSERT INTO job_artifacts (job_id, artifact_type, file_name, file_path, mime_type, file_size_bytes)
+       VALUES ($1, 'single-image', $2, $3, $4, $5)`,
+      [
+        job.id,
+        fileName,
+        dataUrl,
+        payload.format === "png" ? "image/png" : "image/svg+xml",
+        payloadSizeBytes,
+      ],
+    );
+
+    await trackEvent({
+      userId: req.user.id,
+      jobId: job.id,
+      eventType: "qr.single.generated",
+      eventValue: 1,
+      metadata: {
+        format: payload.format,
+      },
+    });
 
     res.json({
       job: {

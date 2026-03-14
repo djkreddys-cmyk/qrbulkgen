@@ -183,6 +183,14 @@ async function markFailed(jobId, message) {
      WHERE id = $1`,
     [jobId, String(message || "Bulk worker failed").slice(0, 2000)],
   );
+
+  await db.query(
+    `INSERT INTO analytics_events (user_id, job_id, event_type, metadata)
+     SELECT user_id, id, 'qr.bulk.failed', jsonb_build_object('message', $2)
+     FROM qr_jobs
+     WHERE id = $1`,
+    [jobId, String(message || "Bulk worker failed").slice(0, 2000)],
+  );
 }
 
 async function processBulkJob(jobId, queuedRows = null) {
@@ -210,6 +218,8 @@ async function processBulkJob(jobId, queuedRows = null) {
     [jobId],
   );
 
+  await db.query("DELETE FROM qr_job_items WHERE job_id = $1", [jobId]);
+
   const rows = Array.isArray(queuedRows) ? queuedRows : null;
   if (!rows || rows.length === 0) {
     throw new Error("Queued bulk rows missing from worker payload");
@@ -224,17 +234,32 @@ async function processBulkJob(jobId, queuedRows = null) {
     const content = buildBulkContent(job.bulk_qr_type || "URL", rows[i]);
     if (!content) {
       failureCount += 1;
+      await db.query(
+        `INSERT INTO qr_job_items (job_id, row_index, content, status, error_message)
+         VALUES ($1, $2, $3, 'failed', $4)`,
+        [jobId, i, "", "Unable to build QR content from CSV row"],
+      );
       continue;
     }
 
     const requestedFileName = getCell(rows[i], "filename") || getCell(rows[i], "file_name");
     if (!requestedFileName) {
       failureCount += 1;
+      await db.query(
+        `INSERT INTO qr_job_items (job_id, row_index, content, status, error_message)
+         VALUES ($1, $2, $3, 'failed', $4)`,
+        [jobId, i, content, "Missing filename column value"],
+      );
       continue;
     }
     const rowFileBase = sanitizeFileBaseName(requestedFileName, "");
     if (!rowFileBase) {
       failureCount += 1;
+      await db.query(
+        `INSERT INTO qr_job_items (job_id, row_index, content, status, error_message)
+         VALUES ($1, $2, $3, 'failed', $4)`,
+        [jobId, i, content, "Filename could not be sanitized"],
+      );
       continue;
     }
     const fileName = `${rowFileBase}.${job.output_format || "png"}`;
@@ -265,8 +290,24 @@ async function processBulkJob(jobId, queuedRows = null) {
         });
       }
       successCount += 1;
+      await db.query(
+        `INSERT INTO qr_job_items (job_id, row_index, content, status, output_file_name, output_path)
+         VALUES ($1, $2, $3, 'completed', $4, $5)`,
+        [
+          jobId,
+          i,
+          content,
+          fileName,
+          path.relative(uploadsRoot, filePath).replace(/\\/g, "/"),
+        ],
+      );
     } catch {
       failureCount += 1;
+      await db.query(
+        `INSERT INTO qr_job_items (job_id, row_index, content, status, output_file_name, error_message)
+         VALUES ($1, $2, $3, 'failed', $4, $5)`,
+        [jobId, i, content, fileName, "QR generation failed for row"],
+      );
     }
   }
 
@@ -290,6 +331,14 @@ async function processBulkJob(jobId, queuedRows = null) {
          failure_count = $3,
          completed_at = NOW(),
          updated_at = NOW()
+     WHERE id = $1`,
+    [jobId, successCount, failureCount],
+  );
+
+  await db.query(
+    `INSERT INTO analytics_events (user_id, job_id, event_type, event_value, metadata)
+     SELECT user_id, id, 'qr.bulk.completed', $2, jsonb_build_object('failureCount', $3)
+     FROM qr_jobs
      WHERE id = $1`,
     [jobId, successCount, failureCount],
   );

@@ -189,9 +189,24 @@ export function BulkGenerateContent({ embedded = false }) {
     }
   }
 
+  async function fetchBulkJobs() {
+    try {
+      setLoadingJobs(true)
+      const data = await apiRequest("/qr/jobs?limit=10&jobType=bulk", {
+        method: "GET",
+        headers: withAuthHeader(),
+      })
+      setRecentJobs(Array.isArray(data?.jobs) ? data.jobs : [])
+    } catch {
+      setRecentJobs([])
+    } finally {
+      setLoadingJobs(false)
+    }
+  }
+
   useEffect(() => {
-    fetchRecentJobs()
-    const timer = setInterval(fetchRecentJobs, 6000)
+    fetchBulkJobs()
+    const timer = setInterval(fetchBulkJobs, 6000)
     return () => clearInterval(timer)
   }, [])
 
@@ -292,7 +307,7 @@ export function BulkGenerateContent({ embedded = false }) {
 
       setSuccess(`Bulk job queued: ${data?.job?.id || "created"}`)
       setFile(null)
-      fetchRecentJobs()
+      fetchBulkJobs()
     } catch (submitError) {
       setError(submitError.message || "Failed to create bulk job")
     } finally {

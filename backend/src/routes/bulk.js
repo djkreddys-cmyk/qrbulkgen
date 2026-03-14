@@ -7,6 +7,7 @@ const csvParser = require("csv-parser");
 const { query } = require("../db/postgres");
 const { createHttpError } = require("../lib/http-error");
 const { requireAuth } = require("../middleware/auth");
+const { trackEvent } = require("../services/analytics");
 const { enqueueBulkQrJob } = require("../services/queue");
 const { normalizeSingleQrPayload } = require("../services/qr-single");
 
@@ -235,6 +236,17 @@ bulkRouter.post("/bulk/upload", requireAuth, upload.single("file"), async (req, 
       throw createHttpError(500, "QUEUE_ERROR", "Failed to enqueue bulk generation job");
     }
 
+    await trackEvent({
+      userId: req.user.id,
+      jobId: job.id,
+      eventType: "qr.bulk.queued",
+      eventValue: csvInfo.rowCount,
+      metadata: {
+        qrType: options.qrType,
+        format: options.format,
+      },
+    });
+
     res.status(201).json({
       job: {
         id: job.id,
@@ -251,6 +263,9 @@ bulkRouter.post("/bulk/upload", requireAuth, upload.single("file"), async (req, 
 
 bulkRouter.get("/jobs/summary", requireAuth, async (req, res, next) => {
   try {
+    const jobType = String(req.query.jobType || "").trim().toLowerCase();
+    const filterSingle = jobType === "single";
+    const filterBulk = jobType === "bulk";
     const result = await query(
       `SELECT
          COUNT(*)::int AS total_jobs,
@@ -259,8 +274,13 @@ bulkRouter.get("/jobs/summary", requireAuth, async (req, res, next) => {
          COALESCE(SUM(failure_count), 0)::int AS total_failure
        FROM qr_jobs
        WHERE user_id = $1
-         AND job_type = 'bulk'`,
-      [req.user.id],
+         AND (
+           $2 = false OR job_type = 'single'
+         )
+         AND (
+           $3 = false OR job_type = 'bulk'
+         )`,
+      [req.user.id, filterSingle, filterBulk],
     );
 
     const row = result.rows[0];
@@ -280,32 +300,41 @@ bulkRouter.get("/jobs/summary", requireAuth, async (req, res, next) => {
 bulkRouter.get("/jobs", requireAuth, async (req, res, next) => {
   try {
     const limit = Math.max(1, Math.min(50, parseInt(req.query.limit || "10", 10)));
+    const jobType = String(req.query.jobType || "").trim().toLowerCase();
+    const filterSingle = jobType === "single";
+    const filterBulk = jobType === "bulk";
 
     const result = await query(
       `SELECT
-         j.id, j.status, j.bulk_qr_type, j.source_file_name, j.total_count, j.success_count, j.failure_count,
+         j.id, j.job_type, j.status, j.bulk_qr_type, j.source_file_name, j.total_count, j.success_count, j.failure_count,
          j.error_message, j.created_at, j.started_at, j.completed_at,
-         a.file_name AS artifact_file_name, a.file_path AS artifact_file_path, a.mime_type AS artifact_mime_type
+         a.artifact_type AS artifact_type, a.file_name AS artifact_file_name, a.file_path AS artifact_file_path, a.mime_type AS artifact_mime_type
        FROM qr_jobs j
        LEFT JOIN LATERAL (
-         SELECT file_name, file_path, mime_type
+         SELECT artifact_type, file_name, file_path, mime_type
          FROM job_artifacts
          WHERE job_id = j.id
          ORDER BY created_at DESC
          LIMIT 1
        ) a ON true
        WHERE j.user_id = $1
-         AND j.job_type = 'bulk'
+         AND (
+           $2 = false OR j.job_type = 'single'
+         )
+         AND (
+           $3 = false OR j.job_type = 'bulk'
+         )
        ORDER BY j.created_at DESC
-       LIMIT $2`,
-      [req.user.id, limit],
+       LIMIT $4`,
+      [req.user.id, filterSingle, filterBulk, limit],
     );
 
     res.json({
       jobs: result.rows.map((row) => ({
         id: row.id,
+        jobType: row.job_type,
         status: row.status,
-        qrType: row.bulk_qr_type,
+        qrType: row.job_type === "single" ? "Single" : row.bulk_qr_type,
         sourceFileName: row.source_file_name,
         totalCount: row.total_count,
         successCount: row.success_count,
@@ -316,6 +345,7 @@ bulkRouter.get("/jobs", requireAuth, async (req, res, next) => {
         completedAt: row.completed_at,
         artifact: row.artifact_file_path
           ? {
+              artifactType: row.artifact_type,
               fileName: row.artifact_file_name,
               filePath: row.artifact_file_path,
               mimeType: row.artifact_mime_type,
