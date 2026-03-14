@@ -3,14 +3,6 @@
 import { useMemo, useState } from "react"
 import { useSearchParams } from "next/navigation"
 
-function renderStars(value, active) {
-  return Array.from({ length: value }, (_, i) => (
-    <span key={i} className={active ? "text-yellow-500" : "text-gray-400"}>
-      ★
-    </span>
-  ))
-}
-
 export default function RateClientPage() {
   const searchParams = useSearchParams()
   const [rating, setRating] = useState(0)
@@ -34,20 +26,36 @@ export default function RateClientPage() {
         {!submitted ? (
           <>
             <p className="mt-2 text-gray-600">Select your rating:</p>
-            <div className="mt-4 grid grid-cols-5 gap-2">
-              {options.map((value) => (
-                <button
-                  key={value}
-                  type="button"
-                  onClick={() => setRating(value)}
-                  className={`border rounded p-2 text-center ${
-                    rating === value ? "bg-black text-white" : "bg-white text-black"
-                  }`}
-                >
-                  {style === "numbers" ? value : renderStars(value, rating === value)}
-                </button>
-              ))}
-            </div>
+            {style === "stars" ? (
+              <div className="mt-4 flex gap-2 text-4xl">
+                {options.map((value) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => setRating(value)}
+                    className={value <= rating ? "text-yellow-500" : "text-gray-300"}
+                    aria-label={`Rate ${value} out of ${scale}`}
+                  >
+                    ★
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className={`mt-4 grid ${scale === 10 ? "grid-cols-5" : "grid-cols-5"} gap-2`}>
+                {options.map((value) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => setRating(value)}
+                    className={`border rounded p-2 text-center ${
+                      rating === value ? "bg-black text-white" : "bg-white text-black"
+                    }`}
+                  >
+                    {value}
+                  </button>
+                ))}
+              </div>
+            )}
 
             <button
               type="button"

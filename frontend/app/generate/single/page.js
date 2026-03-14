@@ -264,6 +264,11 @@ export default function SingleGeneratePage() {
   })
 
   useEffect(() => {
+    const publicSiteUrl = process.env.NEXT_PUBLIC_SITE_URL
+    if (publicSiteUrl) {
+      setAppOrigin(publicSiteUrl.replace(/\/$/, ""))
+      return
+    }
     setAppOrigin(window.location.origin)
   }, [])
 
@@ -534,7 +539,7 @@ export default function SingleGeneratePage() {
               <div className="space-y-2">
                 <input className="w-full border p-2" placeholder="Feedback form title" value={fields.feedbackTitle} onChange={(e) => setField("feedbackTitle", e.target.value)} />
                 {fields.feedbackQuestions.map((question, index) => (
-                  <div key={`${index}-${question}`} className="flex gap-2">
+                  <div key={index} className="flex gap-2">
                     <input
                       className="w-full border p-2"
                       placeholder={`Question ${index + 1}`}
