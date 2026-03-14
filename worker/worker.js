@@ -86,7 +86,15 @@ function resolveSourceCsvPath(storedPath) {
     candidates.push(path.join(uploadsRoot, relativeFromUploads));
   }
 
-  return candidates.find((candidate) => candidate && fs.existsSync(candidate)) || "";
+  const found = candidates.find((candidate) => candidate && fs.existsSync(candidate)) || "";
+  if (!found) {
+    console.error("CSV resolve failed", {
+      storedPath: raw,
+      uploadsRoot,
+      candidates,
+    });
+  }
+  return found;
 }
 
 function toUtcDateTime(value) {
