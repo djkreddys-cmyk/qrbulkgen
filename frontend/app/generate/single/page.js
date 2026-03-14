@@ -121,7 +121,16 @@ function buildQrContent(type, fields, appOrigin, ids, socialLinks) {
         "END:VCALENDAR",
       ].join("\n")
     case "Bitcoin":
-      return `bitcoin:${fields.bitcoinAddress.trim()}`
+      {
+        const amount = fields.bitcoinAmount ? `?amount=${fields.bitcoinAmount}` : ""
+        const label = fields.bitcoinLabel
+          ? `${amount ? "&" : "?"}label=${encodeURIComponent(fields.bitcoinLabel)}`
+          : ""
+        const message = fields.bitcoinMessage
+          ? `${amount || label ? "&" : "?"}message=${encodeURIComponent(fields.bitcoinMessage)}`
+          : ""
+        return `bitcoin:${fields.bitcoinAddress.trim()}${amount}${label}${message}`
+      }
     case "PDF":
       return ids.pdfLinkId ? `${appOrigin}/pdf/${ids.pdfLinkId}` : fields.pdfUrl.trim()
     case "Social Media":
@@ -219,6 +228,7 @@ export default function SingleGeneratePage() {
     vcardPhone: "", vcardEmail: "", vcardUrl: "", address: "", latitude: "", longitude: "",
     youtubeUrl: "", wifiType: "WPA", wifiSsid: "", wifiPassword: "", wifiHidden: false,
     eventTitle: "", eventStart: "", eventEnd: "", eventLocation: "", eventDescription: "", bitcoinAddress: "",
+    bitcoinAmount: "", bitcoinLabel: "", bitcoinMessage: "",
     pdfUrl: "", appStoreUrl: "", galleryUrl: "", ratingTitle: "Rate your experience",
     ratingStyle: "stars", ratingScale: "5", feedbackTitle: "Share your feedback",
     feedbackQuestions: ["How was your experience?"],
@@ -249,6 +259,17 @@ export default function SingleGeneratePage() {
 
   function setField(name, value) {
     setFields((prev) => ({ ...prev, [name]: value }))
+  }
+
+  function handleQrTypeChange(nextType) {
+    setQrType(nextType)
+    setUploadError("")
+    setUploadMessage("")
+    setGalleryLinkId("")
+    setPdfLinkId("")
+    if (previewRef.current) {
+      previewRef.current.innerHTML = ""
+    }
   }
 
   function updateSocialLink(index, key, value) {
@@ -380,7 +401,7 @@ export default function SingleGeneratePage() {
         <h1 className="text-3xl font-bold">Single QR Generator</h1>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mt-8">
           <section className="border rounded-lg p-6 bg-white space-y-4">
-            <select value={qrType} onChange={(e) => setQrType(e.target.value)} className="w-full border p-2">
+            <select value={qrType} onChange={(e) => handleQrTypeChange(e.target.value)} className="w-full border p-2">
               {QR_TYPES.map((type) => <option key={type} value={type}>{type}</option>)}
             </select>
 
@@ -395,6 +416,24 @@ export default function SingleGeneratePage() {
                 <textarea className="w-full border p-2" rows={3} placeholder="Message (optional)" value={fields.whatsappMessage} onChange={(e) => setField("whatsappMessage", e.target.value)} />
               </div>
             )}
+            {qrType === "vCard" && (
+              <div className="space-y-2">
+                <input className="w-full border p-2" placeholder="First name" value={fields.firstName} onChange={(e) => setField("firstName", e.target.value)} />
+                <input className="w-full border p-2" placeholder="Last name" value={fields.lastName} onChange={(e) => setField("lastName", e.target.value)} />
+                <input className="w-full border p-2" placeholder="Organization" value={fields.organization} onChange={(e) => setField("organization", e.target.value)} />
+                <input className="w-full border p-2" placeholder="Job title" value={fields.jobTitle} onChange={(e) => setField("jobTitle", e.target.value)} />
+                <input className="w-full border p-2" placeholder="Phone" value={fields.vcardPhone} onChange={(e) => setField("vcardPhone", e.target.value)} />
+                <input className="w-full border p-2" placeholder="Email" value={fields.vcardEmail} onChange={(e) => setField("vcardEmail", e.target.value)} />
+                <input className="w-full border p-2" placeholder="Website URL" value={fields.vcardUrl} onChange={(e) => setField("vcardUrl", e.target.value)} />
+                <input className="w-full border p-2" placeholder="Address" value={fields.address} onChange={(e) => setField("address", e.target.value)} />
+              </div>
+            )}
+            {qrType === "Location" && (
+              <div className="grid grid-cols-2 gap-2">
+                <input className="w-full border p-2" placeholder="Latitude" value={fields.latitude} onChange={(e) => setField("latitude", e.target.value)} />
+                <input className="w-full border p-2" placeholder="Longitude" value={fields.longitude} onChange={(e) => setField("longitude", e.target.value)} />
+              </div>
+            )}
             {["Youtube", "App Store"].includes(qrType) && (
               <input
                 className="w-full border p-2"
@@ -405,6 +444,36 @@ export default function SingleGeneratePage() {
                   if (qrType === "App Store") setField("appStoreUrl", e.target.value)
                 }}
               />
+            )}
+            {qrType === "WIFI" && (
+              <div className="space-y-2">
+                <input className="w-full border p-2" placeholder="SSID" value={fields.wifiSsid} onChange={(e) => setField("wifiSsid", e.target.value)} />
+                <input className="w-full border p-2" placeholder="Password" value={fields.wifiPassword} onChange={(e) => setField("wifiPassword", e.target.value)} />
+                <select className="w-full border p-2" value={fields.wifiType} onChange={(e) => setField("wifiType", e.target.value)}>
+                  <option value="WPA">WPA/WPA2</option>
+                  <option value="WEP">WEP</option>
+                  <option value="nopass">Open</option>
+                </select>
+              </div>
+            )}
+            {qrType === "Event" && (
+              <div className="space-y-2">
+                <input className="w-full border p-2" placeholder="Event title" value={fields.eventTitle} onChange={(e) => setField("eventTitle", e.target.value)} />
+                <label className="block text-sm">Start</label>
+                <input className="w-full border p-2" type="datetime-local" value={fields.eventStart} onChange={(e) => setField("eventStart", e.target.value)} />
+                <label className="block text-sm">End</label>
+                <input className="w-full border p-2" type="datetime-local" value={fields.eventEnd} onChange={(e) => setField("eventEnd", e.target.value)} />
+                <input className="w-full border p-2" placeholder="Location" value={fields.eventLocation} onChange={(e) => setField("eventLocation", e.target.value)} />
+                <textarea className="w-full border p-2" rows={3} placeholder="Description" value={fields.eventDescription} onChange={(e) => setField("eventDescription", e.target.value)} />
+              </div>
+            )}
+            {qrType === "Bitcoin" && (
+              <div className="space-y-2">
+                <input className="w-full border p-2" placeholder="Bitcoin wallet address" value={fields.bitcoinAddress} onChange={(e) => setField("bitcoinAddress", e.target.value)} />
+                <input className="w-full border p-2" placeholder="Amount (optional)" value={fields.bitcoinAmount} onChange={(e) => setField("bitcoinAmount", e.target.value)} />
+                <input className="w-full border p-2" placeholder="Label (optional)" value={fields.bitcoinLabel} onChange={(e) => setField("bitcoinLabel", e.target.value)} />
+                <input className="w-full border p-2" placeholder="Message (optional)" value={fields.bitcoinMessage} onChange={(e) => setField("bitcoinMessage", e.target.value)} />
+              </div>
             )}
 
             {qrType === "Social Media" && (
