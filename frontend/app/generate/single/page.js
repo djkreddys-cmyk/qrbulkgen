@@ -55,6 +55,15 @@ function toUtcDateTime(value) {
   return `${yyyy}${mm}${dd}T${hh}${mi}${ss}Z`
 }
 
+function fallbackEventStartUtc() {
+  return toUtcDateTime(new Date().toISOString())
+}
+
+function fallbackEventEndUtc() {
+  const end = new Date(Date.now() + 60 * 60 * 1000)
+  return toUtcDateTime(end.toISOString())
+}
+
 function encodePayload(value) {
   return btoa(unescape(encodeURIComponent(JSON.stringify(value))))
 }
@@ -113,8 +122,8 @@ function buildQrContent(type, fields, appOrigin, ids, socialLinks) {
         "VERSION:2.0",
         "BEGIN:VEVENT",
         `SUMMARY:${fields.eventTitle || ""}`,
-        `DTSTART:${toUtcDateTime(fields.eventStart)}`,
-        `DTEND:${toUtcDateTime(fields.eventEnd)}`,
+        `DTSTART:${toUtcDateTime(fields.eventStart) || fallbackEventStartUtc()}`,
+        `DTEND:${toUtcDateTime(fields.eventEnd) || fallbackEventEndUtc()}`,
         `LOCATION:${fields.eventLocation || ""}`,
         `DESCRIPTION:${fields.eventDescription || ""}`,
         "END:VEVENT",
@@ -175,7 +184,7 @@ function hasRequiredFields(type, fields, ids, modes, socialLinks) {
     SMS: fields.smsPhone.trim(),
     Youtube: fields.youtubeUrl.trim(),
     WIFI: fields.wifiSsid.trim(),
-    Event: fields.eventTitle.trim() && fields.eventStart.trim() && fields.eventEnd.trim(),
+    Event: fields.eventTitle.trim(),
     Bitcoin: fields.bitcoinAddress.trim(),
     "App Store": fields.appStoreUrl.trim(),
     vCard: fields.firstName.trim(),
@@ -600,27 +609,51 @@ export default function SingleGeneratePage() {
             )}
 
             <div className="grid grid-cols-2 gap-4">
-              <input type="color" value={foregroundColor} onChange={(e) => setForegroundColor(e.target.value)} className="w-full border p-1 h-10" />
-              <input type="color" value={backgroundColor} onChange={(e) => setBackgroundColor(e.target.value)} className="w-full border p-1 h-10" />
+              <div>
+                <label className="block mb-1 text-sm">Foreground</label>
+                <input type="color" value={foregroundColor} onChange={(e) => setForegroundColor(e.target.value)} className="w-full border p-1 h-10" />
+              </div>
+              <div>
+                <label className="block mb-1 text-sm">Background</label>
+                <input type="color" value={backgroundColor} onChange={(e) => setBackgroundColor(e.target.value)} className="w-full border p-1 h-10" />
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
-              <select value={dotStyle} onChange={(e) => setDotStyle(e.target.value)} className="w-full border p-2">
-                <option value="square">Square</option><option value="dots">Dots</option><option value="rounded">Rounded</option><option value="classy">Classy</option><option value="classy-rounded">Classy Rounded</option><option value="extra-rounded">Extra Rounded</option>
-              </select>
-              <select value={cornerSquareStyle} onChange={(e) => setCornerSquareStyle(e.target.value)} className="w-full border p-2">
-                <option value="square">Square</option><option value="dot">Dot</option><option value="extra-rounded">Extra Rounded</option>
-              </select>
+              <div>
+                <label className="block mb-1 text-sm">Dot Style</label>
+                <select value={dotStyle} onChange={(e) => setDotStyle(e.target.value)} className="w-full border p-2">
+                  <option value="square">Square</option><option value="dots">Dots</option><option value="rounded">Rounded</option><option value="classy">Classy</option><option value="classy-rounded">Classy Rounded</option><option value="extra-rounded">Extra Rounded</option>
+                </select>
+              </div>
+              <div>
+                <label className="block mb-1 text-sm">Corner Square</label>
+                <select value={cornerSquareStyle} onChange={(e) => setCornerSquareStyle(e.target.value)} className="w-full border p-2">
+                  <option value="square">Square</option><option value="dot">Dot</option><option value="extra-rounded">Extra Rounded</option>
+                </select>
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
-              <select value={cornerDotStyle} onChange={(e) => setCornerDotStyle(e.target.value)} className="w-full border p-2"><option value="square">Square</option><option value="dot">Dot</option></select>
-              <select value={errorCorrectionLevel} onChange={(e) => setErrorCorrectionLevel(e.target.value)} className="w-full border p-2"><option value="L">L</option><option value="M">M</option><option value="Q">Q</option><option value="H">H</option></select>
+              <div>
+                <label className="block mb-1 text-sm">Corner Dot</label>
+                <select value={cornerDotStyle} onChange={(e) => setCornerDotStyle(e.target.value)} className="w-full border p-2"><option value="square">Square</option><option value="dot">Dot</option></select>
+              </div>
+              <div>
+                <label className="block mb-1 text-sm">Error Correction</label>
+                <select value={errorCorrectionLevel} onChange={(e) => setErrorCorrectionLevel(e.target.value)} className="w-full border p-2"><option value="L">L</option><option value="M">M</option><option value="Q">Q</option><option value="H">H</option></select>
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
-              <input type="file" accept="image/*" onChange={(e) => { const file = e.target.files?.[0]; if (!file) return; const reader = new FileReader(); reader.onload = () => setLogoDataUrl(String(reader.result || "")); reader.readAsDataURL(file) }} className="w-full border p-2" />
-              <input value={filenamePrefix} onChange={(e) => setFilenamePrefix(e.target.value)} className="w-full border p-2" />
+              <div>
+                <label className="block mb-1 text-sm">Logo (optional)</label>
+                <input type="file" accept="image/*" onChange={(e) => { const file = e.target.files?.[0]; if (!file) return; const reader = new FileReader(); reader.onload = () => setLogoDataUrl(String(reader.result || "")); reader.readAsDataURL(file) }} className="w-full border p-2" />
+              </div>
+              <div>
+                <label className="block mb-1 text-sm">Filename Prefix</label>
+                <input value={filenamePrefix} onChange={(e) => setFilenamePrefix(e.target.value)} className="w-full border p-2" />
+              </div>
             </div>
           </section>
 
