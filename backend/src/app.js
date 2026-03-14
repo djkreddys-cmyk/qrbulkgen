@@ -1,7 +1,9 @@
 const express = require("express");
+const path = require("path");
 
 const { loadEnv } = require("./config/env");
 const { authRouter } = require("./routes/auth");
+const { publicRouter, uploadsRoot } = require("./routes/public");
 const { qrRouter } = require("./routes/qr");
 
 function createApp() {
@@ -64,8 +66,10 @@ function createApp() {
     res.json({ ok: true });
   });
 
+  app.use("/uploads", express.static(path.resolve(uploadsRoot)));
   app.use("/api/auth", authRouter);
   app.use("/api/qr", qrRouter);
+  app.use("/api/public", publicRouter);
 
   app.use((err, _req, res, _next) => {
     console.error(err);

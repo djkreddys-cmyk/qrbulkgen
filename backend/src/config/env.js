@@ -18,6 +18,7 @@ function loadEnv() {
     redisUrl: requireEnv("REDIS_URL", "redis://127.0.0.1:6379"),
     authTokenBytes: Number(process.env.AUTH_TOKEN_BYTES || 32),
     frontendUrl: requireEnv("FRONTEND_URL", "http://localhost:3000"),
+    backendUrl: requireEnv("BACKEND_URL", "http://localhost:4000"),
     resendApiKey: process.env.RESEND_API_KEY || "",
     resendFromEmail: requireEnv("RESEND_FROM_EMAIL", "no-reply@qrbulkgen.com"),
     resetPasswordTokenTtlMinutes: Number(process.env.RESET_PASSWORD_TOKEN_TTL_MINUTES || 30),
