@@ -1,12 +1,9 @@
 "use client"
 
 import { useEffect, useMemo, useRef, useState } from "react"
-import { useRouter } from "next/navigation"
 import QRCodeStyling from "qr-code-styling"
 
 import Navbar from "../../../components/Navbar"
-import { apiRequest } from "../../../lib/api"
-import { loadAuthSession } from "../../../lib/auth"
 
 const QR_TYPES = [
   "URL",
@@ -30,6 +27,8 @@ const QR_TYPES = [
   "Feedback",
 ]
 
+const DOWNLOAD_RESOLUTIONS = [512, 768, 1024, 1536, 2048]
+
 function toUtcDateTime(value) {
   if (!value) return ""
   const d = new Date(value)
@@ -43,7 +42,19 @@ function toUtcDateTime(value) {
   return `${yyyy}${mm}${dd}T${hh}${mi}${ss}Z`
 }
 
-function buildQrContent(type, fields) {
+function encodePayload(value) {
+  return btoa(unescape(encodeURIComponent(JSON.stringify(value))))
+}
+
+function decodeSafe(value) {
+  try {
+    return decodeURIComponent(value)
+  } catch {
+    return value
+  }
+}
+
+function buildQrContent(type, fields, appOrigin) {
   switch (type) {
     case "URL":
       return fields.url.trim()
@@ -114,10 +125,22 @@ function buildQrContent(type, fields) {
       return fields.appStoreUrl.trim()
     case "Image Gallery":
       return fields.galleryUrl.trim()
-    case "Rating":
-      return fields.ratingUrl.trim()
-    case "Feedback":
-      return fields.feedbackUrl.trim()
+    case "Rating": {
+      const title = encodeURIComponent(fields.ratingTitle || "Rate your experience")
+      const style = encodeURIComponent(fields.ratingStyle || "stars")
+      const scale = encodeURIComponent(fields.ratingScale || "5")
+      const next = fields.ratingRedirectUrl ? `&next=${encodeURIComponent(fields.ratingRedirectUrl)}` : ""
+      return `${appOrigin}/rate?title=${title}&style=${style}&scale=${scale}${next}`
+    }
+    case "Feedback": {
+      const nonEmptyQuestions = (fields.feedbackQuestions || []).map((q) => q.trim()).filter(Boolean)
+      const payload = {
+        title: fields.feedbackTitle || "Share your feedback",
+        questions: nonEmptyQuestions,
+      }
+      const encoded = encodeURIComponent(encodePayload(payload))
+      return `${appOrigin}/feedback?f=${encoded}`
+    }
     default:
       return ""
   }
@@ -166,16 +189,15 @@ function hasRequiredFields(type, fields) {
     case "Image Gallery":
       return !!fields.galleryUrl.trim()
     case "Rating":
-      return !!fields.ratingUrl.trim()
+      return true
     case "Feedback":
-      return !!fields.feedbackUrl.trim()
+      return (fields.feedbackQuestions || []).map((q) => q.trim()).filter(Boolean).length > 0
     default:
       return false
   }
 }
 
 export default function SingleGeneratePage() {
-  const router = useRouter()
   const previewRef = useRef(null)
   const qrCodeRef = useRef(null)
 
@@ -188,9 +210,8 @@ export default function SingleGeneratePage() {
   const [cornerSquareStyle, setCornerSquareStyle] = useState("extra-rounded")
   const [cornerDotStyle, setCornerDotStyle] = useState("dot")
   const [logoDataUrl, setLogoDataUrl] = useState("")
-  const [generatedContent, setGeneratedContent] = useState("")
-  const [error, setError] = useState("")
-  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [downloadResolution, setDownloadResolution] = useState(1024)
+  const [appOrigin, setAppOrigin] = useState("")
   const [fields, setFields] = useState({
     url: "",
     text: "",
@@ -234,14 +255,48 @@ export default function SingleGeneratePage() {
     socialYoutubeUrl: "",
     appStoreUrl: "",
     galleryUrl: "",
-    ratingUrl: "",
-    feedbackUrl: "",
+    ratingTitle: "Rate your experience",
+    ratingStyle: "stars",
+    ratingScale: "5",
+    ratingRedirectUrl: "",
+    feedbackTitle: "Share your feedback",
+    feedbackQuestions: ["How was your experience?"],
   })
 
+  useEffect(() => {
+    setAppOrigin(window.location.origin)
+  }, [])
+
   const canGenerate = useMemo(() => hasRequiredFields(qrType, fields), [qrType, fields])
+  const generatedContent = useMemo(
+    () => (canGenerate && appOrigin ? buildQrContent(qrType, fields, appOrigin) : ""),
+    [canGenerate, qrType, fields, appOrigin],
+  )
 
   function setField(name, value) {
     setFields((prev) => ({ ...prev, [name]: value }))
+  }
+
+  function updateFeedbackQuestion(index, value) {
+    setFields((prev) => {
+      const next = [...prev.feedbackQuestions]
+      next[index] = value
+      return { ...prev, feedbackQuestions: next }
+    })
+  }
+
+  function addFeedbackQuestion() {
+    setFields((prev) => ({
+      ...prev,
+      feedbackQuestions: [...prev.feedbackQuestions, ""],
+    }))
+  }
+
+  function removeFeedbackQuestion(index) {
+    setFields((prev) => ({
+      ...prev,
+      feedbackQuestions: prev.feedbackQuestions.filter((_, i) => i !== index),
+    }))
   }
 
   async function handleLogoUpload(event) {
@@ -255,48 +310,9 @@ export default function SingleGeneratePage() {
     reader.readAsDataURL(file)
   }
 
-  async function handleGenerate(event) {
-    event.preventDefault()
-    setError("")
-    setIsSubmitting(true)
-
-    const session = loadAuthSession()
-    if (!session?.token) {
-      router.push("/login")
-      return
-    }
-
-    try {
-      const content = buildQrContent(qrType, fields)
-
-      if (!content) {
-        throw new Error("Please fill required fields for selected QR type")
-      }
-
-      await apiRequest("/qr/single", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${session.token}`,
-        },
-        body: JSON.stringify({
-          content,
-          foregroundColor,
-          backgroundColor,
-          errorCorrectionLevel,
-          filenamePrefix,
-        }),
-      })
-
-      setGeneratedContent(content)
-    } catch (submitError) {
-      setError(submitError.message)
-    } finally {
-      setIsSubmitting(false)
-    }
-  }
-
   useEffect(() => {
     if (!generatedContent || !previewRef.current) {
+      if (previewRef.current) previewRef.current.innerHTML = ""
       return
     }
 
@@ -304,7 +320,7 @@ export default function SingleGeneratePage() {
       width: 340,
       height: 340,
       type: "canvas",
-      data: generatedContent,
+      data: decodeSafe(generatedContent),
       image: logoDataUrl || undefined,
       dotsOptions: {
         color: foregroundColor,
@@ -352,9 +368,14 @@ export default function SingleGeneratePage() {
   ])
 
   function handleDownload() {
-    if (!qrCodeRef.current) return
+    if (!qrCodeRef.current || !generatedContent) return
     const name = (filenamePrefix || "qr").replace(/[^a-zA-Z0-9-_]/g, "") || "qr"
+    qrCodeRef.current.update({
+      width: Number(downloadResolution),
+      height: Number(downloadResolution),
+    })
     qrCodeRef.current.download({ name, extension: "png" })
+    qrCodeRef.current.update({ width: 340, height: 340 })
   }
 
   return (
@@ -364,11 +385,11 @@ export default function SingleGeneratePage() {
       <main className="max-w-6xl mx-auto px-6 py-10">
         <h1 className="text-3xl font-bold">Single QR Generator</h1>
         <p className="mt-2 text-gray-600">
-          Generate dynamic QR codes with custom content types, dot styles, and logo embedding.
+          Live QR preview with styling, logo insertion, and advanced dynamic content types.
         </p>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mt-8">
-          <form onSubmit={handleGenerate} className="border rounded-lg p-6 bg-white space-y-4">
+          <section className="border rounded-lg p-6 bg-white space-y-4">
             <div>
               <label className="block mb-1">QR Type</label>
               <select
@@ -424,7 +445,7 @@ export default function SingleGeneratePage() {
                 <input className="w-full border p-2" placeholder="Longitude" value={fields.longitude} onChange={(e) => setField("longitude", e.target.value)} />
               </div>
             )}
-            {["Facebook", "Twitter", "Youtube", "PDF", "App Store", "Image Gallery", "Rating", "Feedback"].includes(qrType) && (
+            {["Facebook", "Twitter", "Youtube", "PDF", "App Store", "Image Gallery"].includes(qrType) && (
               <input
                 className="w-full border p-2"
                 placeholder="Paste URL"
@@ -439,11 +460,7 @@ export default function SingleGeneratePage() {
                           ? fields.pdfUrl
                           : qrType === "App Store"
                             ? fields.appStoreUrl
-                            : qrType === "Image Gallery"
-                              ? fields.galleryUrl
-                              : qrType === "Rating"
-                                ? fields.ratingUrl
-                                : fields.feedbackUrl
+                            : fields.galleryUrl
                 }
                 onChange={(e) => {
                   if (qrType === "Facebook") setField("facebookUrl", e.target.value)
@@ -452,8 +469,6 @@ export default function SingleGeneratePage() {
                   if (qrType === "PDF") setField("pdfUrl", e.target.value)
                   if (qrType === "App Store") setField("appStoreUrl", e.target.value)
                   if (qrType === "Image Gallery") setField("galleryUrl", e.target.value)
-                  if (qrType === "Rating") setField("ratingUrl", e.target.value)
-                  if (qrType === "Feedback") setField("feedbackUrl", e.target.value)
                 }}
               />
             )}
@@ -494,6 +509,45 @@ export default function SingleGeneratePage() {
                 <input className="w-full border p-2" placeholder="Facebook URL" value={fields.socialFacebookUrl} onChange={(e) => setField("socialFacebookUrl", e.target.value)} />
                 <input className="w-full border p-2" placeholder="Twitter URL" value={fields.socialTwitterUrl} onChange={(e) => setField("socialTwitterUrl", e.target.value)} />
                 <input className="w-full border p-2" placeholder="Youtube URL" value={fields.socialYoutubeUrl} onChange={(e) => setField("socialYoutubeUrl", e.target.value)} />
+              </div>
+            )}
+            {qrType === "Rating" && (
+              <div className="space-y-2">
+                <input className="w-full border p-2" placeholder="Rating page title" value={fields.ratingTitle} onChange={(e) => setField("ratingTitle", e.target.value)} />
+                <div className="grid grid-cols-2 gap-2">
+                  <select className="w-full border p-2" value={fields.ratingStyle} onChange={(e) => setField("ratingStyle", e.target.value)}>
+                    <option value="stars">5 Star Rating</option>
+                    <option value="numbers">Number Rating</option>
+                  </select>
+                  <select className="w-full border p-2" value={fields.ratingScale} onChange={(e) => setField("ratingScale", e.target.value)}>
+                    <option value="5">1-5</option>
+                    <option value="10">1-10</option>
+                  </select>
+                </div>
+                <input className="w-full border p-2" placeholder="Redirect URL after submit (optional)" value={fields.ratingRedirectUrl} onChange={(e) => setField("ratingRedirectUrl", e.target.value)} />
+              </div>
+            )}
+            {qrType === "Feedback" && (
+              <div className="space-y-2">
+                <input className="w-full border p-2" placeholder="Feedback form title" value={fields.feedbackTitle} onChange={(e) => setField("feedbackTitle", e.target.value)} />
+                {fields.feedbackQuestions.map((question, index) => (
+                  <div key={`${index}-${question}`} className="flex gap-2">
+                    <input
+                      className="w-full border p-2"
+                      placeholder={`Question ${index + 1}`}
+                      value={question}
+                      onChange={(e) => updateFeedbackQuestion(index, e.target.value)}
+                    />
+                    {fields.feedbackQuestions.length > 1 && (
+                      <button type="button" onClick={() => removeFeedbackQuestion(index)} className="border px-3">
+                        Remove
+                      </button>
+                    )}
+                  </div>
+                ))}
+                <button type="button" onClick={addFeedbackQuestion} className="border px-3 py-2">
+                  Add Question
+                </button>
               </div>
             )}
 
@@ -563,19 +617,27 @@ export default function SingleGeneratePage() {
                 <input value={filenamePrefix} onChange={(e) => setFilenamePrefix(e.target.value)} className="w-full border p-2" />
               </div>
             </div>
-
-            {error && <p className="text-sm text-red-600">{error}</p>}
-
-            <button type="submit" disabled={isSubmitting || !canGenerate} className="w-full bg-black text-white py-2 disabled:opacity-60">
-              {isSubmitting ? "Generating..." : "Generate QR"}
-            </button>
-          </form>
+          </section>
 
           <section className="border rounded-lg p-6 bg-white">
-            <h2 className="text-xl font-semibold">Preview</h2>
-            {!generatedContent && <p className="mt-4 text-gray-600">Generate a QR code to preview and download.</p>}
-
+            <h2 className="text-xl font-semibold">Live Preview</h2>
+            {!generatedContent && <p className="mt-4 text-gray-600">Fill required fields to generate QR instantly.</p>}
             <div ref={previewRef} className="mt-4 flex justify-center" />
+
+            <div className="mt-4">
+              <label className="block mb-1">Download Resolution</label>
+              <select
+                value={downloadResolution}
+                onChange={(e) => setDownloadResolution(Number(e.target.value))}
+                className="w-full border p-2"
+              >
+                {DOWNLOAD_RESOLUTIONS.map((res) => (
+                  <option key={res} value={res}>
+                    {res} x {res}
+                  </option>
+                ))}
+              </select>
+            </div>
 
             {generatedContent && (
               <button type="button" onClick={handleDownload} className="inline-block mt-4 px-4 py-2 bg-black text-white rounded">
