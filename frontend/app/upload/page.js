@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react"
 import QRCodeStyling from "qr-code-styling"
 import Navbar from "../../components/Navbar"
-import { apiRequest } from "../../lib/api"
+import { API_BASE_URL, apiRequest } from "../../lib/api"
 import { getAuthToken } from "../../lib/auth"
 
 const DOWNLOAD_RESOLUTIONS = [512, 768, 1024, 1536, 2048]
@@ -111,10 +111,45 @@ export function BulkGenerateContent({ embedded = false }) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState("")
   const [success, setSuccess] = useState("")
+  const [recentJobs, setRecentJobs] = useState([])
+  const [loadingJobs, setLoadingJobs] = useState(false)
 
   useEffect(() => {
     setPreviewContent(previewFromSampleType(qrType))
   }, [qrType])
+
+  function getBackendOrigin() {
+    const apiBase = String(API_BASE_URL || "").trim()
+    if (!apiBase) return ""
+    return apiBase.endsWith("/api") ? apiBase.slice(0, -4) : apiBase
+  }
+
+  function toArtifactUrl(filePath) {
+    if (!filePath) return ""
+    if (/^https?:\/\//i.test(filePath)) return filePath
+    return `${getBackendOrigin()}${filePath.startsWith("/") ? filePath : `/${filePath}`}`
+  }
+
+  async function fetchRecentJobs() {
+    try {
+      setLoadingJobs(true)
+      const data = await apiRequest("/qr/jobs?limit=10", {
+        method: "GET",
+        headers: withAuthHeader(),
+      })
+      setRecentJobs(Array.isArray(data?.jobs) ? data.jobs : [])
+    } catch {
+      setRecentJobs([])
+    } finally {
+      setLoadingJobs(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchRecentJobs()
+    const timer = setInterval(fetchRecentJobs, 6000)
+    return () => clearInterval(timer)
+  }, [])
 
   useEffect(() => {
     if (!previewRef.current || !previewContent.trim()) {
@@ -213,6 +248,7 @@ export function BulkGenerateContent({ embedded = false }) {
 
       setSuccess(`Bulk job queued: ${data?.job?.id || "created"}`)
       setFile(null)
+      fetchRecentJobs()
     } catch (submitError) {
       setError(submitError.message || "Failed to create bulk job")
     } finally {
@@ -375,6 +411,58 @@ export function BulkGenerateContent({ embedded = false }) {
             )}
           </section>
         </div>
+
+        <section className="border rounded-lg p-6 bg-white mt-8">
+          <h2 className="text-xl font-semibold">Recent Bulk Jobs</h2>
+          {loadingJobs && <p className="text-sm text-gray-600 mt-3">Loading jobs...</p>}
+          {!loadingJobs && recentJobs.length === 0 && (
+            <p className="text-sm text-gray-600 mt-3">No jobs yet.</p>
+          )}
+          {recentJobs.length > 0 && (
+            <div className="mt-4 overflow-x-auto">
+              <table className="w-full text-sm border-collapse">
+                <thead>
+                  <tr className="text-left border-b">
+                    <th className="py-2 pr-3">Job</th>
+                    <th className="py-2 pr-3">Type</th>
+                    <th className="py-2 pr-3">Status</th>
+                    <th className="py-2 pr-3">Count</th>
+                    <th className="py-2 pr-3">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {recentJobs.map((job) => {
+                    const fileUrl = toArtifactUrl(job?.artifact?.filePath)
+                    return (
+                      <tr key={job.id} className="border-b">
+                        <td className="py-2 pr-3">{job.id}</td>
+                        <td className="py-2 pr-3">{job.qrType}</td>
+                        <td className="py-2 pr-3">{job.status}</td>
+                        <td className="py-2 pr-3">
+                          {job.successCount}/{job.totalCount}
+                        </td>
+                        <td className="py-2 pr-3">
+                          {job.status === "completed" && fileUrl ? (
+                            <a
+                              href={fileUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-block px-3 py-1 bg-black text-white rounded"
+                            >
+                              Download ZIP
+                            </a>
+                          ) : (
+                            <span className="text-gray-500">Not ready</span>
+                          )}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
       </main>
   )
 
