@@ -1,0 +1,27 @@
+{
+  "expo": {
+    "name": "QRBulkGen",
+    "slug": "qrbulkgen-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "qrbulkgen",
+    "userInterfaceStyle": "light",
+    "jsEngine": "hermes",
+    "newArchEnabled": true,
+    "platforms": [
+      "android"
+    ],
+    "android": {
+      "package": "com.qrbulkgen.mobile",
+      "versionCode": 1,
+      "permissions": [
+        "CAMERA"
+      ]
+    },
+    "extra": {
+      "eas": {
+        "projectId": ""
+      }
+    }
+  }
+}
