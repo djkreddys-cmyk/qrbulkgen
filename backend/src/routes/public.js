@@ -52,10 +52,40 @@ const upload = multer({
   },
 });
 
-function buildPublicAssetUrl(relativePath) {
-  const env = loadEnv();
-  const base = env.backendUrl.replace(/\/$/, "");
+function getRequestBaseUrl(req) {
+  const forwardedProto = String(req.headers["x-forwarded-proto"] || "").split(",")[0].trim();
+  const forwardedHost = String(req.headers["x-forwarded-host"] || "").split(",")[0].trim();
+  const host = forwardedHost || String(req.headers.host || "").split(",")[0].trim();
+
+  if (host) {
+    const protocol = forwardedProto || req.protocol || "https";
+    return `${protocol}://${host}`;
+  }
+
+  return loadEnv().backendUrl.replace(/\/$/, "");
+}
+
+function buildPublicAssetUrl(req, relativePath) {
+  const base = getRequestBaseUrl(req);
   return `${base}/uploads/${relativePath.replace(/\\/g, "/")}`;
+}
+
+function rewriteLegacyUrl(url, req) {
+  const raw = String(url || "").trim();
+  if (!raw) return raw;
+
+  try {
+    const parsed = new URL(raw);
+    if (["localhost", "127.0.0.1", "::1"].includes(parsed.hostname)) {
+      const base = new URL(getRequestBaseUrl(req));
+      parsed.protocol = base.protocol;
+      parsed.host = base.host;
+      return parsed.toString();
+    }
+    return raw;
+  } catch {
+    return raw;
+  }
 }
 
 publicRouter.post(
@@ -83,7 +113,7 @@ publicRouter.post(
       const images = files.map((file) => {
         const relativePath = path.join("gallery", file.filename);
         return {
-          url: buildPublicAssetUrl(relativePath),
+          url: buildPublicAssetUrl(req, relativePath),
           fileName: file.originalname,
         };
       });
@@ -128,7 +158,7 @@ publicRouter.post("/upload/pdf", requireAuth, upload.single("pdf"), async (req, 
     const title = String(req.body.title || "PDF Document").trim().slice(0, 255);
     const relativePath = path.join("pdf", file.filename);
     const payload = {
-      url: buildPublicAssetUrl(relativePath),
+      url: buildPublicAssetUrl(req, relativePath),
       fileName: file.originalname,
     };
 
@@ -173,12 +203,31 @@ publicRouter.get("/links/:id", async (req, res, next) => {
     }
 
     const row = result.rows[0];
+    let payload = row.payload || {};
+
+    if (row.link_type === "gallery" && Array.isArray(payload.images)) {
+      payload = {
+        ...payload,
+        images: payload.images.map((item) => ({
+          ...item,
+          url: rewriteLegacyUrl(item.url, req),
+        })),
+      };
+    }
+
+    if (row.link_type === "pdf" && payload.url) {
+      payload = {
+        ...payload,
+        url: rewriteLegacyUrl(payload.url, req),
+      };
+    }
+
     res.json({
       link: {
         id: row.id,
         type: row.link_type,
         title: row.title,
-        payload: row.payload,
+        payload,
         createdAt: row.created_at,
       },
     });
