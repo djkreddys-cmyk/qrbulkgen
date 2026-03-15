@@ -165,16 +165,16 @@ export default function HomePageClient() {
     mobileFeatureDetails.find((feature) => feature.id === activeMobileFeature) || mobileFeatureDetails[0]
 
   return (
-    <main className="mx-auto flex max-w-6xl flex-col gap-24 px-6 py-16">
-      <section className="grid gap-12 lg:grid-cols-[1.05fr_0.95fr] lg:items-center">
+    <main className="mx-auto flex max-w-[88rem] flex-col gap-20 px-4 py-14 md:px-6 md:py-16 xl:px-8">
+      <section className="grid gap-10 xl:grid-cols-[1.02fr_0.98fr] xl:items-center">
         <div className="space-y-7">
           <p className="inline-flex rounded-full border border-sky-300/70 bg-white/85 px-4 py-2 text-xs font-semibold uppercase tracking-[0.24em] text-sky-900 shadow-sm">
             Web + mobile QR operating system
           </p>
-          <h1 className="max-w-4xl text-5xl font-black leading-[0.96] tracking-tight text-slate-950 md:text-7xl">
+          <h1 className="max-w-3xl text-[clamp(3.2rem,7vw,6.2rem)] font-black leading-[0.92] tracking-tight text-slate-950">
             Build branded QR journeys, bulk delivery, and scan analysis in one polished product.
           </h1>
-          <p className="max-w-2xl text-lg leading-8 text-slate-600">
+          <p className="max-w-2xl text-[1.05rem] leading-8 text-slate-600 md:text-lg">
             QRBulkGen gives teams one place for single QR creation, bulk CSV operations, tracked public
             scan experiences, mobile visibility, and dashboard reporting. No more one tool for design,
             one for feedback, and another for monitoring.
@@ -195,19 +195,21 @@ export default function HomePageClient() {
           </div>
         </div>
 
-        <div className="rounded-[2.2rem] border border-white/70 bg-white/80 p-8 shadow-[0_24px_90px_rgba(15,23,42,0.12)] backdrop-blur">
+        <div className="rounded-[2.2rem] border border-white/70 bg-white/80 p-7 shadow-[0_24px_90px_rgba(15,23,42,0.12)] backdrop-blur md:p-8">
           <div className="grid gap-4 md:grid-cols-2">
             {operatingModes.map((mode) => (
               <div
                 key={mode.label}
-                className="rounded-[1.5rem] border border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(243,247,255,0.92))] p-5 shadow-sm"
+                className="min-h-[212px] rounded-[1.5rem] border border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(243,247,255,0.92))] p-5 shadow-sm"
               >
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
                       {mode.label}
                     </p>
-                    <p className="mt-3 text-3xl font-black text-slate-950">{mode.value}</p>
+                    <p className="mt-3 text-[2.1rem] font-black leading-none text-slate-950 md:text-[2.5rem]">
+                      {mode.value}
+                    </p>
                   </div>
                   <span className="rounded-full bg-slate-950 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-white">
                     Active
@@ -245,14 +247,14 @@ export default function HomePageClient() {
         </div>
       </section>
 
-      <section className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr]">
-        <div className="grid gap-6 sm:grid-cols-3">
+      <section className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
+        <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
           {bestFeatures.map((feature) => (
             <button
               key={feature.id}
               type="button"
               onClick={() => setActiveFeatureCard(feature.id)}
-              className={`rounded-[2rem] border p-7 text-left shadow-sm transition ${
+              className={`flex min-h-[265px] flex-col justify-between rounded-[2rem] border p-7 text-left shadow-sm transition ${
                 activeFeatureCard === feature.id
                   ? "border-slate-950 bg-slate-950 text-white shadow-[0_20px_60px_rgba(15,23,42,0.18)]"
                   : "border-white/80 bg-white/85 text-slate-950 hover:-translate-y-1"
@@ -261,8 +263,14 @@ export default function HomePageClient() {
               <p className={`text-sm font-semibold uppercase tracking-[0.22em] ${activeFeatureCard === feature.id ? "text-slate-300" : "text-slate-500"}`}>
                 Feature focus
               </p>
-              <h2 className="mt-4 text-3xl font-black tracking-tight">{feature.title}</h2>
-              <p className={`mt-6 text-4xl font-black ${activeFeatureCard === feature.id ? "text-white" : "text-slate-950"}`}>
+              <h2 className="mt-4 max-w-[11ch] text-[2rem] font-black leading-[1.02] tracking-tight">
+                {feature.title}
+              </h2>
+              <p
+                className={`mt-8 text-[2.9rem] font-black leading-none ${
+                  activeFeatureCard === feature.id ? "text-white" : "text-slate-950"
+                }`}
+              >
                 {feature.stat}
               </p>
               <p className={`mt-2 text-sm ${activeFeatureCard === feature.id ? "text-slate-300" : "text-slate-500"}`}>
@@ -275,7 +283,7 @@ export default function HomePageClient() {
           <p className="text-sm font-semibold uppercase tracking-[0.22em] text-slate-500">
             {bestFeatures.find((feature) => feature.id === activeFeatureCard)?.title}
           </p>
-          <h3 className="mt-4 text-4xl font-black tracking-tight text-slate-950">
+          <h3 className="mt-4 max-w-[14ch] text-[2.6rem] font-black leading-[1.02] tracking-tight text-slate-950">
             {activeFeatureContent.title}
           </h3>
           <p className="mt-5 leading-8 text-slate-600">{activeFeatureContent.body}</p>
@@ -295,7 +303,7 @@ export default function HomePageClient() {
       <section className="grid gap-8 lg:grid-cols-[0.9fr_1.1fr] lg:items-start">
         <div className="rounded-[2rem] border border-white/80 bg-white/85 p-8 shadow-sm backdrop-blur">
           <p className="text-sm font-semibold uppercase tracking-[0.22em] text-slate-500">QR types</p>
-          <h2 className="mt-3 text-4xl font-black tracking-tight text-slate-950">
+          <h2 className="mt-3 text-[2.8rem] font-black tracking-tight text-slate-950">
             One generator, the QR types your teams actually need.
           </h2>
           <p className="mt-5 leading-8 text-slate-600">
@@ -319,7 +327,7 @@ export default function HomePageClient() {
       <section className="space-y-8">
         <div className="max-w-3xl">
           <p className="text-sm font-semibold uppercase tracking-[0.22em] text-slate-500">Pricing path</p>
-          <h2 className="mt-3 text-4xl font-black tracking-tight text-slate-950">
+          <h2 className="mt-3 text-[2.7rem] font-black tracking-tight text-slate-950">
             Start free, then scale only when the workflow proves itself.
           </h2>
         </div>
@@ -386,7 +394,7 @@ export default function HomePageClient() {
                 <span>{post.date}</span>
                 <span>{post.readTime}</span>
               </div>
-              <h3 className="mt-4 text-2xl font-bold text-slate-950">{post.title}</h3>
+              <h3 className="mt-4 text-[1.7rem] font-bold leading-tight text-slate-950">{post.title}</h3>
               <p className="mt-4 leading-7 text-slate-600">{post.description}</p>
               <p className="mt-6 text-sm font-semibold text-slate-950">Read article</p>
             </Link>
@@ -398,7 +406,7 @@ export default function HomePageClient() {
         <div className="grid gap-8 lg:grid-cols-[1fr_1fr] lg:items-center">
           <div>
             <p className="text-sm font-semibold uppercase tracking-[0.22em] text-slate-500">Mobile app</p>
-            <h2 className="mt-3 text-4xl font-black tracking-tight text-slate-950">
+            <h2 className="mt-3 max-w-[13ch] text-[2.8rem] font-black tracking-tight text-slate-950">
               Use the same account on web and mobile without losing job history.
             </h2>
             <p className="mt-5 leading-8 text-slate-600">

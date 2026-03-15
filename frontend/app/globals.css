@@ -1,10 +1,21 @@
 @import "tailwindcss";
 
+:root {
+  --page-background: #f4f7fb;
+  --page-foreground: #0f172a;
+  --card-shadow: 0 18px 55px rgba(15, 23, 42, 0.08);
+}
 
 body {
-  font-family: "Segoe UI", Helvetica, Arial, sans-serif;
-  background: #f4f7fb;
-  color: #0f172a;
+  margin: 0;
+  min-height: 100vh;
+  font-family: var(--font-manrope), "Segoe UI", Helvetica, Arial, sans-serif;
+  background:
+    radial-gradient(circle at top, rgba(255, 249, 237, 0.96) 0%, rgba(246, 247, 251, 0.96) 42%, rgba(238, 242, 255, 0.98) 100%),
+    var(--page-background);
+  color: var(--page-foreground);
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
 }
 
 a {
@@ -13,6 +24,20 @@ a {
 
 * {
   box-sizing: border-box;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-space-grotesk), var(--font-manrope), "Segoe UI", Helvetica, Arial, sans-serif;
+  letter-spacing: -0.03em;
+}
+
+button {
+  cursor: pointer;
 }
 
 ::selection {

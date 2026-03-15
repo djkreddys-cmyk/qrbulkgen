@@ -8,7 +8,7 @@ export function MarketingShell({ children }) {
       <Navbar />
       {children}
       <footer className="border-t border-slate-200/70 bg-white/80">
-        <div className="mx-auto flex max-w-6xl flex-col gap-6 px-6 py-10 text-sm text-slate-600 md:flex-row md:items-center md:justify-between">
+        <div className="mx-auto flex max-w-[88rem] flex-col gap-6 px-4 py-10 text-sm text-slate-600 md:px-6 md:flex-row md:items-center md:justify-between xl:px-8">
           <div>
             <p className="text-base font-semibold text-slate-950">QRBulkGen</p>
             <p>Bulk and single QR workflows for teams, campaigns, events, and packaging operations.</p>
