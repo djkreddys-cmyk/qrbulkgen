@@ -56,6 +56,85 @@ function addMonths(date, months) {
   return copy
 }
 
+function clamp(value, min, max) {
+  return Math.min(max, Math.max(min, value))
+}
+
+function rgbToHex(r, g, b) {
+  return `#${[r, g, b]
+    .map((channel) => clamp(Math.round(channel), 0, 255).toString(16).padStart(2, "0"))
+    .join("")}`
+}
+
+function getLuminance(r, g, b) {
+  return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255
+}
+
+async function extractBrandPalette(dataUrl) {
+  if (!dataUrl || typeof window === "undefined") {
+    return null
+  }
+
+  return await new Promise((resolve) => {
+    const image = new window.Image()
+    image.crossOrigin = "anonymous"
+    image.onload = () => {
+      try {
+        const canvas = document.createElement("canvas")
+        canvas.width = 48
+        canvas.height = 48
+        const ctx = canvas.getContext("2d")
+        if (!ctx) {
+          resolve(null)
+          return
+        }
+        ctx.drawImage(image, 0, 0, 48, 48)
+        const { data } = ctx.getImageData(0, 0, 48, 48)
+        let primary = null
+        let accent = null
+        let primaryScore = -1
+        let accentScore = -1
+
+        for (let i = 0; i < data.length; i += 16) {
+          const r = data[i]
+          const g = data[i + 1]
+          const b = data[i + 2]
+          const a = data[i + 3]
+          if (a < 140) continue
+
+          const max = Math.max(r, g, b)
+          const min = Math.min(r, g, b)
+          const saturation = max === 0 ? 0 : (max - min) / max
+          const luminance = getLuminance(r, g, b)
+          if (luminance > 0.94 || saturation < 0.08) continue
+
+          const primaryCandidateScore = saturation * (1.2 - luminance)
+          const accentCandidateScore = saturation * (0.6 + (1 - Math.abs(luminance - 0.55)))
+
+          if (primaryCandidateScore > primaryScore) {
+            primaryScore = primaryCandidateScore
+            primary = { r, g, b }
+          }
+
+          if (accentCandidateScore > accentScore) {
+            accentScore = accentCandidateScore
+            accent = { r, g, b }
+          }
+        }
+
+        resolve({
+          primary: primary ? rgbToHex(primary.r, primary.g, primary.b) : "#0f172a",
+          accent: accent ? rgbToHex(accent.r, accent.g, accent.b) : "#1d4ed8",
+        })
+      } catch {
+        resolve(null)
+      }
+    }
+    image.onerror = () => resolve(null)
+    image.src = dataUrl
+  })
+}
+
 function parseExpiryDate(value) {
   const raw = String(value || "").trim()
   if (!raw) return null
@@ -302,6 +381,8 @@ export function SingleGenerateContent({ embedded = false, brandMode = false }) {
   const [cornerSquareStyle, setCornerSquareStyle] = useState("extra-rounded")
   const [cornerDotStyle, setCornerDotStyle] = useState("dot")
   const [logoDataUrl, setLogoDataUrl] = useState("")
+  const [brandAccentColor, setBrandAccentColor] = useState("#1d4ed8")
+  const [brandStrength, setBrandStrength] = useState("balanced")
   const [downloadResolution, setDownloadResolution] = useState(1024)
   const [appOrigin, setAppOrigin] = useState("")
   const [expiryDate, setExpiryDate] = useState("")
@@ -355,7 +436,7 @@ export function SingleGenerateContent({ embedded = false, brandMode = false }) {
   }, [brandMode, isEditing])
 
   function applyBrandPreset() {
-    if (!isEditing && qrType === "URL") {
+    if (!isEditing && !["Feedback", "Rating", "PDF", "Image Gallery", "URL"].includes(qrType)) {
       setQrType("Feedback")
     }
     setErrorCorrectionLevel("H")
@@ -364,8 +445,24 @@ export function SingleGenerateContent({ embedded = false, brandMode = false }) {
     setCornerDotStyle("dot")
     setForegroundColor("#0f172a")
     setBackgroundColor("#ffffff")
+    setBrandAccentColor("#1d4ed8")
     setFilenamePrefix("brand-qr")
   }
+
+  useEffect(() => {
+    if (!brandMode || !logoDataUrl) return
+    let active = true
+
+    extractBrandPalette(logoDataUrl).then((palette) => {
+      if (!active || !palette) return
+      setForegroundColor(palette.primary)
+      setBrandAccentColor(palette.accent)
+    })
+
+    return () => {
+      active = false
+    }
+  }, [brandMode, logoDataUrl])
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
@@ -590,6 +687,12 @@ export function SingleGenerateContent({ embedded = false, brandMode = false }) {
     }
   }
 
+  const brandImageSize = brandStrength === "subtle" ? 0.22 : brandStrength === "bold" ? 0.3 : 0.26
+  const brandSilhouetteOpacity = brandStrength === "subtle" ? 0.08 : brandStrength === "bold" ? 0.16 : 0.12
+  const selectableQrTypes = brandMode
+    ? QR_TYPES.filter((type) => ["Feedback", "Rating", "PDF", "Image Gallery", "URL"].includes(type))
+    : QR_TYPES
+
   useEffect(() => {
     if (!generatedContent || !previewRef.current) {
       if (previewRef.current) previewRef.current.innerHTML = ""
@@ -603,10 +706,10 @@ export function SingleGenerateContent({ embedded = false, brandMode = false }) {
       image: logoDataUrl || undefined,
       dotsOptions: { color: foregroundColor, type: dotStyle },
       backgroundOptions: { color: backgroundColor },
-      cornersSquareOptions: { color: foregroundColor, type: cornerSquareStyle },
-      cornersDotOptions: { color: foregroundColor, type: cornerDotStyle },
+      cornersSquareOptions: { color: brandMode && logoDataUrl ? brandAccentColor : foregroundColor, type: cornerSquareStyle },
+      cornersDotOptions: { color: brandMode && logoDataUrl ? brandAccentColor : foregroundColor, type: cornerDotStyle },
       qrOptions: { errorCorrectionLevel },
-      imageOptions: { hideBackgroundDots: true, imageSize: 0.35, margin: 4, crossOrigin: "anonymous" },
+      imageOptions: { hideBackgroundDots: true, imageSize: brandMode ? brandImageSize : 0.35, margin: brandMode ? 2 : 4, crossOrigin: "anonymous" },
     }
     if (!qrCodeRef.current) {
       qrCodeRef.current = new QRCodeStyling(options)
@@ -615,7 +718,7 @@ export function SingleGenerateContent({ embedded = false, brandMode = false }) {
       return
     }
     qrCodeRef.current.update(options)
-  }, [generatedContent, logoDataUrl, foregroundColor, backgroundColor, dotStyle, cornerSquareStyle, cornerDotStyle, errorCorrectionLevel])
+  }, [generatedContent, logoDataUrl, foregroundColor, backgroundColor, dotStyle, cornerSquareStyle, cornerDotStyle, errorCorrectionLevel, brandMode, brandAccentColor, brandImageSize])
 
   async function handleDownload() {
     if (!generatedContent) return
@@ -683,8 +786,13 @@ export function SingleGenerateContent({ embedded = false, brandMode = false }) {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mt-8">
           <section className="border rounded-lg p-6 bg-white space-y-4">
             <select value={qrType} onChange={(e) => handleQrTypeChange(e.target.value)} className="w-full border p-2" disabled={isEditing}>
-              {QR_TYPES.map((type) => <option key={type} value={type}>{type}</option>)}
+              {selectableQrTypes.map((type) => <option key={type} value={type}>{type}</option>)}
             </select>
+            {brandMode && (
+              <p className="text-xs text-slate-500">
+                Brand QR works best with tracked QR types like Feedback, Rating, PDF, and Image Gallery for denser visual patterns.
+              </p>
+            )}
 
             {lockContent ? renderLockedContentSummary() : null}
             {!lockContent && qrType === "URL" && <input className="w-full border p-2" placeholder="https://example.com" value={fields.url} onChange={(e) => setField("url", e.target.value)} />}
@@ -942,6 +1050,23 @@ export function SingleGenerateContent({ embedded = false, brandMode = false }) {
               </div>
             </div>
 
+            {brandMode && (
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block mb-1 text-sm">Brand Accent</label>
+                  <input type="color" value={brandAccentColor} onChange={(e) => setBrandAccentColor(e.target.value)} className="w-full border p-1 h-10" />
+                </div>
+                <div>
+                  <label className="block mb-1 text-sm">Logo Style Strength</label>
+                  <select value={brandStrength} onChange={(e) => setBrandStrength(e.target.value)} className="w-full border p-2">
+                    <option value="subtle">Subtle</option>
+                    <option value="balanced">Balanced</option>
+                    <option value="bold">Bold</option>
+                  </select>
+                </div>
+              </div>
+            )}
+
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block mb-1 text-sm">Dot Style</label>
@@ -970,7 +1095,7 @@ export function SingleGenerateContent({ embedded = false, brandMode = false }) {
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block mb-1 text-sm">Logo (optional)</label>
+                <label className="block mb-1 text-sm">{brandMode ? "Brand Logo" : "Logo (optional)"}</label>
                 <input type="file" accept="image/*" onChange={(e) => { const file = e.target.files?.[0]; if (!file) return; const reader = new FileReader(); reader.onload = () => setLogoDataUrl(String(reader.result || "")); reader.readAsDataURL(file) }} className="w-full border p-2" />
               </div>
               <div>
@@ -1002,11 +1127,23 @@ export function SingleGenerateContent({ embedded = false, brandMode = false }) {
               )}
             </div>
             {!generatedContent && <p className="mt-4 text-gray-600">Fill required fields to generate QR instantly.</p>}
-            <div ref={previewRef} className="mt-4 flex justify-center" />
+            <div className="mt-4 flex justify-center">
+              <div className="relative flex items-center justify-center">
+                {brandMode && logoDataUrl && (
+                  <img
+                    src={logoDataUrl}
+                    alt="Brand silhouette"
+                    className="pointer-events-none absolute h-[250px] w-[250px] object-contain blur-[1px]"
+                    style={{ opacity: brandSilhouetteOpacity }}
+                  />
+                )}
+                <div ref={previewRef} className="relative z-10 flex justify-center" />
+              </div>
+            </div>
             {brandMode && (
               <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
                 <p className="font-semibold text-slate-900">Brand QR guidance</p>
-                <p className="mt-2">Upload your logo, keep contrast high, and use this mode for a logo-led branded QR. This preserves scan reliability better than trying to turn the logo pixels directly into the QR matrix.</p>
+                <p className="mt-2">Upload your logo, keep contrast high, and use this mode for a logo-led branded QR. It auto-picks colors from the logo, applies accent corners, and uses a softer silhouette preview while keeping the real QR structure scannable.</p>
               </div>
             )}
             <div className="mt-4">
