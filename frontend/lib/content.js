@@ -119,6 +119,14 @@ export const landingPages = [
       "Use one consistent style system across single and bulk generation",
       "Handle feedback, ratings, PDFs, image galleries, and more in one workflow",
     ],
+    workflowTitle: "Bulk runs need an operations-grade handoff, not a one-time generator.",
+    workflowBody:
+      "Teams using bulk QR codes usually care about vendor handoff, inventory labeling, or campaign rollout deadlines. The real value is not just creating files. It is validating rows, watching queue progress, and downloading one production-ready ZIP at the end.",
+    workflowPoints: [
+      "Validate CSV structure before queueing work",
+      "Watch status changes while the worker processes rows",
+      "Download finished ZIP artifacts only when the batch is truly ready",
+    ],
     faqs: [
       {
         question: "What does a bulk CSV need?",
@@ -146,6 +154,14 @@ export const landingPages = [
       "Live preview before download",
       "Color, dot style, corner style, and logo support",
       "PNG and SVG delivery from the same workflow",
+    ],
+    workflowTitle: "Single QR generation should feel instant, but still polished.",
+    workflowBody:
+      "The single flow is for teams that need one strong QR now: a package insert, quick event asset, support link, or campaign test. The product should help you preview, style, and download in one pass without sacrificing consistency.",
+    workflowPoints: [
+      "See the design before you export anything",
+      "Keep styling controls simple enough for fast iteration",
+      "Move from one-off use cases into bulk only when the workflow proves itself",
     ],
     faqs: [
       {
@@ -175,6 +191,14 @@ export const landingPages = [
       "Feedback and rating experiences for post-campaign insight",
       "Blog, landing page, and pricing links for funnel continuity",
     ],
+    workflowTitle: "Marketing QR campaigns work best when the destination feels intentional.",
+    workflowBody:
+      "Great campaign QR codes do more than open a random page. They continue the message, preserve the offer context, and support response capture after the campaign lands. That means the generator, landing flow, and reporting need to work together.",
+    workflowPoints: [
+      "Keep scan destinations aligned with the CTA on print",
+      "Use feedback and rating to measure response, not just scans",
+      "Connect campaign QR pages to the wider pricing and content funnel",
+    ],
     faqs: [
       {
         question: "Can marketers use branded QR codes?",
@@ -203,6 +227,14 @@ export const landingPages = [
       "Bulk-generate attendee assets with CSV imports",
       "Collect feedback after sessions or activations",
     ],
+    workflowTitle: "Event teams need QR coverage before, during, and after the event.",
+    workflowBody:
+      "A useful event QR system supports registration, schedules, wayfinding, booth engagement, and post-session feedback. The workflow has to stay clear for operators while still feeling smooth for attendees who scan in fast-moving environments.",
+    workflowPoints: [
+      "Use one setup for attendee-facing details and operator-facing bulk output",
+      "Generate event assets in batches when guest lists grow",
+      "Capture feedback while sessions and activations are still fresh",
+    ],
     faqs: [
       {
         question: "Can this support large attendee lists?",
@@ -230,6 +262,14 @@ export const landingPages = [
       "Generate product-linked QR codes in bulk",
       "Track ZIP outputs and row-level job items",
       "Use PDF, gallery, and support content after purchase",
+    ],
+    workflowTitle: "Packaging and inventory workflows need reliability more than gimmicks.",
+    workflowBody:
+      "For packaging inserts, warehouse labels, and product-linked experiences, teams need clean naming, predictable output, and a simple way to route scans into the right support content after purchase. That is where a real queue and artifact history matter.",
+    workflowPoints: [
+      "Keep SKU-scale batches organized with downloadable artifacts",
+      "Support support-doc, gallery, and feedback flows after purchase",
+      "Make warehouse and brand teams work from the same operational output",
     ],
     faqs: [
       {
