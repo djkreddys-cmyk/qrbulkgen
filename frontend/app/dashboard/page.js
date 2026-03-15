@@ -400,9 +400,8 @@ export default function Dashboard() {
               Clear Filters
             </button>
           </div>
-          <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-slate-200 pt-3 text-xs text-slate-500">
-            <span className="rounded-full bg-slate-100 px-3 py-1 font-semibold text-slate-700">Live control strip</span>
-            <span>Archived QR jobs appear here when Status is set to <span className="font-semibold text-slate-700">Archived</span> or <span className="font-semibold text-slate-700">All</span>. Archived rows show a permanent delete action.</span>
+          <div className="mt-3 border-t border-slate-200 pt-3 text-xs text-slate-500">
+            Archived QR jobs appear when Status is set to <span className="font-semibold text-slate-700">Archived</span> or <span className="font-semibold text-slate-700">All</span>. Archived rows show a <span className="font-semibold text-slate-700">Delete Permanently</span> action.
           </div>
         </section>
 
