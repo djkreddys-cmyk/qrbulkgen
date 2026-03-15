@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Image,
   ScrollView,
@@ -12,7 +12,7 @@ import { Picker } from "@react-native-picker/picker";
 import { useAuth } from "../context/AuthContext";
 import { apiRequest, createAuthHeaders } from "../lib/api";
 import { shareDataUrlFile } from "../lib/files";
-import { getQrPlaceholder, QR_TYPES } from "../lib/qr";
+import { applyExpiryToContent, getQrPlaceholder, QR_TYPES, supportsExpiry } from "../lib/qr";
 
 const FORMATS = ["png", "svg"];
 const EC_LEVELS = ["L", "M", "Q", "H"];
@@ -73,6 +73,7 @@ function SelectRow({ label, value, options, onChange }) {
 
 export function SingleGenerateScreen() {
   const { token, singleDraft, setSingleDraft } = useAuth();
+  const skipQrTypeResetRef = useRef(false);
   const [qrType, setQrType] = useState("URL");
   const [content, setContent] = useState("https://www.qrbulkgen.com");
   const [filenamePrefix, setFilenamePrefix] = useState("mobile-qr");
@@ -85,6 +86,7 @@ export function SingleGenerateScreen() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [shareMessage, setShareMessage] = useState("");
+  const [expiryDate, setExpiryDate] = useState("");
 
   const previewSource = useMemo(() => {
     if (!artifact?.dataUrl) return null;
@@ -98,6 +100,7 @@ export function SingleGenerateScreen() {
     if (!singleDraft) {
       return;
     }
+    skipQrTypeResetRef.current = true;
     if (singleDraft.qrType) {
       setQrType(singleDraft.qrType);
     }
@@ -108,11 +111,20 @@ export function SingleGenerateScreen() {
   }, [singleDraft, setSingleDraft]);
 
   useEffect(() => {
+    if (skipQrTypeResetRef.current) {
+      skipQrTypeResetRef.current = false;
+      setArtifact(null);
+      setJob(null);
+      setError("");
+      setShareMessage("");
+      return;
+    }
     setArtifact(null);
     setJob(null);
     setError("");
     setShareMessage("");
     setContent("");
+    setExpiryDate("");
   }, [qrType]);
 
   async function handleGenerate() {
@@ -120,11 +132,12 @@ export function SingleGenerateScreen() {
     setError("");
     setShareMessage("");
     try {
+      const nextContent = applyExpiryToContent(qrType, content, expiryDate);
       const data = await apiRequest("/qr/single", {
         method: "POST",
         headers: createAuthHeaders(token),
         body: JSON.stringify({
-          content,
+          content: nextContent,
           qrType,
           filenamePrefix,
           foregroundColor,
@@ -204,6 +217,31 @@ export function SingleGenerateScreen() {
               color: "#0f172a",
             }}
           />
+          <Text style={{ color: "#64748b", fontSize: 12 }}>
+            Example format: {getQrPlaceholder(qrType)}
+          </Text>
+        </View>
+
+        <View style={{ gap: 6 }}>
+          <FieldLabel>LAST SCAN DATE / EXPIRY</FieldLabel>
+          <TextInput
+            value={expiryDate}
+            onChangeText={setExpiryDate}
+            placeholder="MM/DD/YYYY or DD/MM/YYYY"
+            style={{
+              borderWidth: 1,
+              borderColor: "#cbd5e1",
+              borderRadius: 16,
+              paddingHorizontal: 14,
+              paddingVertical: 12,
+              color: "#0f172a",
+            }}
+          />
+          <Text style={{ color: "#64748b", fontSize: 12, lineHeight: 18 }}>
+            Leave blank to default app-hosted QR validity to 6 months from creation. Expiry warnings are
+            enforced on app-hosted QR pages like Rating, Feedback, PDF, and Image Gallery.
+            {!supportsExpiry(qrType, content) ? " Direct QR content types may not honor expiry after scan." : ""}
+          </Text>
         </View>
 
         <View style={{ gap: 6 }}>

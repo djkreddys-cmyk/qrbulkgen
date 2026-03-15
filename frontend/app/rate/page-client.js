@@ -15,6 +15,8 @@ export default function RateClientPage() {
   const title = searchParams.get("title") || "Rate your experience"
   const style = searchParams.get("style") === "numbers" ? "numbers" : "stars"
   const scale = searchParams.get("scale") === "10" ? 10 : 5
+  const expiryValue = searchParams.get("exp") || ""
+  const isExpired = expiryValue ? new Date(expiryValue).getTime() < Date.now() : false
 
   const options = useMemo(() => Array.from({ length: scale }, (_, i) => i + 1), [scale])
 
@@ -47,7 +49,12 @@ export default function RateClientPage() {
       <section className="w-full max-w-lg bg-white border rounded-lg p-8">
         <h1 className="text-2xl font-bold">{title}</h1>
 
-        {!submitted ? (
+        {isExpired ? (
+          <div className="mt-6 rounded border border-amber-200 bg-amber-50 p-4 text-amber-800">
+            <p className="font-semibold">QR expired</p>
+            <p className="mt-1 text-sm">This rating QR is no longer accepting scans.</p>
+          </div>
+        ) : !submitted ? (
           <>
             <p className="mt-2 text-gray-600">Select your rating:</p>
             {style === "stars" ? (

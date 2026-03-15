@@ -79,7 +79,63 @@ function normalizeSiteOrigin(value, fallbackOrigin) {
   }
 }
 
-function buildQrContent(type, fields, appOrigin, ids, socialLinks) {
+function addMonths(date, months) {
+  const copy = new Date(date)
+  copy.setMonth(copy.getMonth() + months)
+  return copy
+}
+
+function parseFlexibleExpiry(value) {
+  const raw = String(value || "").trim()
+  if (!raw) return null
+
+  if (raw.includes("T")) {
+    const parsed = new Date(raw)
+    return Number.isNaN(parsed.getTime()) ? null : parsed
+  }
+
+  const slashMatch = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/)
+  if (slashMatch) {
+    const first = Number(slashMatch[1])
+    const second = Number(slashMatch[2])
+    const year = Number(slashMatch[3])
+
+    let month
+    let day
+
+    if (first > 12 && second <= 12) {
+      day = first
+      month = second
+    } else if (second > 12 && first <= 12) {
+      month = first
+      day = second
+    } else {
+      month = first
+      day = second
+    }
+
+    const parsed = new Date(Date.UTC(year, month - 1, day, 23, 59, 59, 999))
+    return Number.isNaN(parsed.getTime()) ? null : parsed
+  }
+
+  const dashMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  if (dashMatch) {
+    const parsed = new Date(`${raw}T23:59:59.999Z`)
+    return Number.isNaN(parsed.getTime()) ? null : parsed
+  }
+
+  const fallback = new Date(raw)
+  return Number.isNaN(fallback.getTime()) ? null : fallback
+}
+
+function toExpiryQueryValue(value) {
+  const parsed = parseFlexibleExpiry(value)
+  return parsed ? parsed.toISOString() : ""
+}
+
+function buildQrContent(type, fields, appOrigin, ids, socialLinks, expiryDate) {
+  const expiryValue = toExpiryQueryValue(expiryDate) || addMonths(new Date(), 6).toISOString()
+  const expiryParam = expiryValue ? `exp=${encodeURIComponent(expiryValue)}` : ""
   switch (type) {
     case "URL":
       return fields.url.trim()
@@ -141,7 +197,7 @@ function buildQrContent(type, fields, appOrigin, ids, socialLinks) {
         return `bitcoin:${fields.bitcoinAddress.trim()}${amount}${label}${message}`
       }
     case "PDF":
-      return ids.pdfLinkId ? `${appOrigin}/pdf/${ids.pdfLinkId}` : fields.pdfUrl.trim()
+      return ids.pdfLinkId ? `${appOrigin}/pdf/${ids.pdfLinkId}${expiryParam ? `?${expiryParam}` : ""}` : fields.pdfUrl.trim()
     case "Social Media":
       return socialLinks
         .map((item) => {
@@ -156,16 +212,16 @@ function buildQrContent(type, fields, appOrigin, ids, socialLinks) {
     case "App Store":
       return fields.appStoreUrl.trim()
     case "Image Gallery":
-      return ids.galleryLinkId ? `${appOrigin}/gallery/${ids.galleryLinkId}` : fields.galleryUrl.trim()
+      return ids.galleryLinkId ? `${appOrigin}/gallery/${ids.galleryLinkId}${expiryParam ? `?${expiryParam}` : ""}` : fields.galleryUrl.trim()
     case "Rating": {
       const title = encodeURIComponent(fields.ratingTitle || "Rate your experience")
       const style = encodeURIComponent(fields.ratingStyle || "stars")
       const scale = encodeURIComponent((fields.ratingStyle || "stars") === "stars" ? "5" : fields.ratingScale || "5")
-      return `${appOrigin}/rate?title=${title}&style=${style}&scale=${scale}`
+      return `${appOrigin}/rate?title=${title}&style=${style}&scale=${scale}${expiryParam ? `&${expiryParam}` : ""}`
     }
     case "Feedback": {
       const qs = (fields.feedbackQuestions || []).map((q) => q.trim()).filter(Boolean)
-      return `${appOrigin}/feedback?f=${encodeURIComponent(encodePayload({ title: fields.feedbackTitle || "Share your feedback", questions: qs }))}`
+      return `${appOrigin}/feedback?f=${encodeURIComponent(encodePayload({ title: fields.feedbackTitle || "Share your feedback", questions: qs }))}${expiryParam ? `&${expiryParam}` : ""}`
     }
     default:
       return ""
@@ -216,6 +272,7 @@ export function SingleGenerateContent({ embedded = false }) {
   const [logoDataUrl, setLogoDataUrl] = useState("")
   const [downloadResolution, setDownloadResolution] = useState(1024)
   const [appOrigin, setAppOrigin] = useState("")
+  const [expiryDate, setExpiryDate] = useState("")
 
   const [galleryMode, setGalleryMode] = useState("url")
   const [pdfMode, setPdfMode] = useState("url")
@@ -292,9 +349,9 @@ export function SingleGenerateContent({ embedded = false }) {
   const generatedContent = useMemo(
     () =>
       canGenerate && appOrigin
-        ? buildQrContent(qrType, fields, appOrigin, { galleryLinkId, pdfLinkId }, socialLinks)
+        ? buildQrContent(qrType, fields, appOrigin, { galleryLinkId, pdfLinkId }, socialLinks, expiryDate)
         : "",
-    [canGenerate, appOrigin, qrType, fields, galleryLinkId, pdfLinkId, socialLinks],
+    [canGenerate, appOrigin, qrType, fields, galleryLinkId, pdfLinkId, socialLinks, expiryDate],
   )
 
   function setField(name, value) {
@@ -690,6 +747,21 @@ export function SingleGenerateContent({ embedded = false }) {
               <div>
                 {!!uploadError && <p className="text-sm text-red-600">{uploadError}</p>}
                 {!!uploadMessage && <p className="text-sm text-green-700">{uploadMessage}</p>}
+              </div>
+            )}
+
+            {["PDF", "Image Gallery", "Rating", "Feedback"].includes(qrType) && (
+              <div>
+                <label className="block mb-1 text-sm">Last Scan Date / Expiry</label>
+                <input
+                  type="datetime-local"
+                  value={expiryDate}
+                  onChange={(e) => setExpiryDate(e.target.value)}
+                  className="w-full border p-2"
+                />
+                <p className="mt-1 text-xs text-slate-500">
+                  After this time, app-hosted QR pages show an expiry warning instead of the normal content.
+                </p>
               </div>
             )}
 

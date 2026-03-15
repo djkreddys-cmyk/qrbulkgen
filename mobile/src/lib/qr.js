@@ -47,3 +47,87 @@ export function getQrPlaceholder(qrType) {
 export function looksLikeUrl(value) {
   return /^https?:\/\//i.test(value || "");
 }
+
+export function addMonths(date, months) {
+  const copy = new Date(date);
+  copy.setMonth(copy.getMonth() + months);
+  return copy;
+}
+
+export function parseFlexibleExpiry(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return null;
+
+  if (raw.includes("T")) {
+    const parsed = new Date(raw);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+
+  const slashMatch = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (slashMatch) {
+    const first = Number(slashMatch[1]);
+    const second = Number(slashMatch[2]);
+    const year = Number(slashMatch[3]);
+
+    let month;
+    let day;
+
+    if (first > 12 && second <= 12) {
+      day = first;
+      month = second;
+    } else if (second > 12 && first <= 12) {
+      month = first;
+      day = second;
+    } else {
+      month = first;
+      day = second;
+    }
+
+    const parsed = new Date(Date.UTC(year, month - 1, day, 23, 59, 59, 999));
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+
+  const isoDateMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (isoDateMatch) {
+    const parsed = new Date(`${raw}T23:59:59.999Z`);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+
+  const fallback = new Date(raw);
+  return Number.isNaN(fallback.getTime()) ? null : fallback;
+}
+
+export function supportsExpiry(qrType, content) {
+  if (["PDF", "Image Gallery", "Rating", "Feedback"].includes(qrType)) {
+    return true;
+  }
+
+  if (!looksLikeUrl(content)) {
+    return false;
+  }
+
+  try {
+    const parsed = new URL(content);
+    const pathname = parsed.pathname.toLowerCase();
+    return pathname === "/rate" || pathname === "/feedback" || pathname.startsWith("/gallery/") || pathname.startsWith("/pdf/");
+  } catch (_error) {
+    return false;
+  }
+}
+
+export function applyExpiryToContent(qrType, content, expiryInput) {
+  const raw = String(content || "").trim();
+  if (!raw || !looksLikeUrl(raw) || !supportsExpiry(qrType, raw)) {
+    return raw;
+  }
+
+  const expiry = parseFlexibleExpiry(expiryInput) || addMonths(new Date(), 6);
+
+  try {
+    const parsed = new URL(raw);
+    parsed.searchParams.set("exp", expiry.toISOString());
+    return parsed.toString();
+  } catch (_error) {
+    return raw;
+  }
+}

@@ -94,6 +94,43 @@ function parseDateFilter(value, endOfDay = false) {
   return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
 }
 
+function extractPublicAnalysisTarget(content) {
+  const raw = String(content || "").trim();
+  if (!/^https?:\/\//i.test(raw)) {
+    return null;
+  }
+
+  try {
+    const parsed = new URL(raw);
+    const pathname = parsed.pathname.toLowerCase();
+
+    if (pathname === "/rate") {
+      return {
+        kind: "rating",
+        title: parsed.searchParams.get("title") || "",
+      };
+    }
+
+    if (pathname === "/feedback") {
+      const encoded = parsed.searchParams.get("f") || "";
+      if (!encoded) {
+        return null;
+      }
+
+      const decoded = Buffer.from(encoded, "base64").toString("utf8");
+      const payload = JSON.parse(decoded);
+      return {
+        kind: "feedback",
+        title: String(payload?.title || "").trim(),
+      };
+    }
+  } catch (_error) {
+    return null;
+  }
+
+  return null;
+}
+
 function normalizeBulkOptions(body) {
   const fakePayload = {
     content: "csv-placeholder",
@@ -623,6 +660,142 @@ bulkRouter.get("/reports/public-engagement", requireAuth, async (req, res, next)
           title: entry.title,
           questions: Object.values(entry.questions),
         })),
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+bulkRouter.get("/jobs/:id/analysis", requireAuth, async (req, res, next) => {
+  try {
+    const jobId = String(req.params.id || "").trim();
+    if (!jobId) {
+      throw createHttpError(400, "VALIDATION_ERROR", "job id is required");
+    }
+
+    const jobResult = await query(
+      `SELECT id, job_type, bulk_qr_type, qr_content, total_count, success_count, failure_count, status
+       FROM qr_jobs
+       WHERE id = $1 AND user_id = $2
+       LIMIT 1`,
+      [jobId, req.user.id],
+    );
+
+    const job = jobResult.rows[0];
+    if (!job) {
+      throw createHttpError(404, "NOT_FOUND", "Job not found");
+    }
+
+    const typeLabel = job.job_type === "single" ? "Single" : job.bulk_qr_type;
+
+    const typePerformanceResult = await query(
+      `SELECT
+         COUNT(*)::int AS jobs_count,
+         COALESCE(SUM(total_count), 0)::int AS requested_count,
+         COALESCE(SUM(success_count), 0)::int AS success_count,
+         COALESCE(SUM(failure_count), 0)::int AS failure_count,
+         COUNT(*) FILTER (WHERE status = 'completed')::int AS completed_jobs,
+         COUNT(*) FILTER (WHERE status = 'failed')::int AS failed_jobs
+       FROM qr_jobs
+       WHERE user_id = $1
+         AND (
+           CASE
+             WHEN job_type = 'single' THEN 'Single'
+             ELSE bulk_qr_type
+           END
+         ) = $2`,
+      [req.user.id, typeLabel],
+    );
+
+    const typePerformanceRow = typePerformanceResult.rows[0];
+    const publicTarget = extractPublicAnalysisTarget(job.qr_content);
+
+    let rating = null;
+    let feedback = null;
+
+    if (publicTarget?.kind === "rating" && publicTarget.title) {
+      const ratingRows = await query(
+        `SELECT style, scale, rating, COUNT(*)::int AS count
+         FROM rating_submissions
+         WHERE COALESCE(title, 'Untitled rating form') = $1
+         GROUP BY style, scale, rating
+         ORDER BY rating ASC`,
+        [publicTarget.title],
+      );
+
+      rating = {
+        title: publicTarget.title,
+        style: ratingRows.rows[0]?.style || "stars",
+        scale: ratingRows.rows[0]?.scale || 5,
+        buckets: ratingRows.rows.map((row) => ({
+          label: String(row.rating),
+          count: row.count,
+        })),
+      };
+    }
+
+    if (publicTarget?.kind === "feedback" && publicTarget.title) {
+      const feedbackRows = await query(
+        `SELECT questions, answers
+         FROM feedback_submissions
+         WHERE title = $1
+         ORDER BY created_at DESC`,
+        [publicTarget.title],
+      );
+
+      const groupedQuestions = {};
+      feedbackRows.rows.forEach((row) => {
+        const questions = Array.isArray(row.questions) ? row.questions : [];
+        const answers = Array.isArray(row.answers) ? row.answers : [];
+        questions.forEach((question, index) => {
+          const label = String(question || "").trim();
+          if (!label) return;
+          if (!groupedQuestions[label]) {
+            groupedQuestions[label] = {
+              label,
+              responses: 0,
+              latestAnswers: [],
+            };
+          }
+          groupedQuestions[label].responses += 1;
+          const answer = String(answers[index] || "").trim();
+          if (answer && groupedQuestions[label].latestAnswers.length < 5) {
+            groupedQuestions[label].latestAnswers.push(answer);
+          }
+        });
+      });
+
+      feedback = {
+        title: publicTarget.title,
+        questions: Object.values(groupedQuestions),
+      };
+    }
+
+    res.json({
+      analysis: {
+        job: {
+          id: job.id,
+          jobType: job.job_type,
+          qrType: typeLabel,
+          status: job.status,
+          totalCount: job.total_count,
+          successCount: job.success_count,
+          failureCount: job.failure_count,
+        },
+        typePerformance: typePerformanceRow
+          ? {
+              label: typeLabel,
+              jobsCount: typePerformanceRow.jobs_count,
+              requestedCount: typePerformanceRow.requested_count,
+              successCount: typePerformanceRow.success_count,
+              failureCount: typePerformanceRow.failure_count,
+              completedJobs: typePerformanceRow.completed_jobs,
+              failedJobs: typePerformanceRow.failed_jobs,
+            }
+          : null,
+        rating,
+        feedback,
       },
     });
   } catch (error) {

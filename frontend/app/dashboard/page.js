@@ -96,6 +96,7 @@ export default function Dashboard() {
   const [isLoading, setIsLoading] = useState(true)
   const [filters, setFilters] = useState({ startDate: "", endDate: "" })
   const [busyJobId, setBusyJobId] = useState("")
+  const [analysisJobId, setAnalysisJobId] = useState("")
 
   const queryString = useMemo(() => buildQuery(filters), [filters])
 
@@ -165,6 +166,33 @@ export default function Dashboard() {
   const ratingCharts = engagementReport?.ratings || []
   const feedbackGroups = engagementReport?.feedback || []
   const qrTypePerformance = overviewReport?.qrTypePerformance || []
+
+  function getJobAnalysis(job) {
+    const typeEntry = qrTypePerformance.find((entry) => entry.label === (job.jobType === "single" ? "Single" : job.qrType))
+    const content = job?.editPayload?.content || ""
+    let linkedTitle = ""
+    try {
+      if (content && /^https?:\/\//i.test(content)) {
+        const parsed = new URL(content)
+        if (parsed.pathname === "/rate") {
+          linkedTitle = parsed.searchParams.get("title") || ""
+        }
+        if (parsed.pathname === "/feedback") {
+          const encoded = parsed.searchParams.get("f") || ""
+          if (encoded) {
+            linkedTitle = JSON.parse(decodeURIComponent(escape(atob(encoded)))).title || ""
+          }
+        }
+      }
+    } catch {
+      linkedTitle = ""
+    }
+
+    const ratingEntry = linkedTitle ? ratingCharts.find((entry) => entry.title === linkedTitle) : null
+    const feedbackEntry = linkedTitle ? feedbackGroups.find((entry) => entry.title === linkedTitle) : null
+
+    return { typeEntry, ratingEntry, feedbackEntry }
+  }
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -283,6 +311,13 @@ export default function Dashboard() {
                           >
                             {job.jobType === "single" ? "Edit QR" : "Open Bulk"}
                           </button>
+                          <button
+                            type="button"
+                            onClick={() => setAnalysisJobId((current) => (current === job.id ? "" : job.id))}
+                            className="rounded-xl border border-sky-300 px-3 py-2 text-sm font-medium text-sky-700"
+                          >
+                            {analysisJobId === job.id ? "Hide Analysis" : "Analysis"}
+                          </button>
                           {job.artifact?.filePath && (
                             <a
                               className="rounded-xl bg-slate-950 px-3 py-2 text-sm font-medium text-white"
@@ -304,6 +339,93 @@ export default function Dashboard() {
                           </button>
                         </div>
                       </div>
+
+                      {analysisJobId === job.id && (
+                        <div className="mt-5 rounded-2xl bg-slate-50 p-4">
+                          <h4 className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">
+                            Analysis for this QR Job
+                          </h4>
+                          {(() => {
+                            const analysis = getJobAnalysis(job)
+                            return (
+                              <div className="mt-4 space-y-4">
+                                <div className="flex flex-wrap gap-2">
+                                  <MetricPill label="Requested" value={job.totalCount} />
+                                  <MetricPill label="Success" value={job.successCount} tone="success" />
+                                  <MetricPill label="Failure" value={job.failureCount} tone="danger" />
+                                  <MetricPill
+                                    label="Success Rate"
+                                    value={job.totalCount ? `${Math.round((job.successCount / job.totalCount) * 100)}%` : "0%"}
+                                    tone="accent"
+                                  />
+                                </div>
+
+                                {analysis.typeEntry && (
+                                  <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                                    <p className="font-medium text-slate-900">{job.qrType} overall performance</p>
+                                    <div className="mt-3 flex flex-wrap gap-2">
+                                      <MetricPill label="Jobs" value={analysis.typeEntry.jobsCount} />
+                                      <MetricPill label="Requested" value={analysis.typeEntry.requestedCount} />
+                                      <MetricPill label="Success" value={analysis.typeEntry.successCount} tone="success" />
+                                      <MetricPill label="Failure" value={analysis.typeEntry.failureCount} tone="danger" />
+                                    </div>
+                                  </div>
+                                )}
+
+                                {analysis.ratingEntry && (
+                                  <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                                    <p className="font-medium text-slate-900">Rating response breakdown</p>
+                                    <div className="mt-3 space-y-2">
+                                      {analysis.ratingEntry.buckets.map((bucket) => (
+                                        <div key={bucket.label}>
+                                          <div className="flex items-center justify-between text-sm">
+                                            <span className="text-slate-700">{bucket.label}</span>
+                                            <span className="text-slate-500">{bucket.count}</span>
+                                          </div>
+                                          <div className="mt-1 h-2 overflow-hidden rounded-full bg-slate-100">
+                                            <div
+                                              className="h-full rounded-full bg-fuchsia-500"
+                                              style={{
+                                                width: `${Math.max(
+                                                  (bucket.count / Math.max(...analysis.ratingEntry.buckets.map((entry) => entry.count), 1)) * 100,
+                                                  6,
+                                                )}%`,
+                                              }}
+                                            />
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {analysis.feedbackEntry && (
+                                  <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                                    <p className="font-medium text-slate-900">Feedback question summary</p>
+                                    <div className="mt-3 space-y-3">
+                                      {analysis.feedbackEntry.questions.map((question) => (
+                                        <div key={question.label} className="rounded-2xl bg-slate-50 p-3">
+                                          <div className="flex items-center justify-between gap-3">
+                                            <span className="font-medium text-slate-800">{question.label}</span>
+                                            <span className="text-sm text-slate-500">{question.responses} responses</span>
+                                          </div>
+                                          {!!question.latestAnswers.length && (
+                                            <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-600">
+                                              {question.latestAnswers.map((answer, index) => (
+                                                <li key={`${question.label}-${index}`}>{answer}</li>
+                                              ))}
+                                            </ul>
+                                          )}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            )
+                          })()}
+                        </div>
+                      )}
                     </article>
                   ))}
                 </div>

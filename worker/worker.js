@@ -52,6 +52,74 @@ function encodeFeedbackPayload(payload) {
   return Buffer.from(JSON.stringify(payload), "utf8").toString("base64");
 }
 
+function addMonths(date, months) {
+  const copy = new Date(date);
+  copy.setMonth(copy.getMonth() + months);
+  return copy;
+}
+
+function parseFlexibleDate(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return null;
+
+  if (raw.includes("T")) {
+    const parsed = new Date(raw);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+
+  const slashMatch = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (slashMatch) {
+    const first = Number(slashMatch[1]);
+    const second = Number(slashMatch[2]);
+    const year = Number(slashMatch[3]);
+
+    let month;
+    let day;
+
+    if (first > 12 && second <= 12) {
+      day = first;
+      month = second;
+    } else if (second > 12 && first <= 12) {
+      month = first;
+      day = second;
+    } else {
+      month = first;
+      day = second;
+    }
+
+    const parsed = new Date(Date.UTC(year, month - 1, day, 23, 59, 59, 999));
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+
+  const dashMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (dashMatch) {
+    const parsed = new Date(`${raw}T23:59:59.999Z`);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+
+  const fallback = new Date(raw);
+  return Number.isNaN(fallback.getTime()) ? null : fallback;
+}
+
+function toExpiryIso(value) {
+  const parsed = parseFlexibleDate(value);
+  return parsed ? parsed.toISOString() : "";
+}
+
+function appendExpiry(url, row) {
+  const expiresAt =
+    toExpiryIso(getCell(row, "expiresAt") || getCell(row, "expiry") || getCell(row, "expiryDate")) ||
+    addMonths(new Date(), 6).toISOString();
+  if (!expiresAt) return url;
+  try {
+    const parsed = new URL(url);
+    parsed.searchParams.set("exp", expiresAt);
+    return parsed.toString();
+  } catch {
+    return url;
+  }
+}
+
 function buildBulkContent(qrType, row) {
   switch (qrType) {
     case "URL":
@@ -89,10 +157,11 @@ function buildBulkContent(qrType, row) {
     case "Location":
       return `geo:${getCell(row, "latitude")},${getCell(row, "longitude")}`;
     case "Youtube":
-    case "PDF":
     case "App Store":
-    case "Image Gallery":
       return getCell(row, "url");
+    case "PDF":
+    case "Image Gallery":
+      return appendExpiry(getCell(row, "url"), row);
     case "WIFI": {
       const wifiType = getCell(row, "wifiType") || "WPA";
       const ssid = getCell(row, "ssid");
@@ -136,7 +205,7 @@ function buildBulkContent(qrType, row) {
       const title = encodeURIComponent(getCell(row, "title") || "Rate your experience");
       const style = getCell(row, "style") === "numbers" ? "numbers" : "stars";
       const scale = style === "numbers" ? (getCell(row, "scale") === "10" ? "10" : "5") : "5";
-      return `${frontendBaseUrl}/rate?title=${title}&style=${style}&scale=${scale}`;
+      return appendExpiry(`${frontendBaseUrl}/rate?title=${title}&style=${style}&scale=${scale}`, row);
     }
     case "Feedback": {
       const title = getCell(row, "title") || "Share your feedback";
@@ -150,7 +219,7 @@ function buildBulkContent(qrType, row) {
           questions: questions.length ? questions : ["How was your experience?"],
         }),
       );
-      return `${frontendBaseUrl}/feedback?f=${encoded}`;
+      return appendExpiry(`${frontendBaseUrl}/feedback?f=${encoded}`, row);
     }
     default:
       return getCell(row, "content");

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { ScrollView, Text, TouchableOpacity, View } from "react-native";
+import { ScrollView, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { Picker } from "@react-native-picker/picker";
 import * as DocumentPicker from "expo-document-picker";
 
@@ -282,6 +282,29 @@ export function BulkJobsScreen() {
         <View
           style={{
             borderWidth: 1,
+            borderColor: "#dbe3f0",
+            borderRadius: 16,
+            padding: 14,
+            backgroundColor: "#f8fafc",
+            gap: 6,
+          }}
+        >
+          <Text style={{ color: "#0f172a", fontWeight: "700" }}>Validity / expiresAt column</Text>
+          <Text style={{ color: "#64748b", lineHeight: 20 }}>
+            You can add an optional <Text style={{ fontWeight: "700", color: "#0f172a" }}>expiresAt</Text>{" "}
+            column in your CSV. Supported formats:
+          </Text>
+          <Text style={{ color: "#475569" }}>• MM/DD/YYYY</Text>
+          <Text style={{ color: "#475569" }}>• DD/MM/YYYY</Text>
+          <Text style={{ color: "#475569" }}>• YYYY-MM-DD</Text>
+          <Text style={{ color: "#475569" }}>• Full ISO date/time</Text>
+          <Text style={{ color: "#64748b", lineHeight: 20 }}>
+            If left blank, app-hosted QR links default to 6 months validity from the job creation date.
+          </Text>
+        </View>
+        <View
+          style={{
+            borderWidth: 1,
             borderColor: "#cbd5e1",
             borderRadius: 16,
             overflow: "hidden",
@@ -328,9 +351,19 @@ export function BulkJobsScreen() {
           </View>
           <View style={{ flex: 1, gap: 6 }}>
             <Text style={{ color: "#64748b", fontSize: 12, fontWeight: "700" }}>ZIP FILE NAME PREFIX</Text>
-            <View style={{ borderWidth: 1, borderColor: "#cbd5e1", borderRadius: 16, paddingHorizontal: 14, paddingVertical: 12 }}>
-              <Text style={{ color: "#0f172a" }}>{createFilenamePrefix}</Text>
-            </View>
+            <TextInput
+              value={createFilenamePrefix}
+              onChangeText={setCreateFilenamePrefix}
+              placeholder="qr"
+              style={{
+                borderWidth: 1,
+                borderColor: "#cbd5e1",
+                borderRadius: 16,
+                paddingHorizontal: 14,
+                paddingVertical: 12,
+                color: "#0f172a",
+              }}
+            />
           </View>
         </View>
         <View style={{ flexDirection: "row", gap: 12 }}>

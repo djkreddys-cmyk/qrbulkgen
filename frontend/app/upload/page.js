@@ -29,12 +29,12 @@ const BULK_QR_TYPES = [
 ]
 
 const SAMPLE_ROWS_BY_TYPE = {
-  URL: { content: "https://example.com", filename: "qr-url-1" },
-  Text: { content: "Hello from bulk QR", filename: "qr-text-1" },
-  Email: { email: "hello@example.com", subject: "Hello", body: "Message body", filename: "qr-email-1" },
-  Phone: { phone: "+919876543210", filename: "qr-phone-1" },
-  SMS: { phone: "+919876543210", message: "Your SMS text", filename: "qr-sms-1" },
-  WhatsApp: { phone: "919876543210", message: "Hello on WhatsApp", filename: "qr-whatsapp-1" },
+  URL: { content: "https://example.com", filename: "qr-url-1", expiresAt: "" },
+  Text: { content: "Hello from bulk QR", filename: "qr-text-1", expiresAt: "" },
+  Email: { email: "hello@example.com", subject: "Hello", body: "Message body", filename: "qr-email-1", expiresAt: "" },
+  Phone: { phone: "+919876543210", filename: "qr-phone-1", expiresAt: "" },
+  SMS: { phone: "+919876543210", message: "Your SMS text", filename: "qr-sms-1", expiresAt: "" },
+  WhatsApp: { phone: "919876543210", message: "Hello on WhatsApp", filename: "qr-whatsapp-1", expiresAt: "" },
   vCard: {
     firstName: "John",
     lastName: "Doe",
@@ -45,10 +45,11 @@ const SAMPLE_ROWS_BY_TYPE = {
     url: "https://example.com",
     address: "Bengaluru",
     filename: "qr-vcard-1",
+    expiresAt: "",
   },
-  Location: { latitude: "12.9716", longitude: "77.5946", filename: "qr-location-1" },
-  Youtube: { url: "https://youtube.com/watch?v=abc123", filename: "qr-youtube-1" },
-  WIFI: { ssid: "MyWifi", password: "secret123", wifiType: "WPA", hidden: "false", filename: "qr-wifi-1" },
+  Location: { latitude: "12.9716", longitude: "77.5946", filename: "qr-location-1", expiresAt: "" },
+  Youtube: { url: "https://youtube.com/watch?v=abc123", filename: "qr-youtube-1", expiresAt: "" },
+  WIFI: { ssid: "MyWifi", password: "secret123", wifiType: "WPA", hidden: "false", filename: "qr-wifi-1", expiresAt: "" },
   Event: {
     title: "Launch Event",
     start: "2026-03-20T10:00:00Z",
@@ -56,6 +57,7 @@ const SAMPLE_ROWS_BY_TYPE = {
     location: "Bengaluru",
     description: "Product launch",
     filename: "qr-event-1",
+    expiresAt: "",
   },
   Bitcoin: {
     address: "1BoatSLRHtKNngkdXEeobR76b53LETtpyT",
@@ -63,16 +65,18 @@ const SAMPLE_ROWS_BY_TYPE = {
     label: "Payment",
     message: "Order123",
     filename: "qr-bitcoin-1",
+    expiresAt: "",
   },
-  PDF: { url: "https://example.com/file.pdf", filename: "qr-pdf-1" },
+  PDF: { url: "https://www.qrbulkgen.com/pdf/your-public-id", filename: "qr-pdf-1", expiresAt: "2026-04-30T23:59:59Z" },
   "Social Media": {
     content: "Instagram: https://instagram.com/yourbrand\nTwitter: https://x.com/yourbrand",
     filename: "qr-social-1",
+    expiresAt: "",
   },
-  "App Store": { url: "https://apps.apple.com/app/id000000", filename: "qr-appstore-1" },
-  "Image Gallery": { url: "https://example.com/gallery", filename: "qr-gallery-1" },
-  Rating: { title: "Rate your experience", style: "stars", scale: "5", filename: "qr-rating-1" },
-  Feedback: { title: "Share your feedback", questions: "How was your experience?|Any suggestions?", filename: "qr-feedback-1" },
+  "App Store": { url: "https://apps.apple.com/app/id000000", filename: "qr-appstore-1", expiresAt: "" },
+  "Image Gallery": { url: "https://www.qrbulkgen.com/gallery/your-public-id", filename: "qr-gallery-1", expiresAt: "2026-04-30T23:59:59Z" },
+  Rating: { title: "Rate your experience", style: "stars", scale: "5", filename: "qr-rating-1", expiresAt: "2026-04-30T23:59:59Z" },
+  Feedback: { title: "Share your feedback", questions: "How was your experience?|Any suggestions?", filename: "qr-feedback-1", expiresAt: "2026-04-30T23:59:59Z" },
 }
 
 const REQUIRED_COLUMNS_BY_TYPE = {
@@ -94,6 +98,13 @@ const REQUIRED_COLUMNS_BY_TYPE = {
   "Image Gallery": ["url", "filename"],
   Rating: ["title", "style", "scale", "filename"],
   Feedback: ["title", "questions", "filename"],
+}
+
+const OPTIONAL_COLUMNS_BY_TYPE = {
+  PDF: ["expiresAt"],
+  "Image Gallery": ["expiresAt"],
+  Rating: ["expiresAt"],
+  Feedback: ["expiresAt"],
 }
 
 function withAuthHeader() {
@@ -383,6 +394,15 @@ export function BulkGenerateContent({ embedded = false }) {
                 <p className="text-xs text-gray-700 mt-1">
                   {(REQUIRED_COLUMNS_BY_TYPE[qrType] || ["content", "filename"]).join(", ")}
                 </p>
+                {!!OPTIONAL_COLUMNS_BY_TYPE[qrType]?.length && (
+                  <>
+                    <p className="mt-3 text-xs font-semibold text-gray-800">Optional validity column</p>
+                    <p className="text-xs text-gray-700 mt-1">
+                      {OPTIONAL_COLUMNS_BY_TYPE[qrType].join(", ")}. You can use <code>MM/DD/YYYY</code>, <code>DD/MM/YYYY</code>, or ISO format.
+                      If time is not given, the QR stays valid until the end of that day. If left blank, validity defaults to 6 months from creation.
+                    </p>
+                  </>
+                )}
               </div>
             </div>
 

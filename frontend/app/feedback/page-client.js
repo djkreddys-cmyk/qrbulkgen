@@ -16,6 +16,8 @@ export default function FeedbackClientPage() {
   const searchParams = useSearchParams()
   const encoded = searchParams.get("f") || ""
   const payload = useMemo(() => decodePayload(encoded), [encoded])
+  const expiryValue = searchParams.get("exp") || ""
+  const isExpired = expiryValue ? new Date(expiryValue).getTime() < Date.now() : false
 
   const questions = payload?.questions?.length
     ? payload.questions
@@ -60,7 +62,12 @@ export default function FeedbackClientPage() {
       <section className="w-full max-w-2xl bg-white border rounded-lg p-8">
         <h1 className="text-2xl font-bold">{title}</h1>
 
-        {!submitted ? (
+        {isExpired ? (
+          <div className="mt-6 rounded border border-amber-200 bg-amber-50 p-4 text-amber-800">
+            <p className="font-semibold">QR expired</p>
+            <p className="mt-1 text-sm">This feedback QR is no longer accepting scans.</p>
+          </div>
+        ) : !submitted ? (
           <form onSubmit={handleSubmit} className="mt-4 space-y-4">
             {questions.map((question, index) => (
               <div key={index}>
