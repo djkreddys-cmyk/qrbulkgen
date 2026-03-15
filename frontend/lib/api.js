@@ -20,7 +20,9 @@ export async function apiRequest(path, options = {}) {
 
   if (!response.ok) {
     const message = data?.error?.message || "Request failed";
-    throw new Error(message);
+    const error = new Error(message);
+    error.status = response.status;
+    throw error;
   }
 
   return data;

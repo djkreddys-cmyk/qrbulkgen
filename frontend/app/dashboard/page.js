@@ -139,7 +139,10 @@ export default function Dashboard() {
       setEngagementReport(engagementData.report)
       setError("")
     } catch (requestError) {
-      clearAuthSession()
+      if (requestError?.status === 401) {
+        clearAuthSession()
+        router.replace("/login")
+      }
       setError(requestError.message)
     } finally {
       setIsLoading(false)

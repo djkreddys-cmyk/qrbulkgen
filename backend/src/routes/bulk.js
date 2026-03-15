@@ -778,24 +778,24 @@ bulkRouter.get("/reports/public-engagement", requireAuth, async (req, res, next)
     const [ratingRows, feedbackRows] = await Promise.all([
       query(
         `SELECT
-           COALESCE(title, 'Untitled rating form') AS title,
+           COALESCE(rs.title, m.title, 'Untitled rating form') AS title,
            style,
            scale,
            rating,
            COUNT(*)::int AS count
          FROM rating_submissions rs
-         INNER JOIN managed_qr_links m ON m.url = rs.source_url
+         INNER JOIN managed_qr_links m ON m.content = rs.source_url
          WHERE m.user_id = $1
            AND ($2::timestamptz IS NULL OR rs.created_at >= $2::timestamptz)
            AND ($3::timestamptz IS NULL OR rs.created_at <= $3::timestamptz)
-         GROUP BY COALESCE(title, 'Untitled rating form'), style, scale, rating
+         GROUP BY COALESCE(rs.title, m.title, 'Untitled rating form'), style, scale, rating
          ORDER BY title ASC, rating ASC`,
         [req.user.id, startDate, endDate],
       ),
       query(
-        `SELECT fs.title, fs.questions, fs.answers, fs.created_at
+        `SELECT COALESCE(fs.title, m.title) AS title, fs.questions, fs.answers, fs.created_at
          FROM feedback_submissions fs
-         INNER JOIN managed_qr_links m ON m.url = fs.source_url
+         INNER JOIN managed_qr_links m ON m.content = fs.source_url
          WHERE m.user_id = $1
            AND ($2::timestamptz IS NULL OR fs.created_at >= $2::timestamptz)
            AND ($3::timestamptz IS NULL OR fs.created_at <= $3::timestamptz)
@@ -930,11 +930,11 @@ bulkRouter.get("/jobs/:id/analysis", requireAuth, async (req, res, next) => {
     let feedback = null;
     const linkStatsResult = await query(
       `WITH links AS (
-         SELECT id, url, qr_type, title, expires_at
+         SELECT id, content AS url, qr_type, title, expires_at
          FROM managed_qr_links
          WHERE id = $1
          UNION
-         SELECT m.id, m.url, m.qr_type, m.title, m.expires_at
+         SELECT m.id, m.content AS url, m.qr_type, m.title, m.expires_at
          FROM qr_job_items i
          INNER JOIN managed_qr_links m ON m.id = i.managed_link_id
          WHERE i.job_id = $2
@@ -973,11 +973,11 @@ bulkRouter.get("/jobs/:id/analysis", requireAuth, async (req, res, next) => {
     if (targetKind === "Rating") {
       const ratingRows = await query(
         `WITH links AS (
-           SELECT url, title
+           SELECT content AS url, title
            FROM managed_qr_links
            WHERE id = $1
            UNION
-           SELECT m.url, m.title
+           SELECT m.content AS url, m.title
            FROM qr_job_items i
            INNER JOIN managed_qr_links m ON m.id = i.managed_link_id
            WHERE i.job_id = $2
@@ -1018,11 +1018,11 @@ bulkRouter.get("/jobs/:id/analysis", requireAuth, async (req, res, next) => {
     if (targetKind === "Feedback") {
       const feedbackRows = await query(
         `WITH links AS (
-           SELECT url, title
+           SELECT content AS url, title
            FROM managed_qr_links
            WHERE id = $1
            UNION
-           SELECT m.url, m.title
+           SELECT m.content AS url, m.title
            FROM qr_job_items i
            INNER JOIN managed_qr_links m ON m.id = i.managed_link_id
            WHERE i.job_id = $2
