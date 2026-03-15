@@ -1,12 +1,20 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import Navbar from "../../components/Navbar"
 import { SingleGenerateContent } from "./single/page"
 import { BulkGenerateContent } from "../upload/page"
 
 export default function GeneratePage() {
   const [mode, setMode] = useState("single")
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const queryMode = params.get("mode")
+    if (queryMode === "bulk" || queryMode === "single") {
+      setMode(queryMode)
+    }
+  }, [])
 
   return (
     <div>

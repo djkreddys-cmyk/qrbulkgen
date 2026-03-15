@@ -230,6 +230,7 @@ export function SingleGenerateContent({ embedded = false }) {
   const [socialLinks, setSocialLinks] = useState([
     { platform: "Instagram", customPlatform: "", url: "" },
   ])
+  const [editMessage, setEditMessage] = useState("")
 
   const [fields, setFields] = useState({
     url: "", text: "", email: "", subject: "", body: "", phone: "", smsPhone: "", smsMessage: "",
@@ -245,6 +246,36 @@ export function SingleGenerateContent({ embedded = false }) {
 
   useEffect(() => {
     setAppOrigin(normalizeSiteOrigin(process.env.NEXT_PUBLIC_SITE_URL, window.location.origin))
+  }, [])
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const editJob = params.get("editJob")
+    if (!editJob) return
+
+    async function loadEditPayload() {
+      try {
+        const token = getAuthToken()
+        if (!token) return
+        const data = await apiRequest(`/qr/jobs/${editJob}/edit-payload`, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+        const job = data?.job
+        if (!job || job.jobType !== "single") return
+        const nextType = /^https?:\/\//i.test(job.content || "") ? "URL" : "Text"
+        setQrType(nextType)
+        setField(nextType === "URL" ? "url" : "text", job.content || "")
+        setForegroundColor(job.foregroundColor || "#000000")
+        setBackgroundColor(job.backgroundColor || "#ffffff")
+        setErrorCorrectionLevel(job.errorCorrectionLevel || "M")
+        setFilenamePrefix(job.filenamePrefix || "qr")
+        setEditMessage("Loaded settings from selected QR job. Update and download a fresh version anytime.")
+      } catch {
+        setEditMessage("Unable to load that QR for editing.")
+      }
+    }
+
+    loadEditPayload()
   }, [])
 
   const canGenerate = useMemo(
@@ -428,6 +459,7 @@ export function SingleGenerateContent({ embedded = false }) {
   const content = (
     <main className="max-w-6xl mx-auto px-6 py-10">
         <h1 className="text-3xl font-bold">Single QR Generator</h1>
+        {!!editMessage && <p className="mt-3 text-sm text-blue-700">{editMessage}</p>}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mt-8">
           <section className="border rounded-lg p-6 bg-white space-y-4">
             <select value={qrType} onChange={(e) => handleQrTypeChange(e.target.value)} className="w-full border p-2">

@@ -86,6 +86,14 @@ function parseNumber(value, fallback) {
   return Number.isFinite(n) ? n : fallback;
 }
 
+function parseDateFilter(value, endOfDay = false) {
+  const raw = String(value || "").trim();
+  if (!raw) return null;
+  const suffix = endOfDay ? "T23:59:59.999Z" : "T00:00:00.000Z";
+  const parsed = new Date(raw.includes("T") ? raw : `${raw}${suffix}`);
+  return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
+}
+
 function normalizeBulkOptions(body) {
   const fakePayload = {
     content: "csv-placeholder",
@@ -266,6 +274,8 @@ bulkRouter.get("/jobs/summary", requireAuth, async (req, res, next) => {
     const jobType = String(req.query.jobType || "").trim().toLowerCase();
     const filterSingle = jobType === "single";
     const filterBulk = jobType === "bulk";
+    const startDate = parseDateFilter(req.query.startDate);
+    const endDate = parseDateFilter(req.query.endDate, true);
     const result = await query(
       `SELECT
          COUNT(*)::int AS total_jobs,
@@ -281,8 +291,10 @@ bulkRouter.get("/jobs/summary", requireAuth, async (req, res, next) => {
          )
          AND (
            $3 = false OR job_type = 'bulk'
-         )`,
-      [req.user.id, filterSingle, filterBulk],
+         )
+         AND ($4::timestamptz IS NULL OR created_at >= $4::timestamptz)
+         AND ($5::timestamptz IS NULL OR created_at <= $5::timestamptz)`,
+      [req.user.id, filterSingle, filterBulk, startDate, endDate],
     );
 
     const row = result.rows[0];
@@ -307,11 +319,15 @@ bulkRouter.get("/jobs", requireAuth, async (req, res, next) => {
     const jobType = String(req.query.jobType || "").trim().toLowerCase();
     const filterSingle = jobType === "single";
     const filterBulk = jobType === "bulk";
+    const startDate = parseDateFilter(req.query.startDate);
+    const endDate = parseDateFilter(req.query.endDate, true);
 
     const result = await query(
       `SELECT
          j.id, j.job_type, j.status, j.bulk_qr_type, j.source_file_name, j.total_count, j.success_count, j.failure_count,
          j.error_message, j.created_at, j.started_at, j.completed_at,
+         j.qr_content, j.qr_size, j.foreground_color, j.background_color, j.qr_margin, j.output_format,
+         j.error_correction_level, j.filename_prefix,
          a.artifact_type AS artifact_type, a.file_name AS artifact_file_name, a.file_path AS artifact_file_path, a.mime_type AS artifact_mime_type
        FROM qr_jobs j
        LEFT JOIN LATERAL (
@@ -328,9 +344,11 @@ bulkRouter.get("/jobs", requireAuth, async (req, res, next) => {
          AND (
            $3 = false OR j.job_type = 'bulk'
          )
+         AND ($4::timestamptz IS NULL OR j.created_at >= $4::timestamptz)
+         AND ($5::timestamptz IS NULL OR j.created_at <= $5::timestamptz)
        ORDER BY j.created_at DESC
-       LIMIT $4`,
-      [req.user.id, filterSingle, filterBulk, limit],
+       LIMIT $6`,
+      [req.user.id, filterSingle, filterBulk, startDate, endDate, limit],
     );
 
     res.json({
@@ -347,6 +365,16 @@ bulkRouter.get("/jobs", requireAuth, async (req, res, next) => {
         createdAt: row.created_at,
         startedAt: row.started_at,
         completedAt: row.completed_at,
+        editPayload: {
+          content: row.qr_content,
+          size: row.qr_size,
+          foregroundColor: row.foreground_color,
+          backgroundColor: row.background_color,
+          margin: row.qr_margin,
+          format: row.output_format,
+          errorCorrectionLevel: row.error_correction_level,
+          filenamePrefix: row.filename_prefix,
+        },
         artifact: row.artifact_file_path
           ? {
               artifactType: row.artifact_type,
@@ -356,6 +384,214 @@ bulkRouter.get("/jobs", requireAuth, async (req, res, next) => {
             }
           : null,
       })),
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+bulkRouter.get("/jobs/:id/edit-payload", requireAuth, async (req, res, next) => {
+  try {
+    const jobId = String(req.params.id || "").trim();
+    if (!jobId) {
+      throw createHttpError(400, "VALIDATION_ERROR", "job id is required");
+    }
+
+    const result = await query(
+      `SELECT id, job_type, bulk_qr_type, qr_content, qr_size, foreground_color, background_color,
+              qr_margin, output_format, error_correction_level, filename_prefix
+       FROM qr_jobs
+       WHERE id = $1 AND user_id = $2
+       LIMIT 1`,
+      [jobId, req.user.id],
+    );
+
+    const row = result.rows[0];
+    if (!row) {
+      throw createHttpError(404, "NOT_FOUND", "Job not found");
+    }
+
+    res.json({
+      job: {
+        id: row.id,
+        jobType: row.job_type,
+        qrType: row.job_type === "single" ? "URL" : row.bulk_qr_type,
+        content: row.qr_content || "",
+        size: row.qr_size,
+        foregroundColor: row.foreground_color,
+        backgroundColor: row.background_color,
+        margin: row.qr_margin,
+        format: row.output_format,
+        errorCorrectionLevel: row.error_correction_level,
+        filenamePrefix: row.filename_prefix || "qr",
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+bulkRouter.delete("/jobs/:id", requireAuth, async (req, res, next) => {
+  try {
+    const jobId = String(req.params.id || "").trim();
+    if (!jobId) {
+      throw createHttpError(400, "VALIDATION_ERROR", "job id is required");
+    }
+
+    const deleted = await query(
+      `DELETE FROM qr_jobs
+       WHERE id = $1 AND user_id = $2
+       RETURNING id`,
+      [jobId, req.user.id],
+    );
+
+    if (!deleted.rows[0]) {
+      throw createHttpError(404, "NOT_FOUND", "Job not found");
+    }
+
+    res.status(204).send();
+  } catch (error) {
+    next(error);
+  }
+});
+
+bulkRouter.get("/reports/overview", requireAuth, async (req, res, next) => {
+  try {
+    const startDate = parseDateFilter(req.query.startDate);
+    const endDate = parseDateFilter(req.query.endDate, true);
+
+    const [qrTypeRows, statusRows, trendRows] = await Promise.all([
+      query(
+        `SELECT bulk_qr_type AS label, COUNT(*)::int AS count
+         FROM qr_jobs
+         WHERE user_id = $1
+           AND ($2::timestamptz IS NULL OR created_at >= $2::timestamptz)
+           AND ($3::timestamptz IS NULL OR created_at <= $3::timestamptz)
+         GROUP BY bulk_qr_type
+         ORDER BY count DESC, label ASC`,
+        [req.user.id, startDate, endDate],
+      ),
+      query(
+        `SELECT status AS label, COUNT(*)::int AS count
+         FROM qr_jobs
+         WHERE user_id = $1
+           AND ($2::timestamptz IS NULL OR created_at >= $2::timestamptz)
+           AND ($3::timestamptz IS NULL OR created_at <= $3::timestamptz)
+         GROUP BY status
+         ORDER BY count DESC, label ASC`,
+        [req.user.id, startDate, endDate],
+      ),
+      query(
+        `SELECT TO_CHAR(DATE(created_at), 'YYYY-MM-DD') AS label, COUNT(*)::int AS count
+         FROM qr_jobs
+         WHERE user_id = $1
+           AND ($2::timestamptz IS NULL OR created_at >= $2::timestamptz)
+           AND ($3::timestamptz IS NULL OR created_at <= $3::timestamptz)
+         GROUP BY DATE(created_at)
+         ORDER BY DATE(created_at) DESC
+         LIMIT 14`,
+        [req.user.id, startDate, endDate],
+      ),
+    ]);
+
+    res.json({
+      report: {
+        jobsByQrType: qrTypeRows.rows,
+        jobsByStatus: statusRows.rows,
+        dailyJobs: [...trendRows.rows].reverse(),
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+bulkRouter.get("/reports/public-engagement", requireAuth, async (req, res, next) => {
+  try {
+    const startDate = parseDateFilter(req.query.startDate);
+    const endDate = parseDateFilter(req.query.endDate, true);
+
+    const [ratingRows, feedbackRows] = await Promise.all([
+      query(
+        `SELECT
+           COALESCE(title, 'Untitled rating form') AS title,
+           style,
+           scale,
+           rating,
+           COUNT(*)::int AS count
+         FROM rating_submissions
+         WHERE ($1::timestamptz IS NULL OR created_at >= $1::timestamptz)
+           AND ($2::timestamptz IS NULL OR created_at <= $2::timestamptz)
+         GROUP BY COALESCE(title, 'Untitled rating form'), style, scale, rating
+         ORDER BY title ASC, rating ASC`,
+        [startDate, endDate],
+      ),
+      query(
+        `SELECT title, questions, answers, created_at
+         FROM feedback_submissions
+         WHERE ($1::timestamptz IS NULL OR created_at >= $1::timestamptz)
+           AND ($2::timestamptz IS NULL OR created_at <= $2::timestamptz)
+         ORDER BY created_at DESC`,
+        [startDate, endDate],
+      ),
+    ]);
+
+    const ratingsByTitle = {};
+    for (const row of ratingRows.rows) {
+      const key = row.title;
+      if (!ratingsByTitle[key]) {
+        ratingsByTitle[key] = {
+          title: key,
+          style: row.style,
+          scale: row.scale,
+          buckets: [],
+        };
+      }
+      ratingsByTitle[key].buckets.push({
+        label: String(row.rating),
+        count: row.count,
+      });
+    }
+
+    const feedbackMap = new Map();
+    for (const row of feedbackRows.rows) {
+      const formTitle = row.title || "Untitled feedback form";
+      const key = formTitle;
+      if (!feedbackMap.has(key)) {
+        feedbackMap.set(key, {
+          title: formTitle,
+          questions: {},
+        });
+      }
+      const target = feedbackMap.get(key);
+      const questions = Array.isArray(row.questions) ? row.questions : [];
+      const answers = Array.isArray(row.answers) ? row.answers : [];
+      questions.forEach((question, index) => {
+        const label = String(question || "").trim();
+        if (!label) return;
+        if (!target.questions[label]) {
+          target.questions[label] = {
+            label,
+            responses: 0,
+            latestAnswers: [],
+          };
+        }
+        const answer = String(answers[index] || "").trim();
+        target.questions[label].responses += 1;
+        if (answer && target.questions[label].latestAnswers.length < 5) {
+          target.questions[label].latestAnswers.push(answer);
+        }
+      });
+    }
+
+    res.json({
+      report: {
+        ratings: Object.values(ratingsByTitle),
+        feedback: Array.from(feedbackMap.values()).map((entry) => ({
+          title: entry.title,
+          questions: Object.values(entry.questions),
+        })),
+      },
     });
   } catch (error) {
     next(error);
