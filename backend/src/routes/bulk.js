@@ -961,6 +961,29 @@ bulkRouter.get("/jobs/:id/analysis", requireAuth, async (req, res, next) => {
       [job.managed_link_id, job.id],
     );
 
+    const scanTrendResult = await query(
+      `WITH links AS (
+         SELECT id
+         FROM managed_qr_links
+         WHERE id = $1
+         UNION
+         SELECT m.id
+         FROM qr_job_items i
+         INNER JOIN managed_qr_links m ON m.id = i.managed_link_id
+         WHERE i.job_id = $2
+       )
+       SELECT
+         TO_CHAR(DATE(ae.created_at), 'YYYY-MM-DD') AS label,
+         COUNT(*)::int AS count
+       FROM analytics_events ae
+       INNER JOIN links ON ae.metadata->>'linkId' = links.id::text
+       WHERE ae.event_type = 'qr.public.scan'
+       GROUP BY DATE(ae.created_at)
+       ORDER BY DATE(ae.created_at) ASC
+       LIMIT 10`,
+      [job.managed_link_id, job.id],
+    );
+
     const linkStats = linkStatsResult.rows[0] || {};
     const totalScans = linkStats.total_scans || 0;
     const uniqueScans = linkStats.unique_scans || 0;
@@ -1116,6 +1139,10 @@ bulkRouter.get("/jobs/:id/analysis", requireAuth, async (req, res, next) => {
             }
           : null,
         engagement,
+        scanTrend: scanTrendResult.rows.map((row) => ({
+          label: row.label,
+          count: row.count,
+        })),
         insight,
         rating,
         feedback,

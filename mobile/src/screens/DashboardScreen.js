@@ -1,13 +1,14 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { ScrollView, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { Image, ScrollView, Text, TextInput, TouchableOpacity, View } from "react-native";
 
 import { useAuth } from "../context/AuthContext";
-import { apiRequest, createAuthHeaders } from "../lib/api";
+import { apiRequest, createAuthHeaders, API_BASE_URL } from "../lib/api";
 
 function buildQuery(filters) {
   const params = new URLSearchParams();
   if (filters.startDate) params.set("startDate", filters.startDate);
   if (filters.endDate) params.set("endDate", filters.endDate);
+  params.set("includeArchived", "true");
   const next = params.toString();
   return next ? `?${next}` : "";
 }
@@ -19,28 +20,32 @@ function formatDateTime(value) {
   return parsed.toLocaleString();
 }
 
-function Card({ children }) {
+function Card({ children, style }) {
   return (
     <View
-      style={{
-        borderWidth: 1,
-        borderColor: "#dbe3f0",
-        borderRadius: 20,
-        padding: 18,
-        gap: 14,
-        backgroundColor: "#ffffff",
-      }}
+      style={[
+        {
+          borderWidth: 1,
+          borderColor: "#dbe3f0",
+          borderRadius: 20,
+          padding: 18,
+          gap: 14,
+          backgroundColor: "#ffffff",
+        },
+        style,
+      ]}
     >
       {children}
     </View>
   );
 }
 
-function StatCard({ label, value, tone = "#0f172a" }) {
+function AnalysisStat({ label, value, tone = "#0f172a" }) {
   return (
     <View
       style={{
         flex: 1,
+        minWidth: 120,
         borderWidth: 1,
         borderColor: "#dbe3f0",
         borderRadius: 16,
@@ -48,8 +53,8 @@ function StatCard({ label, value, tone = "#0f172a" }) {
         backgroundColor: "#ffffff",
       }}
     >
-      <Text style={{ color: "#64748b", fontSize: 12, fontWeight: "700" }}>{label}</Text>
-      <Text style={{ marginTop: 4, fontSize: 24, fontWeight: "800", color: tone }}>{value}</Text>
+      <Text style={{ color: "#64748b", fontSize: 11, fontWeight: "700" }}>{label}</Text>
+      <Text style={{ marginTop: 4, fontSize: 22, fontWeight: "800", color: tone }}>{value}</Text>
     </View>
   );
 }
@@ -62,7 +67,9 @@ function MetricPill({ label, value, tone = "default" }) {
         ? { backgroundColor: "#fff1f2", color: "#b91c1c" }
         : tone === "accent"
           ? { backgroundColor: "#eff6ff", color: "#1d4ed8" }
-          : { backgroundColor: "#f1f5f9", color: "#475569" };
+          : tone === "warning"
+            ? { backgroundColor: "#fffbeb", color: "#b45309" }
+            : { backgroundColor: "#f1f5f9", color: "#475569" };
 
   return (
     <View
@@ -80,80 +87,134 @@ function MetricPill({ label, value, tone = "default" }) {
   );
 }
 
-function BarChart({ title, rows, color = "#0ea5e9", emptyMessage }) {
-  const max = Math.max(...rows.map((row) => row.count || 0), 0);
+function ProgressBar({ label, value, total, color = "#0ea5e9", helper = "" }) {
+  const percent = total ? Math.max(Math.round((value / total) * 100), value > 0 ? 4 : 0) : 0;
 
   return (
-    <Card>
-      <Text style={{ fontSize: 18, fontWeight: "700", color: "#0f172a" }}>{title}</Text>
-      {!rows.length && <Text style={{ color: "#64748b" }}>{emptyMessage}</Text>}
-      {!!rows.length && (
-        <View style={{ gap: 12 }}>
-          {rows.map((row) => (
-            <View key={row.label} style={{ gap: 4 }}>
-              <View style={{ flexDirection: "row", justifyContent: "space-between", gap: 10 }}>
-                <Text style={{ color: "#334155", fontWeight: "600", flex: 1 }}>{row.label}</Text>
-                <Text style={{ color: "#64748b" }}>{row.count}</Text>
-              </View>
-              <View style={{ height: 8, borderRadius: 999, backgroundColor: "#e2e8f0", overflow: "hidden" }}>
-                <View
-                  style={{
-                    height: "100%",
-                    borderRadius: 999,
-                    backgroundColor: color,
-                    width: `${max ? Math.max((row.count / max) * 100, 6) : 0}%`,
-                  }}
-                />
-              </View>
-            </View>
-          ))}
-        </View>
-      )}
-    </Card>
+    <View style={{ gap: 4 }}>
+      <View style={{ flexDirection: "row", justifyContent: "space-between", gap: 10 }}>
+        <Text style={{ color: "#334155", fontWeight: "600", flex: 1 }}>{label}</Text>
+        <Text style={{ color: "#64748b" }}>
+          {value}
+          {helper ? ` | ${helper}` : ""}
+        </Text>
+      </View>
+      <View style={{ height: 8, borderRadius: 999, backgroundColor: "#e2e8f0", overflow: "hidden" }}>
+        <View
+          style={{
+            height: "100%",
+            borderRadius: 999,
+            backgroundColor: color,
+            width: `${percent}%`,
+          }}
+        />
+      </View>
+    </View>
   );
+}
+
+function getStatusAccent(status) {
+  if (status === "completed") return "#10b981";
+  if (status === "processing" || status === "queued") return "#f59e0b";
+  if (status === "failed") return "#f43f5e";
+  return "#94a3b8";
+}
+
+function PerformanceBadge({ label, tone = "default" }) {
+  const palette =
+    tone === "success"
+      ? { backgroundColor: "#ecfdf5", color: "#047857", borderColor: "#a7f3d0" }
+      : tone === "warning"
+        ? { backgroundColor: "#fffbeb", color: "#b45309", borderColor: "#fcd34d" }
+        : tone === "danger"
+          ? { backgroundColor: "#fff1f2", color: "#b91c1c", borderColor: "#fda4af" }
+          : tone === "accent"
+            ? { backgroundColor: "#eff6ff", color: "#1d4ed8", borderColor: "#bfdbfe" }
+            : { backgroundColor: "#f1f5f9", color: "#475569", borderColor: "#cbd5e1" };
+
+  return (
+    <View
+      style={{
+        borderWidth: 1,
+        borderColor: palette.borderColor,
+        borderRadius: 999,
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        backgroundColor: palette.backgroundColor,
+      }}
+    >
+      <Text style={{ color: palette.color, fontWeight: "700", fontSize: 12 }}>{label}</Text>
+    </View>
+  );
+}
+
+function MiniSparkline({ points }) {
+  if (!points.length) {
+    return <Text style={{ color: "#94a3b8", fontSize: 12 }}>No scan trend yet.</Text>;
+  }
+
+  const max = Math.max(...points.map((point) => point.count || 0), 1);
+
+  return (
+    <View style={{ gap: 8 }}>
+      <View style={{ flexDirection: "row", alignItems: "flex-end", gap: 4, height: 42 }}>
+        {points.map((point, index) => (
+          <View
+            key={`${point.label}-${index}`}
+            style={{
+              flex: 1,
+              minWidth: 8,
+              height: `${Math.max((point.count / max) * 100, point.count > 0 ? 12 : 4)}%`,
+              borderRadius: 999,
+              backgroundColor: "#0ea5e9",
+            }}
+          />
+        ))}
+      </View>
+      <View style={{ flexDirection: "row", justifyContent: "space-between", gap: 8 }}>
+        <Text style={{ color: "#94a3b8", fontSize: 11 }}>{points[0]?.label || ""}</Text>
+        <Text style={{ color: "#94a3b8", fontSize: 11 }}>{points[points.length - 1]?.label || ""}</Text>
+      </View>
+    </View>
+  );
+}
+
+function getThumbnailSource(job) {
+  const filePath = job?.artifact?.filePath || "";
+  if (!filePath) return "";
+  const lowered = String(filePath).toLowerCase();
+  if (lowered.startsWith("data:image/")) {
+    return filePath;
+  }
+  if (/\.(png|jpg|jpeg|webp|gif)$/i.test(lowered)) {
+    const origin = API_BASE_URL.replace(/\/api\/?$/, "");
+    return lowered.startsWith("http") ? filePath : `${origin}${filePath}`;
+  }
+  return "";
+}
+
+function getJobTitle(job) {
+  return job.jobType === "single" ? job.qrType || "Single QR" : `${job.qrType || "Bulk"} Bulk`;
 }
 
 export function DashboardScreen() {
   const { token } = useAuth();
-  const [filters, setFilters] = useState({ startDate: "", endDate: "" });
-  const [summary, setSummary] = useState(null);
+  const [filters, setFilters] = useState({ startDate: "", endDate: "", qrType: "all", status: "active" });
   const [jobs, setJobs] = useState([]);
-  const [overviewReport, setOverviewReport] = useState(null);
-  const [engagementReport, setEngagementReport] = useState(null);
   const [expandedJobId, setExpandedJobId] = useState("");
   const [jobAnalysis, setJobAnalysis] = useState({});
   const [busyAnalysisJobId, setBusyAnalysisJobId] = useState("");
+  const [analysisTabByJobId, setAnalysisTabByJobId] = useState({});
   const [error, setError] = useState("");
   const [refreshing, setRefreshing] = useState(false);
 
-  const queryString = useMemo(() => buildQuery(filters), [filters]);
-  const scanSummary = overviewReport?.scanSummary || {
-    totalScans: 0,
-    uniqueScans: 0,
-    repeatedScans: 0,
-    lastScanAt: null,
-  };
-  const scanTrend = (overviewReport?.scanTrend || []).map((row) => ({
-    label: row.label,
-    count: row.totalScans,
-  }));
-  const topPerformingLinks = overviewReport?.topPerformingLinks || [];
-  const expiringSoon = overviewReport?.expiringSoon || [];
-  const expiredLinks = overviewReport?.expired || [];
+  const queryString = useMemo(() => buildQuery(filters), [filters.startDate, filters.endDate]);
 
   async function loadDashboard(activeQuery = queryString) {
     try {
       const headers = createAuthHeaders(token);
-      const [summaryData, jobsData, overviewData, engagementData] = await Promise.all([
-        apiRequest(`/qr/jobs/summary${activeQuery}`, { headers }),
-        apiRequest(`/qr/jobs?limit=12${activeQuery ? `&${activeQuery.slice(1)}` : ""}`, { headers }),
-        apiRequest(`/qr/reports/overview${activeQuery}`, { headers }),
-        apiRequest(`/qr/reports/public-engagement${activeQuery}`, { headers }),
-      ]);
-      setSummary(summaryData.summary || null);
+      const jobsData = await apiRequest(`/qr/jobs?limit=36${activeQuery ? `&${activeQuery.slice(1)}` : ""}`, { headers });
       setJobs(jobsData.jobs || []);
-      setOverviewReport(overviewData.report || null);
-      setEngagementReport(engagementData.report || null);
       setError("");
     } catch (requestError) {
       setError(requestError.message || "Failed to load dashboard");
@@ -215,19 +276,82 @@ export function DashboardScreen() {
     }
   }
 
+  function getAnalysisTab(jobId) {
+    return analysisTabByJobId[jobId] || "overview";
+  }
+
+  function setAnalysisTab(jobId, tab) {
+    setAnalysisTabByJobId((prev) => ({
+      ...prev,
+      [jobId]: tab,
+    }));
+  }
+
+  const qrTypeOptions = useMemo(() => {
+    const values = Array.from(new Set(jobs.map((job) => job.qrType).filter(Boolean))).sort((a, b) => a.localeCompare(b));
+    return ["all", ...values];
+  }, [jobs]);
+
+  const filteredJobs = useMemo(() => {
+    return jobs.filter((job) => {
+      if (filters.qrType !== "all" && job.qrType !== filters.qrType) {
+        return false;
+      }
+
+      if (filters.status === "archived") {
+        return Boolean(job.archivedAt);
+      }
+
+      if (filters.status === "active") {
+        return !job.archivedAt;
+      }
+
+      if (filters.status !== "all") {
+        return !job.archivedAt && job.status === filters.status;
+      }
+
+      return true;
+    });
+  }, [filters.qrType, filters.status, jobs]);
+
   return (
     <ScrollView contentContainerStyle={{ gap: 16, paddingBottom: 36 }}>
       <Card>
-        <Text style={{ fontSize: 24, fontWeight: "700", color: "#0f172a" }}>Dashboard</Text>
+        <Text style={{ fontSize: 24, fontWeight: "700", color: "#0f172a" }}>Analytics Dashboard</Text>
         <Text style={{ color: "#64748b", lineHeight: 22 }}>
-          This dashboard reads the same shared backend data as web, including QR type reports, rating
-          insights, feedback summaries, and per-job analysis.
+          Open analysis on any created QR to inspect generation quality, scan behavior, response depth, and expiry health from mobile.
         </Text>
       </Card>
 
       <Card>
-        <Text style={{ fontSize: 18, fontWeight: "700", color: "#0f172a" }}>Date Filters</Text>
+        <Text style={{ fontSize: 16, fontWeight: "700", color: "#0f172a" }}>Filters</Text>
         <View style={{ gap: 10 }}>
+          <TextInput
+            value={filters.qrType}
+            onChangeText={(value) => setFilters((prev) => ({ ...prev, qrType: value || "all" }))}
+            placeholder={`QR type (${qrTypeOptions.slice(1).join(", ") || "all"})`}
+            style={{
+              borderWidth: 1,
+              borderColor: "#cbd5e1",
+              borderRadius: 16,
+              paddingHorizontal: 14,
+              paddingVertical: 12,
+              color: "#0f172a",
+            }}
+          />
+          <TextInput
+            value={filters.status}
+            onChangeText={(value) => setFilters((prev) => ({ ...prev, status: value || "active" }))}
+            placeholder="Status (active, all, archived, completed, failed, processing, queued)"
+            style={{
+              borderWidth: 1,
+              borderColor: "#cbd5e1",
+              borderRadius: 16,
+              paddingHorizontal: 14,
+              paddingVertical: 12,
+              color: "#0f172a",
+            }}
+          />
           <TextInput
             value={filters.startDate}
             onChangeText={(value) => setFilters((prev) => ({ ...prev, startDate: value }))}
@@ -271,7 +395,7 @@ export function DashboardScreen() {
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
-              onPress={() => setFilters({ startDate: "", endDate: "" })}
+              onPress={() => setFilters({ startDate: "", endDate: "", qrType: "all", status: "active" })}
               style={{
                 flex: 1,
                 borderWidth: 1,
@@ -284,6 +408,9 @@ export function DashboardScreen() {
               <Text style={{ color: "#0f172a", textAlign: "center", fontWeight: "700" }}>Clear</Text>
             </TouchableOpacity>
           </View>
+          <Text style={{ color: "#64748b", fontSize: 12 }}>
+            Archived jobs appear when Status is set to Archived or All.
+          </Text>
         </View>
       </Card>
 
@@ -293,263 +420,81 @@ export function DashboardScreen() {
         </Card>
       )}
 
-      {summary ? (
-        <View style={{ gap: 10 }}>
-          <View style={{ flexDirection: "row", gap: 10 }}>
-            <StatCard label="TOTAL JOBS" value={summary.totalJobs} />
-            <StatCard label="REQUESTED" value={summary.totalRequested} />
-          </View>
-          <View style={{ flexDirection: "row", gap: 10 }}>
-            <StatCard label="SINGLE" value={summary.singleJobs} tone="#1d4ed8" />
-            <StatCard label="BULK" value={summary.bulkJobs} />
-          </View>
-          <View style={{ flexDirection: "row", gap: 10 }}>
-            <StatCard label="SUCCESS" value={summary.totalSuccess} tone="#047857" />
-            <StatCard label="FAILURE" value={summary.totalFailure} tone="#b91c1c" />
-          </View>
-        </View>
-      ) : (
-        <Card>
-          <Text style={{ color: "#64748b" }}>Loading summary...</Text>
-        </Card>
-      )}
-
-      <View style={{ gap: 10 }}>
-        <View style={{ flexDirection: "row", gap: 10 }}>
-          <StatCard label="TOTAL SCANS" value={scanSummary.totalScans} />
-          <StatCard label="UNIQUE SCANS" value={scanSummary.uniqueScans} tone="#1d4ed8" />
-        </View>
-        <View style={{ flexDirection: "row", gap: 10 }}>
-          <StatCard label="REPEATED SCANS" value={scanSummary.repeatedScans} />
-          <StatCard
-            label="LAST SCAN"
-            value={scanSummary.lastScanAt ? formatDateTime(scanSummary.lastScanAt) : "Not yet"}
-            tone="#047857"
-          />
-        </View>
-      </View>
-
-      <BarChart
-        title="Created QR Types"
-        rows={overviewReport?.jobsByQrType || []}
-        color="#0ea5e9"
-        emptyMessage="No QR type data available yet."
-      />
-      <BarChart
-        title="Job Status Overview"
-        rows={overviewReport?.jobsByStatus || []}
-        color="#10b981"
-        emptyMessage="No status data available yet."
-      />
-      <BarChart
-        title="Daily Job Volume"
-        rows={overviewReport?.dailyJobs || []}
-        color="#f59e0b"
-        emptyMessage="No daily activity available yet."
-      />
-      <BarChart
-        title="Scan Trend"
-        rows={scanTrend}
-        color="#6366f1"
-        emptyMessage="No scan activity recorded yet."
-      />
-
       <Card>
-        <Text style={{ fontSize: 20, fontWeight: "700", color: "#0f172a" }}>Top Performing QR Links</Text>
-        {!topPerformingLinks.length && (
-          <Text style={{ color: "#64748b" }}>No managed scan activity yet.</Text>
-        )}
-        {!!topPerformingLinks.length && (
+        <Text style={{ fontSize: 20, fontWeight: "700", color: "#0f172a" }}>Created QR Jobs</Text>
+        {!filteredJobs.length && <Text style={{ color: "#64748b" }}>No QR jobs found for the selected filters.</Text>}
+        {!!filteredJobs.length && (
           <View style={{ gap: 12 }}>
-            {topPerformingLinks.map((link) => (
-              <View key={link.id} style={{ borderTopWidth: 1, borderTopColor: "#e2e8f0", paddingTop: 12, gap: 8 }}>
-                <View style={{ flexDirection: "row", justifyContent: "space-between", gap: 12 }}>
-                  <View style={{ flex: 1, gap: 4 }}>
-                    <Text style={{ color: "#0f172a", fontWeight: "700" }}>{link.title}</Text>
-                    <Text style={{ color: "#64748b" }}>{link.qrType}</Text>
-                  </View>
-                  <MetricPill label="Scans" value={link.totalScans} tone="accent" />
-                </View>
-                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
-                  <MetricPill label="Unique" value={link.uniqueScans} />
-                  <MetricPill label="Repeated" value={link.repeatedScans} />
-                </View>
-                <Text style={{ color: "#475569" }}>
-                  <Text style={{ fontWeight: "700", color: "#0f172a" }}>Last scan: </Text>
-                  {formatDateTime(link.lastScanAt)}
-                </Text>
-              </View>
-            ))}
-          </View>
-        )}
-      </Card>
-
-      <Card>
-        <Text style={{ fontSize: 20, fontWeight: "700", color: "#0f172a" }}>Expiry Watch</Text>
-        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
-          <MetricPill label="Expiring Soon" value={expiringSoon.length} tone="accent" />
-          <MetricPill label="Expired" value={expiredLinks.length} tone="danger" />
-        </View>
-        {!!expiringSoon.length && (
-          <View style={{ gap: 8 }}>
-            <Text style={{ color: "#b45309", fontWeight: "700", fontSize: 12 }}>EXPIRING SOON</Text>
-            {expiringSoon.map((link) => (
-              <View key={link.id} style={{ borderRadius: 16, backgroundColor: "#fffbeb", padding: 12, gap: 4 }}>
-                <Text style={{ color: "#0f172a", fontWeight: "700" }}>{link.title}</Text>
-                <Text style={{ color: "#475569" }}>
-                  {link.qrType} | {formatDateTime(link.expiresAt)}
-                </Text>
-              </View>
-            ))}
-          </View>
-        )}
-        {!!expiredLinks.length && (
-          <View style={{ gap: 8 }}>
-            <Text style={{ color: "#b91c1c", fontWeight: "700", fontSize: 12 }}>EXPIRED</Text>
-            {expiredLinks.map((link) => (
-              <View key={link.id} style={{ borderRadius: 16, backgroundColor: "#fff1f2", padding: 12, gap: 4 }}>
-                <Text style={{ color: "#0f172a", fontWeight: "700" }}>{link.title}</Text>
-                <Text style={{ color: "#475569" }}>
-                  {link.qrType} | {formatDateTime(link.expiresAt)}
-                </Text>
-              </View>
-            ))}
-          </View>
-        )}
-        {!expiringSoon.length && !expiredLinks.length && (
-          <Text style={{ color: "#64748b" }}>No managed links are close to expiry right now.</Text>
-        )}
-      </Card>
-
-      <Card>
-        <Text style={{ fontSize: 20, fontWeight: "700", color: "#0f172a" }}>QR Type Analysis</Text>
-        {!overviewReport?.qrTypePerformance?.length && (
-          <Text style={{ color: "#64748b" }}>No QR type analysis available yet.</Text>
-        )}
-        {!!overviewReport?.qrTypePerformance?.length && (
-          <View style={{ gap: 12 }}>
-            {overviewReport.qrTypePerformance.map((item) => (
-              <View key={item.label} style={{ borderTopWidth: 1, borderTopColor: "#e2e8f0", paddingTop: 12, gap: 8 }}>
-                <View style={{ flexDirection: "row", justifyContent: "space-between", gap: 12 }}>
-                  <Text style={{ color: "#0f172a", fontWeight: "700", flex: 1 }}>{item.label}</Text>
-                  <Text style={{ color: "#64748b" }}>
-                    {item.requestedCount ? `${Math.round((item.successCount / item.requestedCount) * 100)}%` : "0%"}
-                  </Text>
-                </View>
-                <View style={{ height: 8, borderRadius: 999, backgroundColor: "#e2e8f0", overflow: "hidden" }}>
-                  <View
-                    style={{
-                      height: "100%",
-                      borderRadius: 999,
-                      backgroundColor: "#2563eb",
-                      width: `${item.requestedCount ? Math.max((item.successCount / item.requestedCount) * 100, 0) : 0}%`,
-                    }}
-                  />
-                </View>
-                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
-                  <MetricPill label="Jobs" value={item.jobsCount} />
-                  <MetricPill label="Requested" value={item.requestedCount} />
-                  <MetricPill label="Success" value={item.successCount} tone="success" />
-                  <MetricPill label="Failure" value={item.failureCount} tone="danger" />
-                </View>
-              </View>
-            ))}
-          </View>
-        )}
-      </Card>
-
-      <Card>
-        <Text style={{ fontSize: 20, fontWeight: "700", color: "#0f172a" }}>Rating Analytics</Text>
-        {!engagementReport?.ratings?.length && (
-          <Text style={{ color: "#64748b" }}>No rating submissions yet.</Text>
-        )}
-        {!!engagementReport?.ratings?.length && (
-          <View style={{ gap: 14 }}>
-            {engagementReport.ratings.map((item) => (
-              <View key={item.title} style={{ borderTopWidth: 1, borderTopColor: "#e2e8f0", paddingTop: 12, gap: 8 }}>
-                <Text style={{ color: "#0f172a", fontWeight: "700" }}>{item.title}</Text>
-                <Text style={{ color: "#64748b" }}>
-                  {item.style === "stars" ? "5 Star Rating" : `Number Rating 1-${item.scale}`}
-                </Text>
-                {item.buckets.map((bucket) => {
-                  const max = Math.max(...item.buckets.map((entry) => entry.count || 0), 0);
-                  return (
-                    <View key={`${item.title}-${bucket.label}`} style={{ gap: 4 }}>
-                      <View style={{ flexDirection: "row", justifyContent: "space-between", gap: 10 }}>
-                        <Text style={{ color: "#334155" }}>{bucket.label}</Text>
-                        <Text style={{ color: "#64748b" }}>{bucket.count}</Text>
-                      </View>
-                      <View style={{ height: 8, borderRadius: 999, backgroundColor: "#e2e8f0", overflow: "hidden" }}>
-                        <View
-                          style={{
-                            height: "100%",
-                            borderRadius: 999,
-                            backgroundColor: "#d946ef",
-                            width: `${max ? Math.max((bucket.count / max) * 100, 6) : 0}%`,
-                          }}
-                        />
-                      </View>
-                    </View>
-                  );
-                })}
-              </View>
-            ))}
-          </View>
-        )}
-      </Card>
-
-      <Card>
-        <Text style={{ fontSize: 20, fontWeight: "700", color: "#0f172a" }}>Feedback Analysis</Text>
-        {!engagementReport?.feedback?.length && (
-          <Text style={{ color: "#64748b" }}>No feedback submissions yet.</Text>
-        )}
-        {!!engagementReport?.feedback?.length && (
-          <View style={{ gap: 14 }}>
-            {engagementReport.feedback.map((group) => (
-              <View key={group.title} style={{ borderTopWidth: 1, borderTopColor: "#e2e8f0", paddingTop: 12, gap: 8 }}>
-                <Text style={{ color: "#0f172a", fontWeight: "700" }}>{group.title}</Text>
-                {group.questions.map((question) => (
-                  <View key={`${group.title}-${question.label}`} style={{ borderRadius: 16, backgroundColor: "#f8fafc", padding: 12, gap: 6 }}>
-                    <Text style={{ color: "#0f172a", fontWeight: "600" }}>{question.label}</Text>
-                    <Text style={{ color: "#64748b" }}>{question.responses} responses</Text>
-                    {!!question.latestAnswers?.length && (
-                      <View style={{ gap: 4 }}>
-                        {question.latestAnswers.map((answer, index) => (
-                          <Text key={`${question.label}-${index}`} style={{ color: "#475569" }}>
-                            - {answer}
-                          </Text>
-                        ))}
-                      </View>
-                    )}
-                  </View>
-                ))}
-              </View>
-            ))}
-          </View>
-        )}
-      </Card>
-
-      <Card>
-        <Text style={{ fontSize: 20, fontWeight: "700", color: "#0f172a" }}>Recent Jobs</Text>
-        {!jobs.length && <Text style={{ color: "#64748b" }}>No jobs yet.</Text>}
-        {!!jobs.length && (
-          <View style={{ gap: 12 }}>
-            {jobs.map((job) => {
+            {filteredJobs.map((job) => {
               const analysis = jobAnalysis[job.id];
               const expanded = expandedJobId === job.id;
+              const currentTab = getAnalysisTab(job.id);
+              const thumbnailSource = getThumbnailSource(job);
+              const typeAverageSuccessRate = analysis?.typePerformance
+                ? (analysis.typePerformance.successCount || 0) / Math.max(analysis.typePerformance.requestedCount || 1, 1)
+                : 0;
+              const thisJobSuccessRate = analysis
+                ? (analysis.job?.successCount || 0) / Math.max(analysis.job?.totalCount || 1, 1)
+                : 0;
+
               return (
-                <View key={job.id} style={{ borderTopWidth: 1, borderTopColor: "#e2e8f0", paddingTop: 12, gap: 8 }}>
-                  <Text style={{ color: "#0f172a", fontWeight: "700" }}>{job.qrType}</Text>
-                  <Text style={{ color: "#475569" }}>
-                    {job.jobType} | {job.status}
-                  </Text>
-                  <Text style={{ color: "#64748b" }}>Source: {job.sourceFileName || "Direct single QR"}</Text>
-                  <Text style={{ color: "#64748b" }}>
-                    {job.successCount}/{job.totalCount} completed
-                  </Text>
-                  <Text numberOfLines={1} style={{ color: "#94a3b8", fontSize: 12 }}>
-                    {job.id}
-                  </Text>
+                <View
+                  key={job.id}
+                  style={{
+                    borderTopWidth: 1,
+                    borderTopColor: "#e2e8f0",
+                    paddingTop: 12,
+                    gap: 10,
+                    borderLeftWidth: 4,
+                    borderLeftColor: getStatusAccent(job.status),
+                    paddingLeft: 12,
+                  }}
+                >
+                  <View style={{ flexDirection: "row", gap: 12 }}>
+                    <View
+                      style={{
+                        width: 56,
+                        height: 56,
+                        borderRadius: 16,
+                        borderWidth: 1,
+                        borderColor: "#dbe3f0",
+                        backgroundColor: "#f8fafc",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        overflow: "hidden",
+                      }}
+                    >
+                      {thumbnailSource ? (
+                        <Image source={{ uri: thumbnailSource }} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
+                      ) : (
+                        <Text style={{ color: "#64748b", fontWeight: "700", fontSize: 11, textAlign: "center" }}>
+                          {(job.qrType || "QR").slice(0, 6)}
+                        </Text>
+                      )}
+                    </View>
+                    <View style={{ flex: 1, gap: 8 }}>
+                      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+                        <MetricPill label="Status" value={job.status} />
+                        <MetricPill label="Mode" value={job.jobType === "single" ? "Single QR" : `${job.qrType} Bulk`} tone="accent" />
+                        {job.archivedAt ? <PerformanceBadge label="Archived" tone="warning" /> : null}
+                        {job.status === "completed" && job.successCount > 0 ? <PerformanceBadge label="Ready to share" tone="success" /> : null}
+                        {job.failureCount > 0 ? <PerformanceBadge label="Needs review" tone="danger" /> : null}
+                        {job.status === "completed" && job.successCount > 0 && !job.failureCount ? <PerformanceBadge label="Clean output" tone="success" /> : null}
+                        {analysis && thisJobSuccessRate >= typeAverageSuccessRate && (analysis.engagement?.totalScans || 0) > 0 ? (
+                          <PerformanceBadge label="Top Performer" tone="accent" />
+                        ) : null}
+                      </View>
+                      <Text style={{ color: "#0f172a", fontWeight: "700", fontSize: 18 }}>{getJobTitle(job)}</Text>
+                      <Text style={{ color: "#64748b" }}>Source: {job.sourceFileName || "Direct single QR"}</Text>
+                      <Text style={{ color: "#64748b" }}>
+                        {job.successCount}/{job.totalCount} completed
+                      </Text>
+                      <Text numberOfLines={1} style={{ color: "#94a3b8", fontSize: 12 }}>
+                        {job.id}
+                      </Text>
+                    </View>
+                  </View>
+
                   <TouchableOpacity
                     onPress={() => handleToggleAnalysis(job.id)}
                     style={{
@@ -570,147 +515,113 @@ export function DashboardScreen() {
                   {expanded && analysis && (
                     <View style={{ borderRadius: 18, backgroundColor: "#f8fafc", padding: 12, gap: 10 }}>
                       <Text style={{ color: "#64748b", fontSize: 12, fontWeight: "700" }}>ANALYSIS FOR THIS JOB</Text>
-                      <View
-                        style={{
-                          borderWidth: 1,
-                          borderColor: "#bfdbfe",
-                          borderRadius: 16,
-                          padding: 12,
-                          backgroundColor: "#eff6ff",
-                          gap: 6,
-                        }}
-                      >
+                      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+                        {[
+                          ["overview", "Overview"],
+                          ["scans", "Scans"],
+                          ["responses", "Responses"],
+                          ["expiry", "Expiry"],
+                        ].map(([tabValue, tabLabel]) => {
+                          const active = currentTab === tabValue;
+                          return (
+                            <TouchableOpacity
+                              key={`${job.id}-${tabValue}`}
+                              onPress={() => setAnalysisTab(job.id, tabValue)}
+                              style={{
+                                borderWidth: 1,
+                                borderColor: active ? "#0f172a" : "#cbd5e1",
+                                borderRadius: 999,
+                                paddingHorizontal: 12,
+                                paddingVertical: 8,
+                                backgroundColor: active ? "#0f172a" : "#ffffff",
+                              }}
+                            >
+                              <Text style={{ color: active ? "#ffffff" : "#0f172a", fontWeight: "700" }}>{tabLabel}</Text>
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </View>
+
+                      <View style={{ borderWidth: 1, borderColor: "#bfdbfe", borderRadius: 16, padding: 12, backgroundColor: "#eff6ff", gap: 6 }}>
                         <Text style={{ color: "#1d4ed8", fontSize: 12, fontWeight: "700" }}>QUICK INSIGHT</Text>
                         <Text style={{ color: "#0f172a", lineHeight: 20 }}>{analysis.insight}</Text>
                       </View>
 
-                      <View
-                        style={{
-                          borderWidth: 1,
-                          borderColor: "#dbe3f0",
-                          borderRadius: 16,
-                          padding: 12,
-                          backgroundColor: "#ffffff",
-                          gap: 8,
-                        }}
-                      >
-                        <Text style={{ color: "#0f172a", fontWeight: "700" }}>Generation Report</Text>
-                        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
-                          <MetricPill label="Requested" value={analysis.job.totalCount} />
-                          <MetricPill label="Success" value={analysis.job.successCount} tone="success" />
-                          <MetricPill label="Failure" value={analysis.job.failureCount} tone="danger" />
-                          <MetricPill
-                            label="Success Rate"
-                            value={
-                              analysis.job.totalCount
-                                ? `${Math.round((analysis.job.successCount / analysis.job.totalCount) * 100)}%`
-                                : "0%"
-                            }
-                            tone="accent"
-                          />
-                        </View>
-                      </View>
-
-                      <View
-                        style={{
-                          borderWidth: 1,
-                          borderColor: "#dbe3f0",
-                          borderRadius: 16,
-                          padding: 12,
-                          backgroundColor: "#ffffff",
-                          gap: 8,
-                        }}
-                      >
-                        <Text style={{ color: "#0f172a", fontWeight: "700" }}>Usage Report</Text>
-                        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
-                          <MetricPill label="Scans" value={analysis.engagement?.totalScans || 0} />
-                          <MetricPill label="Unique" value={analysis.engagement?.uniqueScans || 0} />
-                          <MetricPill label="Repeated" value={analysis.engagement?.repeatedScans || 0} />
-                          <MetricPill
-                            label="Submissions"
-                            value={analysis.engagement?.totalSubmissions || 0}
-                            tone="accent"
-                          />
-                          <MetricPill
-                            label="Tracked Links"
-                            value={analysis.engagement?.managedLinks || 0}
-                          />
-                          <MetricPill
-                            label="Expiry"
-                            value={
-                              analysis.engagement?.expiryDate
-                                ? analysis.engagement?.isExpired
-                                  ? "Expired"
-                                  : "Active"
-                                : "Not set"
-                            }
-                            tone={analysis.engagement?.isExpired ? "danger" : "success"}
-                          />
-                        </View>
-                        <View style={{ gap: 4 }}>
-                          <Text style={{ color: "#475569" }}>
-                            <Text style={{ fontWeight: "700", color: "#0f172a" }}>Last scan: </Text>
-                            {formatDateTime(analysis.engagement?.lastScanAt)}
-                          </Text>
-                          <Text style={{ color: "#475569" }}>
-                            <Text style={{ fontWeight: "700", color: "#0f172a" }}>Last submission: </Text>
-                            {formatDateTime(analysis.engagement?.lastSubmissionAt)}
-                          </Text>
-                          <Text style={{ color: "#475569" }}>
-                            <Text style={{ fontWeight: "700", color: "#0f172a" }}>Expiry date: </Text>
-                            {analysis.engagement?.expiryDate
-                              ? formatDateTime(analysis.engagement.expiryDate)
-                              : "Not set"}
-                          </Text>
-                          <Text style={{ color: "#475569" }}>
-                            <Text style={{ fontWeight: "700", color: "#0f172a" }}>Engagement type: </Text>
-                            {analysis.engagement?.targetKind || "Direct QR / not tracked"}
-                          </Text>
-                          <Text style={{ color: "#475569" }}>
-                            <Text style={{ fontWeight: "700", color: "#0f172a" }}>Expiring soon links: </Text>
-                            {analysis.engagement?.expiringSoonLinks || 0}
-                          </Text>
-                          <Text style={{ color: "#475569" }}>
-                            <Text style={{ fontWeight: "700", color: "#0f172a" }}>Expired links: </Text>
-                            {analysis.engagement?.expiredLinks || 0}
-                          </Text>
-                        </View>
-                      </View>
-
-                      {analysis.typePerformance && (
-                        <View style={{ gap: 8 }}>
-                          <Text style={{ color: "#0f172a", fontWeight: "700" }}>
-                            {analysis.typePerformance.label} overall performance
-                          </Text>
-                          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
-                            <MetricPill label="Jobs" value={analysis.typePerformance.jobsCount} />
-                            <MetricPill label="Requested" value={analysis.typePerformance.requestedCount} />
-                            <MetricPill label="Success" value={analysis.typePerformance.successCount} tone="success" />
-                            <MetricPill label="Failure" value={analysis.typePerformance.failureCount} tone="danger" />
+                      {(currentTab === "overview" || currentTab === "scans") && (
+                        <View style={{ borderWidth: 1, borderColor: "#dbe3f0", borderRadius: 16, padding: 12, backgroundColor: "#ffffff", gap: 8 }}>
+                          <Text style={{ color: "#0f172a", fontWeight: "700" }}>Generation Report</Text>
+                          <Text style={{ color: "#64748b" }}>Output quality and completion performance for this QR job.</Text>
+                          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}>
+                            <AnalysisStat label="Requested" value={analysis.job?.totalCount || job.totalCount || 0} />
+                            <AnalysisStat label="Success" value={analysis.job?.successCount || job.successCount || 0} tone="#047857" />
+                            <AnalysisStat label="Failure" value={analysis.job?.failureCount || job.failureCount || 0} tone="#b91c1c" />
                           </View>
+                          <ProgressBar label="Successful outputs" value={analysis.job?.successCount || job.successCount || 0} total={Math.max(analysis.job?.totalCount || job.totalCount || 1, 1)} color="#10b981" />
+                          <ProgressBar label="Failed outputs" value={analysis.job?.failureCount || job.failureCount || 0} total={Math.max(analysis.job?.totalCount || job.totalCount || 1, 1)} color="#f43f5e" />
                         </View>
                       )}
 
-                      {analysis.rating && (
-                        <View style={{ gap: 8 }}>
+                      {(currentTab === "overview" || currentTab === "scans" || currentTab === "expiry") && (
+                        <View style={{ borderWidth: 1, borderColor: "#dbe3f0", borderRadius: 16, padding: 12, backgroundColor: "#ffffff", gap: 8 }}>
+                          <Text style={{ color: "#0f172a", fontWeight: "700" }}>Usage Report</Text>
+                          <Text style={{ color: "#64748b" }}>Scan volume, returning visitors, submissions, and expiry health for this QR.</Text>
+                          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}>
+                            <AnalysisStat label="Scans" value={analysis.engagement?.totalScans || 0} />
+                            <AnalysisStat label="Unique" value={analysis.engagement?.uniqueScans || 0} tone="#1d4ed8" />
+                            <AnalysisStat label="Repeated" value={analysis.engagement?.repeatedScans || 0} />
+                            <AnalysisStat label="Submissions" value={analysis.engagement?.totalSubmissions || 0} tone="#047857" />
+                          </View>
+                          {(currentTab === "overview" || currentTab === "scans") && (
+                            <View style={{ borderWidth: 1, borderColor: "#dbe3f0", borderRadius: 16, padding: 12, backgroundColor: "#f8fafc", gap: 8 }}>
+                              <Text style={{ color: "#0f172a", fontWeight: "700" }}>Scan trend</Text>
+                              <Text style={{ color: "#64748b" }}>Recent scan activity for this QR job.</Text>
+                              <MiniSparkline points={analysis.scanTrend || []} />
+                            </View>
+                          )}
+                          <ProgressBar label="Unique visitor share" value={analysis.engagement?.uniqueScans || 0} total={Math.max(analysis.engagement?.totalScans || 1, 1)} color="#0ea5e9" />
+                          <ProgressBar label="Repeat visitor share" value={analysis.engagement?.repeatedScans || 0} total={Math.max(analysis.engagement?.totalScans || 1, 1)} color="#8b5cf6" />
+                          <Text style={{ color: "#475569" }}><Text style={{ fontWeight: "700", color: "#0f172a" }}>Last scan: </Text>{formatDateTime(analysis.engagement?.lastScanAt)}</Text>
+                          <Text style={{ color: "#475569" }}><Text style={{ fontWeight: "700", color: "#0f172a" }}>Last submission: </Text>{formatDateTime(analysis.engagement?.lastSubmissionAt)}</Text>
+                          <Text style={{ color: "#475569" }}><Text style={{ fontWeight: "700", color: "#0f172a" }}>Expiry date: </Text>{analysis.engagement?.expiryDate ? formatDateTime(analysis.engagement.expiryDate) : "Not set"}</Text>
+                        </View>
+                      )}
+
+                      {currentTab === "overview" && (
+                        <View style={{ borderWidth: 1, borderColor: "#dbe3f0", borderRadius: 16, padding: 12, backgroundColor: "#ffffff", gap: 8 }}>
+                          <Text style={{ color: "#0f172a", fontWeight: "700" }}>Actionable Insights</Text>
+                          <Text style={{ color: "#475569" }}>{analysis.job?.failureCount > 0 ? `${analysis.job.failureCount} output(s) failed and may need a rerun.` : "Generation quality is clean with no failed outputs recorded."}</Text>
+                          <Text style={{ color: "#475569" }}>{(analysis.engagement?.totalScans || 0) > 0 ? `This QR has ${analysis.engagement.uniqueScans || 0} unique scan(s) and ${analysis.engagement.repeatedScans || 0} repeat visit(s).` : "No scan activity yet. Share or print this QR to start collecting engagement."}</Text>
+                          <Text style={{ color: "#475569" }}>{analysis.engagement?.expiryDate ? (analysis.engagement?.isExpired ? "Expiry has already been reached." : `Expiry is set for ${formatDateTime(analysis.engagement.expiryDate)}.`) : "No expiry date is set for this QR yet."}</Text>
+                          <Text style={{ color: "#475569" }}>{thisJobSuccessRate >= typeAverageSuccessRate && (analysis.engagement?.totalScans || 0) > 0 ? "This job is outperforming the average for its QR type." : "This job is still building enough activity to compare against its QR type average."}</Text>
+                        </View>
+                      )}
+
+                      {analysis.typePerformance && (currentTab === "overview" || currentTab === "scans") && (
+                        <View style={{ borderWidth: 1, borderColor: "#dbe3f0", borderRadius: 16, padding: 12, backgroundColor: "#ffffff", gap: 8 }}>
+                          <Text style={{ color: "#0f172a", fontWeight: "700" }}>{job.qrType} overall performance</Text>
+                          <Text style={{ color: "#64748b" }}>Compare this job against all created QRs of the same type.</Text>
+                          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}>
+                            <AnalysisStat label="Requested" value={analysis.typePerformance.requestedCount} />
+                            <AnalysisStat label="Success" value={analysis.typePerformance.successCount} tone="#047857" />
+                            <AnalysisStat label="Failure" value={analysis.typePerformance.failureCount} tone="#b91c1c" />
+                          </View>
+                          <ProgressBar label={`${job.qrType} success rate`} value={analysis.typePerformance.successCount} total={Math.max(analysis.typePerformance.requestedCount || 1, 1)} color="#10b981" />
+                        </View>
+                      )}
+
+                      {analysis.rating && (currentTab === "overview" || currentTab === "responses") && (
+                        <View style={{ borderWidth: 1, borderColor: "#dbe3f0", borderRadius: 16, padding: 12, backgroundColor: "#ffffff", gap: 8 }}>
                           <Text style={{ color: "#0f172a", fontWeight: "700" }}>Rating response breakdown</Text>
                           {analysis.rating.buckets.map((bucket) => {
                             const max = Math.max(...analysis.rating.buckets.map((entry) => entry.count || 0), 0);
                             return (
-                              <View key={`${analysis.rating.title}-${bucket.label}`} style={{ gap: 4 }}>
-                                <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                              <View key={bucket.label} style={{ gap: 4 }}>
+                                <View style={{ flexDirection: "row", justifyContent: "space-between", gap: 10 }}>
                                   <Text style={{ color: "#334155" }}>{bucket.label}</Text>
                                   <Text style={{ color: "#64748b" }}>{bucket.count}</Text>
                                 </View>
                                 <View style={{ height: 8, borderRadius: 999, backgroundColor: "#e2e8f0", overflow: "hidden" }}>
-                                  <View
-                                    style={{
-                                      height: "100%",
-                                      borderRadius: 999,
-                                      backgroundColor: "#d946ef",
-                                      width: `${max ? Math.max((bucket.count / max) * 100, 6) : 0}%`,
-                                    }}
-                                  />
+                                  <View style={{ height: "100%", borderRadius: 999, backgroundColor: "#d946ef", width: `${max ? Math.max((bucket.count / max) * 100, 6) : 0}%` }} />
                                 </View>
                               </View>
                             );
@@ -718,11 +629,11 @@ export function DashboardScreen() {
                         </View>
                       )}
 
-                      {analysis.feedback && (
-                        <View style={{ gap: 8 }}>
+                      {analysis.feedback && (currentTab === "overview" || currentTab === "responses") && (
+                        <View style={{ borderWidth: 1, borderColor: "#dbe3f0", borderRadius: 16, padding: 12, backgroundColor: "#ffffff", gap: 8 }}>
                           <Text style={{ color: "#0f172a", fontWeight: "700" }}>Feedback question summary</Text>
                           {analysis.feedback.questions.map((question) => (
-                            <View key={`${analysis.feedback.title}-${question.label}`} style={{ borderRadius: 16, backgroundColor: "#ffffff", padding: 12, gap: 6 }}>
+                            <View key={question.label} style={{ borderRadius: 16, backgroundColor: "#f8fafc", padding: 12, gap: 6 }}>
                               <Text style={{ color: "#0f172a", fontWeight: "600" }}>{question.label}</Text>
                               <Text style={{ color: "#64748b" }}>{question.responses} responses</Text>
                               {!!question.latestAnswers?.length && (
@@ -736,6 +647,19 @@ export function DashboardScreen() {
                               )}
                             </View>
                           ))}
+                        </View>
+                      )}
+
+                      {currentTab === "expiry" && (
+                        <View style={{ borderWidth: 1, borderColor: "#dbe3f0", borderRadius: 16, padding: 12, backgroundColor: "#ffffff", gap: 8 }}>
+                          <Text style={{ color: "#0f172a", fontWeight: "700" }}>Expiry Focus</Text>
+                          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}>
+                            <AnalysisStat label="Expiry State" value={analysis.engagement?.expiryDate ? (analysis.engagement?.isExpired ? "Expired" : "Active") : "Not set"} tone={analysis.engagement?.isExpired ? "#b91c1c" : "#047857"} />
+                            <AnalysisStat label="Expiring Soon" value={analysis.engagement?.expiringSoonLinks || 0} tone="#1d4ed8" />
+                            <AnalysisStat label="Expired Links" value={analysis.engagement?.expiredLinks || 0} tone="#b91c1c" />
+                          </View>
+                          <ProgressBar label="Expiring soon share" value={analysis.engagement?.expiringSoonLinks || 0} total={Math.max(analysis.engagement?.managedLinks || 1, 1)} color="#f59e0b" />
+                          <ProgressBar label="Expired share" value={analysis.engagement?.expiredLinks || 0} total={Math.max(analysis.engagement?.managedLinks || 1, 1)} color="#f43f5e" />
                         </View>
                       )}
                     </View>
