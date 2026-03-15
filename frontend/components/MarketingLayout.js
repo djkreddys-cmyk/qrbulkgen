@@ -3,6 +3,8 @@ import Link from "next/link"
 import Navbar from "./Navbar"
 
 export function MarketingShell({ children }) {
+  const currentYear = new Date().getFullYear()
+
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top,#fff9ed_0%,#f6f7fb_42%,#eef2ff_100%)] text-slate-950">
       <Navbar />
@@ -12,6 +14,18 @@ export function MarketingShell({ children }) {
           <div>
             <p className="text-base font-semibold text-slate-950">QRBulkGen</p>
             <p>Bulk and single QR workflows for teams, campaigns, events, and packaging operations.</p>
+            <p className="mt-2 text-xs text-slate-500">
+              Copyright © {currentYear} QRBulkGen. Built by{" "}
+              <a
+                href="https://werkly.in"
+                target="_blank"
+                rel="noreferrer"
+                className="font-semibold text-slate-700 transition hover:text-slate-950"
+              >
+                Werkly Consulting Pvt. Ltd.
+              </a>
+              .
+            </p>
           </div>
           <div className="flex flex-wrap gap-5">
             <Link href="/generate" className="hover:text-slate-950">Generate</Link>
