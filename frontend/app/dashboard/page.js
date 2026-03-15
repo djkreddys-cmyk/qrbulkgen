@@ -68,6 +68,23 @@ function BarChart({ title, rows, colorClass = "bg-sky-500", emptyMessage }) {
   )
 }
 
+function MetricPill({ label, value, tone = "default" }) {
+  const toneClass =
+    tone === "success"
+      ? "bg-emerald-50 text-emerald-700"
+      : tone === "danger"
+        ? "bg-rose-50 text-rose-700"
+        : tone === "accent"
+          ? "bg-sky-50 text-sky-700"
+          : "bg-slate-100 text-slate-700"
+
+  return (
+    <span className={`rounded-full px-3 py-1 text-xs font-semibold ${toneClass}`}>
+      {label}: {value}
+    </span>
+  )
+}
+
 export default function Dashboard() {
   const router = useRouter()
   const [user, setUser] = useState(null)
@@ -147,6 +164,7 @@ export default function Dashboard() {
 
   const ratingCharts = engagementReport?.ratings || []
   const feedbackGroups = engagementReport?.feedback || []
+  const qrTypePerformance = overviewReport?.qrTypePerformance || []
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -284,6 +302,58 @@ export default function Dashboard() {
                           >
                             {busyJobId === job.id ? "Deleting..." : "Delete"}
                           </button>
+                        </div>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              )}
+            </section>
+
+            <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+              <h2 className="text-2xl font-semibold text-slate-900">QR Type Analysis Reports</h2>
+              <p className="mt-1 text-sm text-slate-500">
+                Compare how each QR type performs by total jobs, requested rows, successful generations, and failure counts.
+              </p>
+
+              {!qrTypePerformance.length && <p className="mt-5 text-slate-500">No QR type analytics available yet.</p>}
+
+              {!!qrTypePerformance.length && (
+                <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                  {qrTypePerformance.map((item) => (
+                    <article key={item.label} className="rounded-2xl border border-slate-200 p-5">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <h3 className="text-lg font-semibold text-slate-900">{item.label}</h3>
+                          <p className="mt-1 text-sm text-slate-500">{item.jobsCount} job(s) created</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Success Rate</p>
+                          <p className="text-2xl font-semibold text-slate-900">
+                            {item.requestedCount
+                              ? `${Math.round((item.successCount / item.requestedCount) * 100)}%`
+                              : "0%"}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="mt-4 space-y-2">
+                        <div className="h-2 overflow-hidden rounded-full bg-slate-100">
+                          <div
+                            className="h-full rounded-full bg-sky-500"
+                            style={{
+                              width: `${item.requestedCount
+                                ? Math.max((item.successCount / item.requestedCount) * 100, 0)
+                                : 0}%`,
+                            }}
+                          />
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          <MetricPill label="Requested" value={item.requestedCount} />
+                          <MetricPill label="Success" value={item.successCount} tone="success" />
+                          <MetricPill label="Failure" value={item.failureCount} tone="danger" />
+                          <MetricPill label="Completed Jobs" value={item.completedJobs} tone="accent" />
+                          <MetricPill label="Failed Jobs" value={item.failedJobs} tone="danger" />
                         </div>
                       </div>
                     </article>

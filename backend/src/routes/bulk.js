@@ -460,7 +460,7 @@ bulkRouter.get("/reports/overview", requireAuth, async (req, res, next) => {
     const startDate = parseDateFilter(req.query.startDate);
     const endDate = parseDateFilter(req.query.endDate, true);
 
-    const [qrTypeRows, statusRows, trendRows] = await Promise.all([
+    const [qrTypeRows, qrTypePerformanceRows, statusRows, trendRows] = await Promise.all([
       query(
         `SELECT bulk_qr_type AS label, COUNT(*)::int AS count
          FROM qr_jobs
@@ -469,6 +469,29 @@ bulkRouter.get("/reports/overview", requireAuth, async (req, res, next) => {
            AND ($3::timestamptz IS NULL OR created_at <= $3::timestamptz)
          GROUP BY bulk_qr_type
          ORDER BY count DESC, label ASC`,
+        [req.user.id, startDate, endDate],
+      ),
+      query(
+        `SELECT
+           CASE
+             WHEN job_type = 'single' THEN 'Single'
+             ELSE bulk_qr_type
+           END AS label,
+           COUNT(*)::int AS jobs_count,
+           COALESCE(SUM(total_count), 0)::int AS requested_count,
+           COALESCE(SUM(success_count), 0)::int AS success_count,
+           COALESCE(SUM(failure_count), 0)::int AS failure_count,
+           COUNT(*) FILTER (WHERE status = 'completed')::int AS completed_jobs,
+           COUNT(*) FILTER (WHERE status = 'failed')::int AS failed_jobs
+         FROM qr_jobs
+         WHERE user_id = $1
+           AND ($2::timestamptz IS NULL OR created_at >= $2::timestamptz)
+           AND ($3::timestamptz IS NULL OR created_at <= $3::timestamptz)
+         GROUP BY CASE
+           WHEN job_type = 'single' THEN 'Single'
+           ELSE bulk_qr_type
+         END
+         ORDER BY jobs_count DESC, label ASC`,
         [req.user.id, startDate, endDate],
       ),
       query(
@@ -497,6 +520,15 @@ bulkRouter.get("/reports/overview", requireAuth, async (req, res, next) => {
     res.json({
       report: {
         jobsByQrType: qrTypeRows.rows,
+        qrTypePerformance: qrTypePerformanceRows.rows.map((row) => ({
+          label: row.label,
+          jobsCount: row.jobs_count,
+          requestedCount: row.requested_count,
+          successCount: row.success_count,
+          failureCount: row.failure_count,
+          completedJobs: row.completed_jobs,
+          failedJobs: row.failed_jobs,
+        })),
         jobsByStatus: statusRows.rows,
         dailyJobs: [...trendRows.rows].reverse(),
       },

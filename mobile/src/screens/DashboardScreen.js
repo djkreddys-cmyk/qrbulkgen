@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { ScrollView, Text, View } from "react-native";
+import { ScrollView, Text, TouchableOpacity, View } from "react-native";
 
 import { useAuth } from "../context/AuthContext";
 import { apiRequest, createAuthHeaders } from "../lib/api";
@@ -9,32 +9,49 @@ export function DashboardScreen() {
   const [summary, setSummary] = useState(null);
   const [jobs, setJobs] = useState([]);
   const [error, setError] = useState("");
+  const [refreshing, setRefreshing] = useState(false);
+
+  async function loadDashboard() {
+    try {
+      const headers = createAuthHeaders(token);
+      const [summaryData, jobsData] = await Promise.all([
+        apiRequest("/qr/jobs/summary", { headers }),
+        apiRequest("/qr/jobs?limit=12", { headers }),
+      ]);
+      setSummary(summaryData.summary || null);
+      setJobs(jobsData.jobs || []);
+      setError("");
+    } catch (requestError) {
+      setError(requestError.message || "Failed to load dashboard");
+    }
+  }
 
   useEffect(() => {
-    let mounted = true;
+    let active = true;
 
-    async function loadDashboard() {
-      try {
-        const headers = createAuthHeaders(token);
-        const [summaryData, jobsData] = await Promise.all([
-          apiRequest("/qr/jobs/summary", { headers }),
-          apiRequest("/qr/jobs?limit=5", { headers }),
-        ]);
-        if (!mounted) return;
-        setSummary(summaryData.summary || null);
-        setJobs(jobsData.jobs || []);
-      } catch (requestError) {
-        if (mounted) {
-          setError(requestError.message || "Failed to load dashboard");
-        }
-      }
+    async function boot() {
+      if (!active) return;
+      await loadDashboard();
     }
 
-    loadDashboard();
+    boot();
+    const poll = setInterval(() => {
+      if (active) {
+        loadDashboard();
+      }
+    }, 8000);
+
     return () => {
-      mounted = false;
+      active = false;
+      clearInterval(poll);
     };
   }, [token]);
+
+  async function handleRefresh() {
+    setRefreshing(true);
+    await loadDashboard();
+    setRefreshing(false);
+  }
 
   return (
     <ScrollView
@@ -49,8 +66,24 @@ export function DashboardScreen() {
     >
       <Text style={{ fontSize: 24, fontWeight: "700", color: "#0f172a" }}>Dashboard</Text>
       <Text style={{ color: "#64748b" }}>
-        Keep an eye on personal generation activity, recent bulk runs, and output quality from the mobile app.
+        This dashboard reads the same shared backend job history as web. If you log in with the same account, the same QR jobs should appear here too.
       </Text>
+      <TouchableOpacity
+        onPress={handleRefresh}
+        style={{
+          alignSelf: "flex-start",
+          borderWidth: 1,
+          borderColor: "#cbd5e1",
+          borderRadius: 999,
+          paddingHorizontal: 14,
+          paddingVertical: 10,
+          backgroundColor: "#f8fafc",
+        }}
+      >
+        <Text style={{ color: "#0f172a", fontWeight: "700" }}>
+          {refreshing ? "Refreshing..." : "Refresh Jobs"}
+        </Text>
+      </TouchableOpacity>
       {!!error && <Text style={{ color: "#b00020" }}>{error}</Text>}
       {summary ? (
         <View style={{ gap: 10 }}>
@@ -92,6 +125,7 @@ export function DashboardScreen() {
           <View key={job.id} style={{ borderTopWidth: 1, borderTopColor: "#e2e8f0", paddingTop: 10 }}>
             <Text style={{ fontWeight: "700", color: "#0f172a" }}>{job.qrType}</Text>
             <Text style={{ color: "#475569" }}>{job.jobType} | {job.status}</Text>
+            <Text style={{ color: "#64748b" }}>Source: {job.sourceFileName || "Direct single QR"}</Text>
             <Text style={{ color: "#64748b" }}>
               {job.successCount}/{job.totalCount} completed
             </Text>
