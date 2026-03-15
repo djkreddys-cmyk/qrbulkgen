@@ -117,6 +117,23 @@ export function AuthProvider({ children }) {
     return data.user || null;
   }
 
+  async function forgotPassword(email) {
+    setError("");
+    setIsSubmitting(true);
+    try {
+      const data = await apiRequest("/auth/forgot-password", {
+        method: "POST",
+        body: JSON.stringify({ email }),
+      });
+      return data;
+    } catch (requestError) {
+      setError(requestError.message || "Failed to send reset link");
+      throw requestError;
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
   function navigate(nextRoute) {
     if (PROTECTED_ROUTES.includes(nextRoute) && !token) {
       setScreen("login");
@@ -155,6 +172,7 @@ export function AuthProvider({ children }) {
       setError,
       login,
       register,
+      forgotPassword,
       refreshSession,
       logout,
     }),

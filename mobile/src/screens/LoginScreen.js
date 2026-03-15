@@ -4,7 +4,7 @@ import { Text, TextInput, TouchableOpacity, View } from "react-native";
 import { useAuth } from "../context/AuthContext";
 
 export function LoginScreen() {
-  const { login, error, isSubmitting } = useAuth();
+  const { login, navigate, error, isSubmitting } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
@@ -30,6 +30,9 @@ export function LoginScreen() {
         style={{ borderWidth: 1, borderColor: "#ccc", padding: 12, borderRadius: 8 }}
       />
       {!!error && <Text style={{ color: "#b00020" }}>{error}</Text>}
+      <TouchableOpacity onPress={() => navigate("forgot-password")} style={{ alignSelf: "flex-end" }}>
+        <Text style={{ color: "#1d4ed8", fontWeight: "600" }}>Forgot Password?</Text>
+      </TouchableOpacity>
       <TouchableOpacity
         onPress={handleLogin}
         disabled={isSubmitting}

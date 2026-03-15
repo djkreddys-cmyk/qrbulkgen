@@ -5,6 +5,7 @@ import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import { AuthProvider, useAuth } from "./src/context/AuthContext";
 import { BulkJobsScreen } from "./src/screens/BulkJobsScreen";
 import { DashboardScreen } from "./src/screens/DashboardScreen";
+import { ForgotPasswordScreen } from "./src/screens/ForgotPasswordScreen";
 import { LoginScreen } from "./src/screens/LoginScreen";
 import { RegisterScreen } from "./src/screens/RegisterScreen";
 import { ScannerScreen } from "./src/screens/ScannerScreen";
@@ -124,7 +125,13 @@ function MobileShell() {
             </Text>
           </TouchableOpacity>
         </View>
-        {screen === "login" ? <LoginScreen /> : <RegisterScreen />}
+        {screen === "login" ? (
+          <LoginScreen />
+        ) : screen === "forgot-password" ? (
+          <ForgotPasswordScreen />
+        ) : (
+          <RegisterScreen />
+        )}
       </View>
     </SafeAreaView>
   );
