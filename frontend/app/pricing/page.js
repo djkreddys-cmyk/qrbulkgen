@@ -101,8 +101,8 @@ export default function PricingPage() {
             <Link href="/generate" className="rounded-3xl bg-white/10 px-5 py-5 font-semibold hover:bg-white/20">
               Open generator
             </Link>
-            <Link href="/blog" className="rounded-3xl bg-white/10 px-5 py-5 font-semibold hover:bg-white/20">
-              Read launch articles
+            <Link href="/#insights" className="rounded-3xl bg-white/10 px-5 py-5 font-semibold hover:bg-white/20">
+              Read launch insights
             </Link>
             <Link href="/bulk-qr-codes" className="rounded-3xl bg-white/10 px-5 py-5 font-semibold hover:bg-white/20">
               Explore bulk QR landing page

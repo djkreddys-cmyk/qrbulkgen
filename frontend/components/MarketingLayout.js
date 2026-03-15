@@ -16,7 +16,7 @@ export function MarketingShell({ children }) {
           <div className="flex flex-wrap gap-5">
             <Link href="/generate" className="hover:text-slate-950">Generate</Link>
             <Link href="/pricing" className="hover:text-slate-950">Pricing</Link>
-            <Link href="/blog" className="hover:text-slate-950">Blog</Link>
+            <Link href="/#insights" className="hover:text-slate-950">Insights</Link>
             <Link href="/bulk-qr-codes" className="hover:text-slate-950">Bulk QR</Link>
             <Link href="/single-qr-codes" className="hover:text-slate-950">Single QR</Link>
           </div>

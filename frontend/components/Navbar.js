@@ -83,9 +83,8 @@ export default function Navbar() {
         <h1 className="text-xl font-bold">QRBulkGen</h1>
 
         <div className="flex items-center gap-6 text-gray-700">
-          <Link href="/">Home</Link>
+          {!session?.user?.email ? <Link href="/">Home</Link> : null}
           <Link href="/generate">Generate</Link>
-          <Link href="/blog">Blog</Link>
           <Link href="/pricing">Pricing</Link>
           <Link href="/dashboard">Dashboard</Link>
 
