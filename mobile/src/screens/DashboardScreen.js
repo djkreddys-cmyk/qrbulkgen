@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Image, ScrollView, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { Alert, Image, ScrollView, Text, TextInput, TouchableOpacity, View } from "react-native";
 
 import { useAuth } from "../context/AuthContext";
 import { apiRequest, createAuthHeaders, API_BASE_URL } from "../lib/api";
@@ -36,6 +36,27 @@ function Card({ children, style }) {
       ]}
     >
       {children}
+    </View>
+  );
+}
+
+function EmptyState({ title, body }) {
+  return (
+    <View
+      style={{
+        borderWidth: 1,
+        borderStyle: "dashed",
+        borderColor: "#cbd5e1",
+        borderRadius: 20,
+        paddingHorizontal: 20,
+        paddingVertical: 24,
+        backgroundColor: "#f8fafc",
+        alignItems: "center",
+        gap: 8,
+      }}
+    >
+      <Text style={{ color: "#0f172a", fontWeight: "700", fontSize: 16, textAlign: "center" }}>{title}</Text>
+      <Text style={{ color: "#64748b", lineHeight: 22, textAlign: "center" }}>{body}</Text>
     </View>
   );
 }
@@ -204,6 +225,7 @@ export function DashboardScreen() {
   const [expandedJobId, setExpandedJobId] = useState("");
   const [jobAnalysis, setJobAnalysis] = useState({});
   const [busyAnalysisJobId, setBusyAnalysisJobId] = useState("");
+  const [busyJobId, setBusyJobId] = useState("");
   const [analysisTabByJobId, setAnalysisTabByJobId] = useState({});
   const [error, setError] = useState("");
   const [refreshing, setRefreshing] = useState(false);
@@ -247,6 +269,51 @@ export function DashboardScreen() {
     setRefreshing(true);
     await loadDashboard();
     setRefreshing(false);
+  }
+
+  async function runDelete(job, forceDelete) {
+    setBusyJobId(job.id);
+    setError("");
+    try {
+      await apiRequest(`/qr/jobs/${job.id}${forceDelete ? "?force=true" : ""}`, {
+        method: "DELETE",
+        headers: createAuthHeaders(token),
+      });
+
+      if (!forceDelete) {
+        setFilters((current) => ({ ...current, status: "archived" }));
+      }
+
+      setExpandedJobId((current) => (current === job.id ? "" : current));
+      setJobAnalysis((current) => {
+        const next = { ...current };
+        delete next[job.id];
+        return next;
+      });
+      await loadDashboard();
+    } catch (requestError) {
+      setError(requestError.message || "Unable to update QR job right now.");
+    } finally {
+      setBusyJobId("");
+    }
+  }
+
+  function handleDeleteJob(job) {
+    const forceDelete = Boolean(job.archivedAt);
+    Alert.alert(
+      forceDelete ? "Delete Permanently" : "Archive QR Job",
+      forceDelete
+        ? "This will permanently remove the QR job and its related data from the server. This cannot be undone."
+        : "This QR job will move to Archived. You can permanently delete it later from the Archived view.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: forceDelete ? "Delete Permanently" : "Archive",
+          style: forceDelete ? "destructive" : "default",
+          onPress: () => runDelete(job, forceDelete),
+        },
+      ]
+    );
   }
 
   async function handleToggleAnalysis(jobId) {
@@ -323,8 +390,8 @@ export function DashboardScreen() {
         </Text>
       </Card>
 
-      <Card>
-        <Text style={{ fontSize: 16, fontWeight: "700", color: "#0f172a" }}>Filters</Text>
+      <Card style={{ shadowColor: "#cbd5e1", shadowOpacity: 0.25, shadowRadius: 10, shadowOffset: { width: 0, height: 2 } }}>
+        <Text style={{ fontSize: 12, fontWeight: "700", color: "#64748b", letterSpacing: 2 }}>FILTERS</Text>
         <View style={{ gap: 10 }}>
           <TextInput
             value={filters.qrType}
@@ -332,11 +399,12 @@ export function DashboardScreen() {
             placeholder={`QR type (${qrTypeOptions.slice(1).join(", ") || "all"})`}
             style={{
               borderWidth: 1,
-              borderColor: "#cbd5e1",
-              borderRadius: 16,
+              borderColor: "#dbe3f0",
+              borderRadius: 18,
               paddingHorizontal: 14,
-              paddingVertical: 12,
+              paddingVertical: 13,
               color: "#0f172a",
+              backgroundColor: "#f8fafc",
             }}
           />
           <TextInput
@@ -345,11 +413,12 @@ export function DashboardScreen() {
             placeholder="Status (active, all, archived, completed, failed, processing, queued)"
             style={{
               borderWidth: 1,
-              borderColor: "#cbd5e1",
-              borderRadius: 16,
+              borderColor: "#dbe3f0",
+              borderRadius: 18,
               paddingHorizontal: 14,
-              paddingVertical: 12,
+              paddingVertical: 13,
               color: "#0f172a",
+              backgroundColor: "#f8fafc",
             }}
           />
           <TextInput
@@ -358,11 +427,12 @@ export function DashboardScreen() {
             placeholder="Start date (YYYY-MM-DD)"
             style={{
               borderWidth: 1,
-              borderColor: "#cbd5e1",
-              borderRadius: 16,
+              borderColor: "#dbe3f0",
+              borderRadius: 18,
               paddingHorizontal: 14,
-              paddingVertical: 12,
+              paddingVertical: 13,
               color: "#0f172a",
+              backgroundColor: "#f8fafc",
             }}
           />
           <TextInput
@@ -371,11 +441,12 @@ export function DashboardScreen() {
             placeholder="End date (YYYY-MM-DD)"
             style={{
               borderWidth: 1,
-              borderColor: "#cbd5e1",
-              borderRadius: 16,
+              borderColor: "#dbe3f0",
+              borderRadius: 18,
               paddingHorizontal: 14,
-              paddingVertical: 12,
+              paddingVertical: 13,
               color: "#0f172a",
+              backgroundColor: "#f8fafc",
             }}
           />
           <View style={{ flexDirection: "row", gap: 10 }}>
@@ -384,8 +455,8 @@ export function DashboardScreen() {
               style={{
                 flex: 1,
                 borderWidth: 1,
-                borderColor: "#cbd5e1",
-                borderRadius: 16,
+                borderColor: "#dbe3f0",
+                borderRadius: 18,
                 paddingVertical: 12,
                 backgroundColor: "#f8fafc",
               }}
@@ -399,8 +470,8 @@ export function DashboardScreen() {
               style={{
                 flex: 1,
                 borderWidth: 1,
-                borderColor: "#cbd5e1",
-                borderRadius: 16,
+                borderColor: "#dbe3f0",
+                borderRadius: 18,
                 paddingVertical: 12,
                 backgroundColor: "#ffffff",
               }}
@@ -421,15 +492,24 @@ export function DashboardScreen() {
       )}
 
       <Card>
-        <Text style={{ fontSize: 20, fontWeight: "700", color: "#0f172a" }}>Created QR Jobs</Text>
-        {!filteredJobs.length && <Text style={{ color: "#64748b" }}>No QR jobs found for the selected filters.</Text>}
+        {!filteredJobs.length && (
+          <EmptyState
+            title={filters.status === "archived" ? "No archived QR jobs yet" : "No QR jobs found"}
+            body={
+              filters.status === "archived"
+                ? "Archived jobs will appear here after you archive them from the active dashboard. You can permanently delete them from this view."
+                : "Try changing the QR type, status, or date filters. Newly created QR jobs will appear here automatically."
+            }
+          />
+        )}
         {!!filteredJobs.length && (
-          <View style={{ gap: 12 }}>
+          <View style={{ gap: 14 }}>
             {filteredJobs.map((job) => {
               const analysis = jobAnalysis[job.id];
               const expanded = expandedJobId === job.id;
               const currentTab = getAnalysisTab(job.id);
               const thumbnailSource = getThumbnailSource(job);
+              const jobBusy = busyJobId === job.id;
               const typeAverageSuccessRate = analysis?.typePerformance
                 ? (analysis.typePerformance.successCount || 0) / Math.max(analysis.typePerformance.requestedCount || 1, 1)
                 : 0;
@@ -441,13 +521,18 @@ export function DashboardScreen() {
                 <View
                   key={job.id}
                   style={{
-                    borderTopWidth: 1,
-                    borderTopColor: "#e2e8f0",
-                    paddingTop: 12,
-                    gap: 10,
+                    borderWidth: 1,
+                    borderColor: "#e2e8f0",
+                    borderRadius: 24,
+                    padding: 14,
+                    gap: 12,
                     borderLeftWidth: 4,
                     borderLeftColor: getStatusAccent(job.status),
-                    paddingLeft: 12,
+                    backgroundColor: "#ffffff",
+                    shadowColor: "#cbd5e1",
+                    shadowOpacity: 0.2,
+                    shadowRadius: 10,
+                    shadowOffset: { width: 0, height: 3 },
                   }}
                 >
                   <View style={{ flexDirection: "row", gap: 12 }}>
@@ -462,6 +547,10 @@ export function DashboardScreen() {
                         alignItems: "center",
                         justifyContent: "center",
                         overflow: "hidden",
+                        shadowColor: "#e2e8f0",
+                        shadowOpacity: 0.7,
+                        shadowRadius: 8,
+                        shadowOffset: { width: 0, height: 2 },
                       }}
                     >
                       {thumbnailSource ? (
@@ -472,7 +561,7 @@ export function DashboardScreen() {
                         </Text>
                       )}
                     </View>
-                    <View style={{ flex: 1, gap: 8 }}>
+                    <View style={{ flex: 1, gap: 10 }}>
                       <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
                         <MetricPill label="Status" value={job.status} />
                         <MetricPill label="Mode" value={job.jobType === "single" ? "Single QR" : `${job.qrType} Bulk`} tone="accent" />
@@ -495,25 +584,44 @@ export function DashboardScreen() {
                     </View>
                   </View>
 
-                  <TouchableOpacity
-                    onPress={() => handleToggleAnalysis(job.id)}
-                    style={{
-                      alignSelf: "flex-start",
-                      borderWidth: 1,
-                      borderColor: "#93c5fd",
-                      borderRadius: 999,
-                      paddingHorizontal: 12,
-                      paddingVertical: 8,
-                      backgroundColor: "#eff6ff",
-                    }}
-                  >
-                    <Text style={{ color: "#1d4ed8", fontWeight: "700" }}>
-                      {expanded ? "Hide Analysis" : busyAnalysisJobId === job.id ? "Loading..." : "Analysis"}
-                    </Text>
-                  </TouchableOpacity>
+                  <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10, paddingTop: 2 }}>
+                    <TouchableOpacity
+                      onPress={() => handleToggleAnalysis(job.id)}
+                      style={{
+                        alignSelf: "flex-start",
+                        borderWidth: 1,
+                        borderColor: "#93c5fd",
+                        borderRadius: 999,
+                        paddingHorizontal: 12,
+                        paddingVertical: 8,
+                        backgroundColor: "#eff6ff",
+                      }}
+                    >
+                      <Text style={{ color: "#1d4ed8", fontWeight: "700" }}>
+                        {expanded ? "Hide Analysis" : busyAnalysisJobId === job.id ? "Loading..." : "Analysis"}
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => handleDeleteJob(job)}
+                      disabled={jobBusy}
+                      style={{
+                        alignSelf: "flex-start",
+                        borderWidth: 1,
+                        borderColor: job.archivedAt ? "#fca5a5" : "#fcd34d",
+                        borderRadius: 999,
+                        paddingHorizontal: 12,
+                        paddingVertical: 8,
+                        backgroundColor: job.archivedAt ? "#fff1f2" : "#fffbeb",
+                      }}
+                    >
+                      <Text style={{ color: job.archivedAt ? "#b91c1c" : "#b45309", fontWeight: "700" }}>
+                        {jobBusy ? "Please wait..." : job.archivedAt ? "Delete Permanently" : "Archive"}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
 
                   {expanded && analysis && (
-                    <View style={{ borderRadius: 18, backgroundColor: "#f8fafc", padding: 12, gap: 10 }}>
+                    <View style={{ borderRadius: 20, backgroundColor: "#f8fafc", padding: 12, gap: 10, borderWidth: 1, borderColor: "#e2e8f0" }}>
                       <Text style={{ color: "#64748b", fontSize: 12, fontWeight: "700" }}>ANALYSIS FOR THIS JOB</Text>
                       <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
                         {[
@@ -529,11 +637,15 @@ export function DashboardScreen() {
                               onPress={() => setAnalysisTab(job.id, tabValue)}
                               style={{
                                 borderWidth: 1,
-                                borderColor: active ? "#0f172a" : "#cbd5e1",
+                                borderColor: active ? "#0f172a" : "#dbe3f0",
                                 borderRadius: 999,
                                 paddingHorizontal: 12,
                                 paddingVertical: 8,
                                 backgroundColor: active ? "#0f172a" : "#ffffff",
+                                shadowColor: active ? "#0f172a" : "#ffffff",
+                                shadowOpacity: active ? 0.15 : 0,
+                                shadowRadius: 8,
+                                shadowOffset: { width: 0, height: 2 },
                               }}
                             >
                               <Text style={{ color: active ? "#ffffff" : "#0f172a", fontWeight: "700" }}>{tabLabel}</Text>

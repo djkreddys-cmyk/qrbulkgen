@@ -152,6 +152,15 @@ function Sparkline({ points }) {
   )
 }
 
+function EmptyState({ title, body }) {
+  return (
+    <div className="rounded-[1.75rem] border border-dashed border-slate-300 bg-slate-50/80 px-6 py-8 text-center">
+      <p className="text-base font-semibold text-slate-900">{title}</p>
+      <p className="mx-auto mt-2 max-w-2xl text-sm leading-6 text-slate-500">{body}</p>
+    </div>
+  )
+}
+
 function getThumbnailSource(job) {
   const filePath = job?.artifact?.filePath || ""
   if (!filePath) return ""
@@ -212,19 +221,27 @@ export default function Dashboard() {
     loadData()
   }, [queryString]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  async function handleDeleteJob(jobId) {
+  async function handleDeleteJob(job) {
     const token = getAuthToken()
     if (!token) return
-    const confirmed = window.confirm("Archive this QR job? You can keep analytics clean without permanently removing the data.")
+    const jobId = job.id
+    const isArchived = Boolean(job.archivedAt)
+    const confirmed = window.confirm(
+      isArchived
+        ? "Permanently delete this archived QR job? This will remove the job and its related data from the server."
+        : "Archive this QR job? You can still review it later from the Archived filter.",
+    )
     if (!confirmed) return
 
     try {
       setBusyJobId(jobId)
-      await apiRequest(`/qr/jobs/${jobId}`, {
+      await apiRequest(`/qr/jobs/${jobId}${isArchived ? "?force=true" : ""}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
       })
-      setFilters((prev) => ({ ...prev, status: "archived" }))
+      if (!isArchived) {
+        setFilters((prev) => ({ ...prev, status: "archived" }))
+      }
       await loadData(queryString)
     } catch (requestError) {
       setError(requestError.message)
@@ -313,7 +330,7 @@ export default function Dashboard() {
     <div className="min-h-screen bg-slate-50">
       <Navbar />
 
-      <main className="mx-auto max-w-[90rem] space-y-6 px-4 py-6 md:px-6">
+      <main className="mx-auto max-w-[96rem] space-y-6 px-3 py-6 md:px-5">
         <section className="flex flex-col gap-5 rounded-[2rem] border border-slate-200 bg-gradient-to-br from-white to-slate-100 p-8 shadow-sm lg:flex-row lg:items-end lg:justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-500">Control Center</p>
@@ -322,14 +339,14 @@ export default function Dashboard() {
           </div>
         </section>
 
-        <section className="sticky top-20 z-10 rounded-[1.75rem] border border-slate-200 bg-white/90 p-4 shadow-sm backdrop-blur">
+        <section className="sticky top-20 z-10 rounded-[1.75rem] border border-slate-200 bg-white/95 p-4 shadow-md shadow-slate-200/40 backdrop-blur">
           <div className="flex flex-col gap-3 xl:flex-row xl:items-end">
-            <label className="text-sm text-slate-600 xl:min-w-[11rem]">
+            <label className="text-[12px] font-semibold uppercase tracking-[0.14em] text-slate-500 xl:min-w-[11rem]">
               QR Type
               <select
                 value={filters.qrType}
                 onChange={(e) => setFilters((prev) => ({ ...prev, qrType: e.target.value }))}
-                className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-slate-900"
+                className="mt-2 h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 text-[15px] text-slate-900 shadow-sm outline-none transition focus:border-sky-300 focus:bg-white focus:ring-2 focus:ring-sky-100"
               >
                 <option value="all">All QR types</option>
                 {qrTypeOptions
@@ -341,12 +358,12 @@ export default function Dashboard() {
                   ))}
               </select>
             </label>
-            <label className="text-sm text-slate-600 xl:min-w-[11rem]">
+            <label className="text-[12px] font-semibold uppercase tracking-[0.14em] text-slate-500 xl:min-w-[11rem]">
               Status
               <select
                 value={filters.status}
                 onChange={(e) => setFilters((prev) => ({ ...prev, status: e.target.value }))}
-                className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-slate-900"
+                className="mt-2 h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 text-[15px] text-slate-900 shadow-sm outline-none transition focus:border-sky-300 focus:bg-white focus:ring-2 focus:ring-sky-100"
               >
                 <option value="active">Active</option>
                 <option value="all">All</option>
@@ -357,33 +374,36 @@ export default function Dashboard() {
                 <option value="queued">Queued</option>
               </select>
             </label>
-            <label className="text-sm text-slate-600 xl:min-w-[10rem]">
+            <label className="text-[12px] font-semibold uppercase tracking-[0.14em] text-slate-500 xl:min-w-[10rem]">
               Start Date
               <input
                 type="date"
                 value={filters.startDate}
                 onChange={(e) => setFilters((prev) => ({ ...prev, startDate: e.target.value }))}
-                className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-slate-900"
+                className="mt-2 h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 text-[15px] text-slate-900 shadow-sm outline-none transition focus:border-sky-300 focus:bg-white focus:ring-2 focus:ring-sky-100"
               />
             </label>
-            <label className="text-sm text-slate-600 xl:min-w-[10rem]">
+            <label className="text-[12px] font-semibold uppercase tracking-[0.14em] text-slate-500 xl:min-w-[10rem]">
               End Date
               <input
                 type="date"
                 value={filters.endDate}
                 onChange={(e) => setFilters((prev) => ({ ...prev, endDate: e.target.value }))}
-                className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-slate-900"
+                className="mt-2 h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 text-[15px] text-slate-900 shadow-sm outline-none transition focus:border-sky-300 focus:bg-white focus:ring-2 focus:ring-sky-100"
               />
             </label>
             <button
               type="button"
               onClick={() => setFilters({ startDate: "", endDate: "", qrType: "all", status: "active" })}
-              className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 xl:mb-0.5"
+              className="h-12 rounded-2xl border border-slate-200 bg-white px-5 text-sm font-semibold text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow"
             >
               Clear Filters
             </button>
           </div>
-          <p className="mt-3 text-xs text-slate-500">Archived QR jobs appear here when Status is set to <span className="font-semibold text-slate-700">Archived</span> or <span className="font-semibold text-slate-700">All</span>.</p>
+          <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-slate-200 pt-3 text-xs text-slate-500">
+            <span className="rounded-full bg-slate-100 px-3 py-1 font-semibold text-slate-700">Live control strip</span>
+            <span>Archived QR jobs appear here when Status is set to <span className="font-semibold text-slate-700">Archived</span> or <span className="font-semibold text-slate-700">All</span>. Archived rows show a permanent delete action.</span>
+          </div>
         </section>
 
         {isLoading && <p className="text-slate-600">Loading dashboard...</p>}
@@ -391,17 +411,26 @@ export default function Dashboard() {
 
         {!isLoading && (
           <>
-            <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-              {!filteredJobs.length && <p className="text-slate-500">No QR jobs found for the selected filters.</p>}
+            <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm md:p-6">
+              {!filteredJobs.length && (
+                <EmptyState
+                  title={filters.status === "archived" ? "No archived QR jobs yet" : "No QR jobs found"}
+                  body={
+                    filters.status === "archived"
+                      ? "Archived jobs will appear here after you archive them from the active dashboard. Once archived, you can permanently delete them."
+                      : "Try changing the QR type, status, or date filters. Newly created QR jobs will appear here automatically."
+                  }
+                />
+              )}
 
               {!!filteredJobs.length && (
-                <div className="grid gap-4">
+                <div className="grid gap-5">
                   {filteredJobs.map((job) => (
-                    <article key={job.id} className="relative overflow-hidden rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:shadow-md">
+                    <article key={job.id} className="group relative overflow-hidden rounded-[1.9rem] border border-slate-200 bg-white p-5 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-lg hover:shadow-slate-200/60 md:p-6">
                       <div className={`absolute inset-y-0 left-0 w-1.5 ${getStatusAccent(job.status)}`} />
-                      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                      <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
                         <div className="flex items-start gap-4">
-                          <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-slate-200 bg-slate-100">
+                          <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-50 to-slate-100 ring-4 ring-slate-50 transition group-hover:ring-sky-50">
                             {getThumbnailSource(job) ? (
                               // eslint-disable-next-line @next/next/no-img-element
                               <img src={getThumbnailSource(job)} alt={getJobTitle(job)} className="h-full w-full object-cover" />
@@ -411,7 +440,7 @@ export default function Dashboard() {
                               </span>
                             )}
                           </div>
-                        <div className="space-y-2">
+                        <div className="space-y-3">
                           <div className="flex flex-wrap items-center gap-2">
                             <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-slate-600">
                               {job.status}
@@ -439,7 +468,7 @@ export default function Dashboard() {
                           </div>
                           <h3 className="text-lg font-semibold text-slate-950">{getJobTitle(job)}</h3>
                           <p className="font-mono text-xs text-slate-500">{job.id}</p>
-                          <div className="grid gap-1 text-sm text-slate-600 sm:grid-cols-2">
+                          <div className="grid gap-x-6 gap-y-1.5 border-t border-slate-100 pt-2 text-sm text-slate-600 sm:grid-cols-2">
                             <p><span className="font-medium text-slate-900">Type:</span> {job.qrType || "-"}</p>
                             <p><span className="font-medium text-slate-900">File:</span> {job.sourceFileName || "-"}</p>
                             <p><span className="font-medium text-slate-900">Requested:</span> {job.totalCount}</p>
@@ -449,24 +478,24 @@ export default function Dashboard() {
                         </div>
                         </div>
 
-                        <div className="flex flex-wrap gap-2 lg:justify-end">
+                        <div className="flex flex-wrap gap-2 lg:max-w-[21rem] lg:justify-end">
                           <button
                             type="button"
                             onClick={() => handleEditJob(job)}
-                            className="rounded-xl border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700"
+                            className="rounded-2xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow"
                           >
                             {job.jobType === "single" ? "Edit QR" : "Open Bulk"}
                           </button>
                           <button
                             type="button"
                             onClick={() => handleToggleAnalysis(job.id)}
-                            className="rounded-xl border border-sky-300 px-3 py-2 text-sm font-medium text-sky-700"
+                            className="rounded-2xl border border-sky-200 bg-sky-50 px-3.5 py-2.5 text-sm font-semibold text-sky-700 shadow-sm transition hover:-translate-y-0.5 hover:border-sky-300 hover:bg-white"
                           >
                             {analysisJobId === job.id ? "Hide Analysis" : "Analysis"}
                           </button>
                           {job.artifact?.filePath && (
                             <a
-                              className="rounded-xl bg-slate-950 px-3 py-2 text-sm font-medium text-white"
+                              className="rounded-2xl bg-slate-950 px-3.5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-slate-800 hover:shadow"
                               href={toAbsoluteDownloadUrl(job.artifact.filePath)}
                               target={String(job.artifact.filePath).startsWith("data:") ? undefined : "_blank"}
                               rel={String(job.artifact.filePath).startsWith("data:") ? undefined : "noreferrer"}
@@ -477,17 +506,27 @@ export default function Dashboard() {
                           )}
                           <button
                             type="button"
-                            onClick={() => handleDeleteJob(job.id)}
+                            onClick={() => handleDeleteJob(job)}
                             disabled={busyJobId === job.id}
-                            className="rounded-xl border border-rose-300 px-3 py-2 text-sm font-medium text-rose-700 disabled:opacity-60"
+                            className={`rounded-2xl px-3.5 py-2.5 text-sm font-semibold shadow-sm transition hover:-translate-y-0.5 disabled:opacity-60 ${
+                              job.archivedAt
+                                ? "border border-rose-500 bg-rose-500 text-white hover:bg-rose-600"
+                                : "border border-rose-200 bg-white text-rose-700 hover:border-rose-300 hover:bg-rose-50"
+                            }`}
                           >
-                            {busyJobId === job.id ? "Archiving..." : "Archive"}
+                            {busyJobId === job.id
+                              ? job.archivedAt
+                                ? "Deleting..."
+                                : "Archiving..."
+                              : job.archivedAt
+                                ? "Delete Permanently"
+                                : "Archive"}
                           </button>
                         </div>
                       </div>
 
                       {analysisJobId === job.id && (
-                        <div className="mt-5 rounded-2xl bg-slate-50 p-4">
+                        <div className="mt-5 rounded-[1.6rem] border border-slate-200 bg-gradient-to-br from-slate-50 to-white p-4 shadow-inner transition-all duration-200 md:p-5">
                           <h4 className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">
                             Analysis for this QR Job
                           </h4>
@@ -540,10 +579,10 @@ export default function Dashboard() {
                                         key={`${job.id}-${tabValue}`}
                                         type="button"
                                         onClick={() => setAnalysisTab(job.id, tabValue)}
-                                        className={`rounded-full px-4 py-2 text-sm font-medium ${
+                                        className={`rounded-full px-4 py-2 text-sm font-semibold transition-all duration-200 ${
                                           active
-                                            ? "bg-slate-950 text-white"
-                                            : "border border-slate-300 bg-white text-slate-700"
+                                            ? "bg-slate-950 text-white shadow-md shadow-slate-300/40"
+                                            : "border border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50"
                                         }`}
                                       >
                                         {tabLabel}
