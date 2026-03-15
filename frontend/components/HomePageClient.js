@@ -3,7 +3,6 @@
 import Link from "next/link"
 import { useState } from "react"
 
-import { HeroCtaRow } from "./MarketingLayout"
 import { blogPosts, homepageStats, landingPages, pricingTiers } from "../lib/content"
 
 export default function HomePageClient() {
@@ -168,8 +167,8 @@ export default function HomePageClient() {
 
   return (
     <main className="mx-auto flex max-w-[88rem] flex-col gap-20 px-4 py-14 md:px-6 md:py-16 xl:px-8">
-      <section className="grid gap-10 xl:grid-cols-[1.02fr_0.98fr] xl:items-center">
-        <div className="space-y-7">
+      <section className="grid gap-10 xl:grid-cols-[1.02fr_0.98fr] xl:items-start">
+        <div className="space-y-7 xl:pt-3">
           <p className="inline-flex rounded-full border border-sky-300/70 bg-white/85 px-4 py-2 text-xs font-semibold uppercase tracking-[0.24em] text-sky-900 shadow-sm">
             Web + mobile QR operating system
           </p>
@@ -181,7 +180,6 @@ export default function HomePageClient() {
             scan experiences, mobile visibility, and dashboard reporting. No more one tool for design,
             one for feedback, and another for monitoring.
           </p>
-          <HeroCtaRow />
           <div className="grid gap-4 md:grid-cols-3">
             {homepageStats.map((stat) => (
               <button
@@ -232,29 +230,45 @@ export default function HomePageClient() {
           </div>
         </div>
 
-        <div className="rounded-[2.2rem] border border-white/70 bg-white/80 p-7 shadow-[0_24px_90px_rgba(15,23,42,0.12)] backdrop-blur md:p-8">
-          <div className="grid gap-4 md:grid-cols-2">
-            {operatingModes.map((mode) => (
-              <div
-                key={mode.label}
-                className="min-h-[212px] rounded-[1.5rem] border border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(243,247,255,0.92))] p-5 shadow-sm"
-              >
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
-                      {mode.label}
-                    </p>
-                    <p className="mt-3 text-[2.1rem] font-black leading-none text-slate-950 md:text-[2.5rem]">
-                      {mode.value}
-                    </p>
+        <div className="space-y-5">
+          <div className="rounded-[2.2rem] border border-white/70 bg-white/80 p-7 shadow-[0_24px_90px_rgba(15,23,42,0.12)] backdrop-blur md:p-8">
+            <div className="grid gap-4 md:grid-cols-2">
+              {operatingModes.map((mode) => (
+                <div
+                  key={mode.label}
+                  className="min-h-[212px] rounded-[1.5rem] border border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(243,247,255,0.92))] p-5 shadow-sm"
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
+                        {mode.label}
+                      </p>
+                      <p className="mt-3 text-[2.1rem] font-black leading-none text-slate-950 md:text-[2.5rem]">
+                        {mode.value}
+                      </p>
+                    </div>
+                    <span className="rounded-full bg-slate-950 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-white">
+                      Active
+                    </span>
                   </div>
-                  <span className="rounded-full bg-slate-950 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-white">
-                    Active
-                  </span>
+                  <p className="mt-4 text-sm leading-6 text-slate-600">{mode.detail}</p>
                 </div>
-                <p className="mt-4 text-sm leading-6 text-slate-600">{mode.detail}</p>
-              </div>
-            ))}
+              ))}
+            </div>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Link
+              href="/login"
+              className="flex min-h-[132px] items-center justify-center rounded-[1.8rem] bg-slate-950 px-6 py-6 text-center text-xl font-bold text-white shadow-[0_18px_45px_rgba(15,23,42,0.16)] transition hover:-translate-y-1 hover:bg-slate-800"
+            >
+              Open Generator
+            </Link>
+            <Link
+              href="/login"
+              className="flex min-h-[132px] items-center justify-center rounded-[1.8rem] border border-slate-300 bg-white/90 px-6 py-6 text-center text-xl font-bold text-slate-950 shadow-sm transition hover:-translate-y-1 hover:border-slate-950"
+            >
+              Create Account
+            </Link>
           </div>
         </div>
       </section>
