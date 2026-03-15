@@ -40,7 +40,7 @@ export default function HomePageClient() {
     },
     {
       title: "Structured business payloads",
-      body: "vCard, Location, YouTube, WiFi, Event, Bitcoin",
+      body: "vCard, Location, YouTube, WiFi, Event",
     },
     {
       title: "Tracked public experiences",
@@ -334,9 +334,7 @@ export default function HomePageClient() {
           ))}
         </div>
         <div className="rounded-[2rem] border border-white/80 bg-white/85 p-8 shadow-[0_18px_60px_rgba(15,23,42,0.08)] backdrop-blur">
-          <p className="text-sm font-semibold uppercase tracking-[0.22em] text-slate-500">
-            {bestFeatures.find((feature) => feature.id === activeFeatureCard)?.title}
-          </p>
+          <p className="text-sm font-semibold uppercase tracking-[0.22em] text-slate-500">Why teams keep using it</p>
           <h3 className="mt-4 max-w-[14ch] text-[2.6rem] font-black leading-[1.02] tracking-tight text-slate-950">
             {activeFeatureContent.title}
           </h3>
@@ -456,55 +454,71 @@ export default function HomePageClient() {
         </div>
       </section>
 
-      <section className="rounded-[2rem] border border-white/80 bg-white/85 px-8 py-10 shadow-sm backdrop-blur">
-        <div className="grid gap-8 lg:grid-cols-[1fr_1fr] lg:items-center">
+      <section className="rounded-[2rem] border border-white/80 bg-white/85 px-8 py-8 shadow-sm backdrop-blur">
+        <div className="grid gap-8 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
           <div>
             <p className="text-sm font-semibold uppercase tracking-[0.22em] text-slate-500">Mobile app</p>
-            <h2 className="mt-3 max-w-[13ch] text-[2.8rem] font-black tracking-tight text-slate-950">
-              Use the same account on web and mobile without losing job history.
+            <h2 className="mt-3 max-w-[12ch] text-[2.35rem] font-black tracking-tight text-slate-950">
+              Keep operators moving even when they leave the desktop dashboard.
             </h2>
-            <p className="mt-5 leading-8 text-slate-600">
-              Teams can scan existing QR codes, watch bulk jobs, open per-job analysis, recover passwords,
-              and generate single QR assets from the phone while the web app remains the full studio.
+            <p className="mt-4 max-w-2xl leading-8 text-slate-600">
+              The phone app mirrors the same account, jobs, and analysis so teams can scan, monitor,
+              share, and recover access away from the main studio.
             </p>
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            {mobileFeatureDetails.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => setActiveMobileFeature(item.id)}
-                className={`rounded-[1.5rem] px-5 py-5 text-left text-sm font-semibold transition ${
-                  activeMobileFeature === item.id
-                    ? "bg-slate-950 text-white shadow-lg"
-                    : "border border-slate-300 bg-white text-slate-900 hover:border-slate-950"
-                }`}
+            <div className="mt-6 flex flex-wrap gap-3">
+              <Link
+                href="/login"
+                className="rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
               >
-                {item.label}
-              </button>
-            ))}
-          </div>
-        </div>
-        <div className="mt-8 rounded-[1.75rem] border border-slate-200/80 bg-slate-50 px-6 py-6">
-          <p className="text-sm font-semibold uppercase tracking-[0.22em] text-slate-500">
-            {activeMobileFeatureContent.label}
-          </p>
-          <h3 className="mt-3 text-3xl font-black tracking-tight text-slate-950">
-            {activeMobileFeatureContent.title}
-          </h3>
-          <p className="mt-4 max-w-3xl leading-8 text-slate-600">
-            {activeMobileFeatureContent.body}
-          </p>
-          <ul className="mt-6 grid gap-3 sm:grid-cols-3">
-            {activeMobileFeatureContent.bullets.map((bullet) => (
-              <li
-                key={bullet}
-                className="rounded-2xl border border-slate-200 bg-white px-4 py-4 text-sm font-medium text-slate-700"
+                Open App Flow
+              </Link>
+              <Link
+                href="/pricing"
+                className="rounded-full border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-950 transition hover:border-slate-950"
               >
-                {bullet}
-              </li>
-            ))}
-          </ul>
+                View Plans
+              </Link>
+            </div>
+          </div>
+          <div className="space-y-4 rounded-[1.75rem] border border-slate-200/80 bg-slate-50 px-6 py-6">
+            <div className="grid gap-4 sm:grid-cols-2">
+              {mobileFeatureDetails.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => setActiveMobileFeature(item.id)}
+                  className={`rounded-[1.35rem] px-4 py-4 text-left text-sm font-semibold transition ${
+                    activeMobileFeature === item.id
+                      ? "bg-slate-950 text-white shadow-lg"
+                      : "border border-slate-300 bg-white text-slate-900 hover:border-slate-950"
+                  }`}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+            <div className="rounded-[1.5rem] border border-slate-200 bg-white px-5 py-5">
+              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
+                {activeMobileFeatureContent.label}
+              </p>
+              <h3 className="mt-3 text-2xl font-black tracking-tight text-slate-950">
+                {activeMobileFeatureContent.title}
+              </h3>
+              <p className="mt-3 leading-7 text-slate-600">
+                {activeMobileFeatureContent.body}
+              </p>
+              <ul className="mt-5 grid gap-3 sm:grid-cols-1">
+                {activeMobileFeatureContent.bullets.map((bullet) => (
+                  <li
+                    key={bullet}
+                    className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-700"
+                  >
+                    {bullet}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
         </div>
       </section>
     </main>

@@ -6,7 +6,7 @@ export const pricingTiers = [
     price: "Free",
     billing: "For testing workflows and shipping quick campaigns",
     ctaLabel: "Create Free Account",
-    ctaHref: "/register",
+    ctaHref: "/login",
     summary: "Best for solo founders validating QR use cases before scaling.",
     features: [
       "Unlimited single QR generation",
@@ -20,7 +20,7 @@ export const pricingTiers = [
     price: "$29/mo",
     billing: "For active operations teams running weekly campaigns",
     ctaLabel: "Start Growth",
-    ctaHref: "/register",
+    ctaHref: "/login",
     summary: "Ideal for marketing teams, packaging workflows, and recurring bulk jobs.",
     features: [
       "Bulk CSV generation with ZIP delivery",
