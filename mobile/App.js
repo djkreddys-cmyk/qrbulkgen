@@ -1,5 +1,5 @@
-import React from "react";
-import { ScrollView, Text, TouchableOpacity, View } from "react-native";
+import React, { useEffect } from "react";
+import { Linking, ScrollView, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 
 import { AuthProvider, useAuth } from "./src/context/AuthContext";
@@ -8,6 +8,7 @@ import { DashboardScreen } from "./src/screens/DashboardScreen";
 import { ForgotPasswordScreen } from "./src/screens/ForgotPasswordScreen";
 import { LoginScreen } from "./src/screens/LoginScreen";
 import { RegisterScreen } from "./src/screens/RegisterScreen";
+import { ResetPasswordScreen } from "./src/screens/ResetPasswordScreen";
 import { ScannerScreen } from "./src/screens/ScannerScreen";
 import { SingleGenerateScreen } from "./src/screens/SingleGenerateScreen";
 
@@ -33,7 +34,49 @@ function TabButton({ label, route, activeRoute, navigate }) {
 }
 
 function MobileShell() {
-  const { screen, activeRoute, isBootstrapping, navigate, user, logout } = useAuth();
+  const {
+    screen,
+    activeRoute,
+    isBootstrapping,
+    navigate,
+    openResetPassword,
+    setResetNotice,
+    user,
+    logout,
+  } = useAuth();
+
+  useEffect(() => {
+    function handleIncomingUrl(nextUrl) {
+      if (!nextUrl) return;
+
+      try {
+        const parsedUrl = new URL(nextUrl);
+        const token = parsedUrl.searchParams.get("token") || "";
+        const reset = parsedUrl.searchParams.get("reset") || "";
+        const route = (parsedUrl.hostname || parsedUrl.pathname || "").replace(/^\/+/, "");
+
+        if (route === "reset-password" && token) {
+          openResetPassword(token);
+        } else if (route === "login" && reset === "1") {
+          setResetNotice("Password reset successful. Please log in.");
+          navigate("login");
+        } else if (route === "dashboard") {
+          navigate("dashboard");
+        }
+      } catch {
+        // Ignore malformed deep links and keep the app usable.
+      }
+    }
+
+    Linking.getInitialURL().then(handleIncomingUrl).catch(() => {});
+    const subscription = Linking.addEventListener("url", ({ url }) => {
+      handleIncomingUrl(url);
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, [navigate, openResetPassword, setResetNotice]);
 
   if (isBootstrapping) {
     return (
@@ -129,6 +172,8 @@ function MobileShell() {
           <LoginScreen />
         ) : screen === "forgot-password" ? (
           <ForgotPasswordScreen />
+        ) : screen === "reset-password" ? (
+          <ResetPasswordScreen />
         ) : (
           <RegisterScreen />
         )}

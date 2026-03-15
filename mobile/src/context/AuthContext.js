@@ -15,6 +15,8 @@ export function AuthProvider({ children }) {
   const [isBootstrapping, setIsBootstrapping] = useState(true);
   const [error, setError] = useState("");
   const [singleDraft, setSingleDraft] = useState(null);
+  const [resetPasswordToken, setResetPasswordToken] = useState("");
+  const [resetNotice, setResetNotice] = useState("");
 
   useEffect(() => {
     let mounted = true;
@@ -134,10 +136,32 @@ export function AuthProvider({ children }) {
     }
   }
 
+  function openResetPassword(tokenValue) {
+    setError("");
+    setResetNotice("");
+    setResetPasswordToken(String(tokenValue || ""));
+    setScreen("reset-password");
+  }
+
+  async function completePasswordReset() {
+    setUser(null);
+    setToken("");
+    setActiveRoute("dashboard");
+    setSingleDraft(null);
+    setResetPasswordToken("");
+    setResetNotice("Password reset successful. Please log in.");
+    setScreen("login");
+    await clearStoredSession();
+  }
+
   function navigate(nextRoute) {
+    setError("");
     if (PROTECTED_ROUTES.includes(nextRoute) && !token) {
       setScreen("login");
       return;
+    }
+    if (nextRoute !== "reset-password") {
+      setResetPasswordToken("");
     }
     setScreen(PROTECTED_ROUTES.includes(nextRoute) ? "app" : nextRoute);
     if (PROTECTED_ROUTES.includes(nextRoute)) {
@@ -152,6 +176,8 @@ export function AuthProvider({ children }) {
     setActiveRoute("dashboard");
     setError("");
     setSingleDraft(null);
+    setResetPasswordToken("");
+    setResetNotice("");
     await clearStoredSession();
   }
 
@@ -166,6 +192,10 @@ export function AuthProvider({ children }) {
       navigate,
       singleDraft,
       setSingleDraft,
+      resetPasswordToken,
+      setResetPasswordToken,
+      resetNotice,
+      setResetNotice,
       isSubmitting,
       isBootstrapping,
       error,
@@ -173,10 +203,12 @@ export function AuthProvider({ children }) {
       login,
       register,
       forgotPassword,
+      openResetPassword,
+      completePasswordReset,
       refreshSession,
       logout,
     }),
-    [user, token, screen, activeRoute, singleDraft, isSubmitting, isBootstrapping, error],
+    [user, token, screen, activeRoute, singleDraft, resetPasswordToken, resetNotice, isSubmitting, isBootstrapping, error],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
