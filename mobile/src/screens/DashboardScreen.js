@@ -12,6 +12,13 @@ function buildQuery(filters) {
   return next ? `?${next}` : "";
 }
 
+function formatDateTime(value) {
+  if (!value) return "Not yet";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "Not yet";
+  return parsed.toLocaleString();
+}
+
 function Card({ children }) {
   return (
     <View
@@ -408,7 +415,7 @@ export function DashboardScreen() {
                       <View style={{ gap: 4 }}>
                         {question.latestAnswers.map((answer, index) => (
                           <Text key={`${question.label}-${index}`} style={{ color: "#475569" }}>
-                            • {answer}
+                            - {answer}
                           </Text>
                         ))}
                       </View>
@@ -462,19 +469,97 @@ export function DashboardScreen() {
                   {expanded && analysis && (
                     <View style={{ borderRadius: 18, backgroundColor: "#f8fafc", padding: 12, gap: 10 }}>
                       <Text style={{ color: "#64748b", fontSize: 12, fontWeight: "700" }}>ANALYSIS FOR THIS JOB</Text>
-                      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
-                        <MetricPill label="Requested" value={analysis.job.totalCount} />
-                        <MetricPill label="Success" value={analysis.job.successCount} tone="success" />
-                        <MetricPill label="Failure" value={analysis.job.failureCount} tone="danger" />
-                        <MetricPill
-                          label="Success Rate"
-                          value={
-                            analysis.job.totalCount
-                              ? `${Math.round((analysis.job.successCount / analysis.job.totalCount) * 100)}%`
-                              : "0%"
-                          }
-                          tone="accent"
-                        />
+                      <View
+                        style={{
+                          borderWidth: 1,
+                          borderColor: "#bfdbfe",
+                          borderRadius: 16,
+                          padding: 12,
+                          backgroundColor: "#eff6ff",
+                          gap: 6,
+                        }}
+                      >
+                        <Text style={{ color: "#1d4ed8", fontSize: 12, fontWeight: "700" }}>QUICK INSIGHT</Text>
+                        <Text style={{ color: "#0f172a", lineHeight: 20 }}>{analysis.insight}</Text>
+                      </View>
+
+                      <View
+                        style={{
+                          borderWidth: 1,
+                          borderColor: "#dbe3f0",
+                          borderRadius: 16,
+                          padding: 12,
+                          backgroundColor: "#ffffff",
+                          gap: 8,
+                        }}
+                      >
+                        <Text style={{ color: "#0f172a", fontWeight: "700" }}>Generation Report</Text>
+                        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+                          <MetricPill label="Requested" value={analysis.job.totalCount} />
+                          <MetricPill label="Success" value={analysis.job.successCount} tone="success" />
+                          <MetricPill label="Failure" value={analysis.job.failureCount} tone="danger" />
+                          <MetricPill
+                            label="Success Rate"
+                            value={
+                              analysis.job.totalCount
+                                ? `${Math.round((analysis.job.successCount / analysis.job.totalCount) * 100)}%`
+                                : "0%"
+                            }
+                            tone="accent"
+                          />
+                        </View>
+                      </View>
+
+                      <View
+                        style={{
+                          borderWidth: 1,
+                          borderColor: "#dbe3f0",
+                          borderRadius: 16,
+                          padding: 12,
+                          backgroundColor: "#ffffff",
+                          gap: 8,
+                        }}
+                      >
+                        <Text style={{ color: "#0f172a", fontWeight: "700" }}>Usage Report</Text>
+                        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+                          <MetricPill label="Scans" value={analysis.engagement?.totalScans || 0} />
+                          <MetricPill
+                            label="Submissions"
+                            value={analysis.engagement?.totalSubmissions || 0}
+                            tone="accent"
+                          />
+                          <MetricPill
+                            label="Expiry"
+                            value={
+                              analysis.engagement?.expiryDate
+                                ? analysis.engagement?.isExpired
+                                  ? "Expired"
+                                  : "Active"
+                                : "Not set"
+                            }
+                            tone={analysis.engagement?.isExpired ? "danger" : "success"}
+                          />
+                        </View>
+                        <View style={{ gap: 4 }}>
+                          <Text style={{ color: "#475569" }}>
+                            <Text style={{ fontWeight: "700", color: "#0f172a" }}>Last scan: </Text>
+                            {formatDateTime(analysis.engagement?.lastScanAt)}
+                          </Text>
+                          <Text style={{ color: "#475569" }}>
+                            <Text style={{ fontWeight: "700", color: "#0f172a" }}>Last submission: </Text>
+                            {formatDateTime(analysis.engagement?.lastSubmissionAt)}
+                          </Text>
+                          <Text style={{ color: "#475569" }}>
+                            <Text style={{ fontWeight: "700", color: "#0f172a" }}>Expiry date: </Text>
+                            {analysis.engagement?.expiryDate
+                              ? formatDateTime(analysis.engagement.expiryDate)
+                              : "Not set"}
+                          </Text>
+                          <Text style={{ color: "#475569" }}>
+                            <Text style={{ fontWeight: "700", color: "#0f172a" }}>Engagement type: </Text>
+                            {analysis.engagement?.targetKind || "Direct QR / not tracked"}
+                          </Text>
+                        </View>
                       </View>
 
                       {analysis.typePerformance && (
@@ -529,7 +614,7 @@ export function DashboardScreen() {
                                 <View style={{ gap: 4 }}>
                                   {question.latestAnswers.map((answer, index) => (
                                     <Text key={`${question.label}-${index}`} style={{ color: "#475569" }}>
-                                      • {answer}
+                                      - {answer}
                                     </Text>
                                   ))}
                                 </View>
