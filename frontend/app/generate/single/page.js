@@ -750,20 +750,21 @@ export function SingleGenerateContent({ embedded = false }) {
               </div>
             )}
 
-            {["PDF", "Image Gallery", "Rating", "Feedback"].includes(qrType) && (
-              <div>
-                <label className="block mb-1 text-sm">Last Scan Date / Expiry</label>
-                <input
-                  type="datetime-local"
-                  value={expiryDate}
-                  onChange={(e) => setExpiryDate(e.target.value)}
-                  className="w-full border p-2"
-                />
-                <p className="mt-1 text-xs text-slate-500">
-                  After this time, app-hosted QR pages show an expiry warning instead of the normal content.
-                </p>
-              </div>
-            )}
+            <div>
+              <label className="block mb-1 text-sm">Last Scan Date / Expiry</label>
+              <input
+                type="text"
+                value={expiryDate}
+                onChange={(e) => setExpiryDate(e.target.value)}
+                placeholder="MM/DD/YYYY or DD/MM/YYYY"
+                className="w-full border p-2"
+              />
+              <p className="mt-1 text-xs text-slate-500">
+                Leave blank to default validity to 6 months from creation for app-hosted QR flows. Direct QR
+                content types can store the date here now, but strict expiry warnings are currently enforced on
+                app-hosted destinations like Rating, Feedback, PDF, and Image Gallery.
+              </p>
+            </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div>

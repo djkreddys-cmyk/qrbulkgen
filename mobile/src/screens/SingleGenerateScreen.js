@@ -238,9 +238,10 @@ export function SingleGenerateScreen() {
             }}
           />
           <Text style={{ color: "#64748b", fontSize: 12, lineHeight: 18 }}>
-            Leave blank to default app-hosted QR validity to 6 months from creation. Expiry warnings are
-            enforced on app-hosted QR pages like Rating, Feedback, PDF, and Image Gallery.
-            {!supportsExpiry(qrType, content) ? " Direct QR content types may not honor expiry after scan." : ""}
+            You can set a last scan date for every QR type here. Leave blank to default app-hosted validity to
+            6 months from creation. Expiry warnings are currently enforced on app-hosted QR pages like Rating,
+            Feedback, PDF, and Image Gallery.
+            {!supportsExpiry(qrType, content) ? " Direct QR content types may not honor expiry after scan yet." : ""}
           </Text>
         </View>
 
