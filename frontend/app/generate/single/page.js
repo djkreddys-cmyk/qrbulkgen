@@ -70,6 +70,10 @@ function getLuminance(r, g, b) {
   return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255
 }
 
+function alphaHex(opacity) {
+  return clamp(Math.round(opacity * 255), 0, 255).toString(16).padStart(2, "0")
+}
+
 async function extractBrandPalette(dataUrl) {
   if (!dataUrl || typeof window === "undefined") {
     return null
@@ -689,6 +693,8 @@ export function SingleGenerateContent({ embedded = false, brandMode = false }) {
 
   const brandImageSize = brandStrength === "subtle" ? 0.22 : brandStrength === "bold" ? 0.3 : 0.26
   const brandSilhouetteOpacity = brandStrength === "subtle" ? 0.08 : brandStrength === "bold" ? 0.16 : 0.12
+  const brandBackgroundOpacity = brandStrength === "subtle" ? 0.18 : brandStrength === "bold" ? 0.34 : 0.26
+  const previewBackgroundColor = brandMode && logoDataUrl ? `#ffffff${alphaHex(0.06)}` : backgroundColor
   const selectableQrTypes = brandMode
     ? QR_TYPES.filter((type) => ["Feedback", "Rating", "PDF", "Image Gallery", "URL"].includes(type))
     : QR_TYPES
@@ -703,9 +709,9 @@ export function SingleGenerateContent({ embedded = false, brandMode = false }) {
       height: 340,
       type: "canvas",
       data: generatedContent,
-      image: logoDataUrl || undefined,
+      image: brandMode ? undefined : logoDataUrl || undefined,
       dotsOptions: { color: foregroundColor, type: dotStyle },
-      backgroundOptions: { color: backgroundColor },
+      backgroundOptions: { color: previewBackgroundColor },
       cornersSquareOptions: { color: brandMode && logoDataUrl ? brandAccentColor : foregroundColor, type: cornerSquareStyle },
       cornersDotOptions: { color: brandMode && logoDataUrl ? brandAccentColor : foregroundColor, type: cornerDotStyle },
       qrOptions: { errorCorrectionLevel },
@@ -718,7 +724,7 @@ export function SingleGenerateContent({ embedded = false, brandMode = false }) {
       return
     }
     qrCodeRef.current.update(options)
-  }, [generatedContent, logoDataUrl, foregroundColor, backgroundColor, dotStyle, cornerSquareStyle, cornerDotStyle, errorCorrectionLevel, brandMode, brandAccentColor, brandImageSize])
+  }, [generatedContent, logoDataUrl, foregroundColor, backgroundColor, dotStyle, cornerSquareStyle, cornerDotStyle, errorCorrectionLevel, brandMode, brandAccentColor, brandImageSize, previewBackgroundColor])
 
   async function handleDownload() {
     if (!generatedContent) return
@@ -761,9 +767,53 @@ export function SingleGenerateContent({ embedded = false, brandMode = false }) {
       const dataUrl = data?.artifact?.dataUrl || ""
       if (!dataUrl) throw new Error("Unable to create QR download")
 
+      let finalDownloadUrl = dataUrl
+      const finalFileName = data?.artifact?.fileName || `${(filenamePrefix || "qr").replace(/[^a-zA-Z0-9-_]/g, "") || "qr"}.png`
+
+      if (brandMode && logoDataUrl && qrCodeRef.current) {
+        const composedCanvas = document.createElement("canvas")
+        composedCanvas.width = downloadResolution
+        composedCanvas.height = downloadResolution
+        const ctx = composedCanvas.getContext("2d")
+        if (ctx) {
+          ctx.fillStyle = "#ffffff"
+          ctx.fillRect(0, 0, downloadResolution, downloadResolution)
+
+          const backgroundImage = new window.Image()
+          backgroundImage.src = logoDataUrl
+          await new Promise((resolve, reject) => {
+            backgroundImage.onload = resolve
+            backgroundImage.onerror = reject
+          })
+
+          const logoBox = downloadResolution * 0.68
+          const logoX = (downloadResolution - logoBox) / 2
+          const logoY = (downloadResolution - logoBox) / 2
+          ctx.save()
+          ctx.globalAlpha = brandBackgroundOpacity
+          ctx.drawImage(backgroundImage, logoX, logoY, logoBox, logoBox)
+          ctx.restore()
+
+          const qrBlob = await qrCodeRef.current.getRawData("png")
+          if (qrBlob) {
+            const qrImage = new window.Image()
+            const qrObjectUrl = URL.createObjectURL(qrBlob)
+            qrImage.src = qrObjectUrl
+            await new Promise((resolve, reject) => {
+              qrImage.onload = resolve
+              qrImage.onerror = reject
+            })
+            ctx.drawImage(qrImage, 0, 0, downloadResolution, downloadResolution)
+            URL.revokeObjectURL(qrObjectUrl)
+          }
+
+          finalDownloadUrl = composedCanvas.toDataURL("image/png")
+        }
+      }
+
       const link = document.createElement("a")
-      link.href = dataUrl
-      link.download = data?.artifact?.fileName || `${(filenamePrefix || "qr").replace(/[^a-zA-Z0-9-_]/g, "") || "qr"}.png`
+      link.href = finalDownloadUrl
+      link.download = finalFileName
       document.body.appendChild(link)
       link.click()
       document.body.removeChild(link)
@@ -1108,10 +1158,10 @@ export function SingleGenerateContent({ embedded = false, brandMode = false }) {
           <section className="border rounded-lg p-6 bg-white">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <h2 className="text-xl font-semibold">Live Preview</h2>
+                <h2 className="text-xl font-semibold">{brandMode ? "Brand QR Preview" : "Live Preview"}</h2>
                 {brandMode && (
                   <p className="mt-2 max-w-md text-sm text-slate-600">
-                    Brand QR uses your uploaded logo as the visual anchor and applies a denser branded preset.
+                    Brand QR uses your uploaded logo as a full background layer and overlays a denser branded QR on top.
                     Feedback and other tracked flows usually produce richer dot patterns.
                   </p>
                 )}
@@ -1143,7 +1193,7 @@ export function SingleGenerateContent({ embedded = false, brandMode = false }) {
             {brandMode && (
               <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
                 <p className="font-semibold text-slate-900">Brand QR guidance</p>
-                <p className="mt-2">Upload your logo, keep contrast high, and use this mode for a logo-led branded QR. It auto-picks colors from the logo, applies accent corners, and uses a softer silhouette preview while keeping the real QR structure scannable.</p>
+                <p className="mt-2">Upload your logo, keep contrast high, and use this mode for a full-logo background QR. It auto-picks colors from the logo, overlays the QR on top of the artwork, and keeps the scannable matrix strong.</p>
               </div>
             )}
             <div className="mt-4">
