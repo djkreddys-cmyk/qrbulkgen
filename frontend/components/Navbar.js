@@ -10,6 +10,7 @@ export default function Navbar() {
   const router = useRouter()
   const [session, setSession] = useState(null)
   const [showAppPrompt, setShowAppPrompt] = useState(false)
+  const [appPromptMessage, setAppPromptMessage] = useState("")
 
   useEffect(() => {
     setSession(loadAuthSession())
@@ -35,6 +36,22 @@ export default function Navbar() {
     setShowAppPrompt(false)
   }
 
+  function handleOpenApp() {
+    if (typeof window === "undefined") return
+
+    setAppPromptMessage("Trying to open QRBulkGen Mobile...")
+    const startedAt = Date.now()
+    window.location.href = "qrbulkgen://dashboard"
+
+    window.setTimeout(() => {
+      if (Date.now() - startedAt >= 1200 && document.visibilityState === "visible") {
+        setAppPromptMessage(
+          "If the app did not open, you are likely using Expo Go or the production app is not installed yet.",
+        )
+      }
+    }, 1400)
+  }
+
   return (
     <>
       {showAppPrompt && session?.user?.email ? (
@@ -46,12 +63,12 @@ export default function Navbar() {
             </p>
           </div>
           <div className="flex gap-3">
-            <a
-              href="qrbulkgen://dashboard"
+            <button
+              onClick={handleOpenApp}
               className="rounded bg-black px-4 py-2 text-white"
             >
               Open App
-            </a>
+            </button>
             <button
               onClick={handleDismissAppPrompt}
               className="rounded border border-slate-300 px-4 py-2 text-slate-700"
@@ -59,6 +76,7 @@ export default function Navbar() {
               Maybe Later
             </button>
           </div>
+          {appPromptMessage ? <p className="text-xs text-slate-500 md:text-right">{appPromptMessage}</p> : null}
         </div>
       ) : null}
       <nav className="flex justify-between items-center p-6 border-b">

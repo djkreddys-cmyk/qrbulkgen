@@ -18,6 +18,7 @@ export default function ResetPasswordClient() {
   const [message, setMessage] = useState("")
   const [error, setError] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [appHandoffMessage, setAppHandoffMessage] = useState("")
   const appResetUrl = useMemo(
     () => (token ? `qrbulkgen://reset-password?token=${encodeURIComponent(token)}` : ""),
     [token],
@@ -34,6 +35,25 @@ export default function ResetPasswordClient() {
       window.location.href = appResetUrl
     }
   }, [appResetUrl, handoffAttempted, token])
+
+  function openMobileApp(targetUrl, onFallback) {
+    if (typeof window === "undefined") return
+
+    setAppHandoffMessage("Trying to open QRBulkGen Mobile...")
+    const startedAt = Date.now()
+    window.location.href = targetUrl
+
+    window.setTimeout(() => {
+      if (Date.now() - startedAt >= 1200 && document.visibilityState === "visible") {
+        setAppHandoffMessage(
+          "If the mobile app did not open, continue in browser or install the production mobile app build. Expo Go will not handle qrbulkgen:// links.",
+        )
+        if (typeof onFallback === "function") {
+          onFallback()
+        }
+      }
+    }, 1400)
+  }
 
   async function handleSubmit(event) {
     event.preventDefault()
@@ -61,10 +81,9 @@ export default function ResetPasswordClient() {
       setMessage(data.message)
       setTimeout(() => {
         if (typeof window !== "undefined" && isMobileBrowser) {
-          window.location.href = "qrbulkgen://login?reset=1"
-          setTimeout(() => {
+          openMobileApp("qrbulkgen://login?reset=1", () => {
             router.push("/login")
-          }, 900)
+          })
           return
         }
         router.push("/login")
@@ -93,12 +112,23 @@ export default function ResetPasswordClient() {
               </a>
               <button
                 type="button"
-                onClick={() => setHandoffAttempted(true)}
+                onClick={() => {
+                  setHandoffAttempted(true)
+                  setAppHandoffMessage("")
+                }}
                 className="rounded border border-black px-4 py-2"
               >
                 Continue In Browser
               </button>
+              <button
+                type="button"
+                onClick={() => openMobileApp(appResetUrl)}
+                className="rounded border border-blue-300 px-4 py-2 text-blue-900"
+              >
+                Try Again
+              </button>
             </div>
+            {appHandoffMessage ? <p className="mt-3 text-xs text-blue-900">{appHandoffMessage}</p> : null}
           </div>
         ) : null}
 
