@@ -50,3 +50,26 @@ export function getAuthToken() {
 
   return "";
 }
+
+export function getAuthUser() {
+  const session = loadAuthSession();
+  if (!session) {
+    return null;
+  }
+
+  if (session.user && typeof session.user === "object") {
+    return session.user;
+  }
+
+  if (session.session?.user && typeof session.session.user === "object") {
+    return session.session.user;
+  }
+
+  return null;
+}
+
+export function isAuthenticated() {
+  const user = getAuthUser();
+  const token = getAuthToken();
+  return !!(token && (user?.email || user?.id));
+}

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation"
 import Navbar from "../../components/Navbar"
 import { SingleGenerateContent } from "./single/page"
 import { BulkGenerateContent } from "../upload/page"
-import { loadAuthSession } from "../../lib/auth"
+import { isAuthenticated } from "../../lib/auth"
 
 export default function GeneratePage() {
   const router = useRouter()
@@ -13,8 +13,7 @@ export default function GeneratePage() {
   const [isCheckingSession, setIsCheckingSession] = useState(true)
 
   useEffect(() => {
-    const session = loadAuthSession()
-    if (!session?.user?.email) {
+    if (!isAuthenticated()) {
       router.replace("/login")
       return
     }

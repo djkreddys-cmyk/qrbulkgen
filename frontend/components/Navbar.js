@@ -4,7 +4,7 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
 
-import { clearAuthSession, loadAuthSession } from "../lib/auth"
+import { clearAuthSession, getAuthUser, isAuthenticated, loadAuthSession } from "../lib/auth"
 
 const MOBILE_APP_INSTALL_URL = process.env.NEXT_PUBLIC_ANDROID_APP_URL || ""
 
@@ -13,9 +13,12 @@ export default function Navbar() {
   const [session, setSession] = useState(null)
   const [showAppPrompt, setShowAppPrompt] = useState(false)
   const [appPromptMessage, setAppPromptMessage] = useState("")
+  const authed = isAuthenticated()
 
   useEffect(() => {
-    setSession(loadAuthSession())
+    const loadedSession = loadAuthSession()
+    const loadedUser = getAuthUser()
+    setSession(loadedUser ? { ...loadedSession, user: loadedUser } : loadedSession)
     if (typeof window !== "undefined") {
       const isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(window.navigator.userAgent || "")
       const dismissed = window.localStorage.getItem("qrbulkgen-mobile-prompt-dismissed")
@@ -63,7 +66,7 @@ export default function Navbar() {
           <div>
             <p className="font-semibold text-slate-900">Use QRBulkGen Mobile for a better experience.</p>
             <p className="text-slate-600">
-              {session?.user?.email
+              {authed
                 ? "Open the mobile app to manage scans, jobs, and password resets more comfortably on your phone."
                 : "Install or open QRBulkGen Mobile to scan QR codes, monitor jobs, and continue your workflow on phone."}
             </p>
@@ -99,12 +102,12 @@ export default function Navbar() {
         <h1 className="text-xl font-bold">QRBulkGen</h1>
 
         <div className="flex items-center gap-6 text-gray-700">
-          {!session?.user?.email ? <Link href="/">Home</Link> : null}
+          {!authed ? <Link href="/">Home</Link> : null}
           <Link href="/generate">Generate</Link>
           <Link href="/pricing">Pricing</Link>
           <Link href="/dashboard">Dashboard</Link>
 
-          {session?.user?.email ? (
+          {authed ? (
             <>
               <span className="text-sm text-gray-600">
                 {session.user.name || session.user.email}

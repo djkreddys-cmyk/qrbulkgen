@@ -360,8 +360,8 @@ bulkRouter.get("/jobs/summary", requireAuth, async (req, res, next) => {
          AND (
            $3 = false OR job_type = 'bulk'
          )
-         AND ($4::timestamptz IS NULL OR created_at >= $4::timestamptz)
-         AND ($5::timestamptz IS NULL OR created_at <= $5::timestamptz)`,
+         AND ($4::timestamptz IS NULL OR qr_jobs.created_at >= $4::timestamptz)
+         AND ($5::timestamptz IS NULL OR qr_jobs.created_at <= $5::timestamptz)`,
       [req.user.id, filterSingle, filterBulk, startDate, endDate, includeArchived],
     );
 
@@ -581,8 +581,8 @@ bulkRouter.get("/reports/overview", requireAuth, async (req, res, next) => {
          LEFT JOIN managed_qr_links m ON m.id = j.managed_link_id
          WHERE j.user_id = $1
            AND j.archived_at IS NULL
-           AND ($2::timestamptz IS NULL OR created_at >= $2::timestamptz)
-           AND ($3::timestamptz IS NULL OR created_at <= $3::timestamptz)
+           AND ($2::timestamptz IS NULL OR j.created_at >= $2::timestamptz)
+           AND ($3::timestamptz IS NULL OR j.created_at <= $3::timestamptz)
          GROUP BY CASE
            WHEN j.job_type = 'single' THEN COALESCE(m.qr_type, 'Text')
            ELSE COALESCE(j.bulk_qr_type, 'Text')
@@ -620,8 +620,8 @@ bulkRouter.get("/reports/overview", requireAuth, async (req, res, next) => {
          FROM qr_jobs
          WHERE user_id = $1
            AND archived_at IS NULL
-           AND ($2::timestamptz IS NULL OR created_at >= $2::timestamptz)
-           AND ($3::timestamptz IS NULL OR created_at <= $3::timestamptz)
+           AND ($2::timestamptz IS NULL OR qr_jobs.created_at >= $2::timestamptz)
+           AND ($3::timestamptz IS NULL OR qr_jobs.created_at <= $3::timestamptz)
          GROUP BY status
          ORDER BY count DESC, label ASC`,
         [req.user.id, startDate, endDate],
@@ -631,8 +631,8 @@ bulkRouter.get("/reports/overview", requireAuth, async (req, res, next) => {
          FROM qr_jobs
          WHERE user_id = $1
            AND archived_at IS NULL
-           AND ($2::timestamptz IS NULL OR created_at >= $2::timestamptz)
-           AND ($3::timestamptz IS NULL OR created_at <= $3::timestamptz)
+           AND ($2::timestamptz IS NULL OR qr_jobs.created_at >= $2::timestamptz)
+           AND ($3::timestamptz IS NULL OR qr_jobs.created_at <= $3::timestamptz)
          GROUP BY DATE(created_at)
          ORDER BY DATE(created_at) DESC
          LIMIT 14`,
@@ -642,7 +642,7 @@ bulkRouter.get("/reports/overview", requireAuth, async (req, res, next) => {
         `SELECT
            COUNT(*)::int AS total_scans,
            COUNT(DISTINCT metadata->>'visitorKey')::int AS unique_scans,
-           MAX(created_at) AS last_scan_at
+           MAX(ae.created_at) AS last_scan_at
          FROM analytics_events ae
          INNER JOIN managed_qr_links m ON m.id::text = ae.metadata->>'linkId'
          WHERE ae.event_type = 'qr.public.scan'
