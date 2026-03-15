@@ -16,6 +16,7 @@ import { shareDataUrlFile } from "../lib/files";
 import {
   addSocialLinkRow,
   buildQrContent,
+  getManagedTitleForQrType,
   getAvailableSocialPlatforms,
   getQrPlaceholder,
   hasRequiredFields,
@@ -349,6 +350,8 @@ export function SingleGenerateScreen() {
         body: JSON.stringify({
           content: generatedContent,
           qrType,
+          managedTitle: getManagedTitleForQrType(qrType, fields),
+          expiresAt: expiryDate,
           filenamePrefix,
           foregroundColor,
           backgroundColor,

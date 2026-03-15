@@ -1,96 +1,12 @@
-export const QR_TYPES = [
-  "App Store",
-  "Email",
-  "Event",
-  "Rating",
-  "Feedback",
-  "Image Gallery",
-  "Location",
-  "PDF",
-  "Phone",
-  "SMS",
-  "Social Media",
-  "Text",
-  "URL",
-  "vCard",
-  "WhatsApp",
-  "WIFI",
-  "Youtube",
-];
+import {
+  INITIAL_QR_FIELDS,
+  QR_PLACEHOLDERS,
+  QR_TYPES,
+  SOCIAL_PLATFORM_OPTIONS,
+  validateQrFields,
+} from "../../../shared/qr-config";
 
-export const SOCIAL_PLATFORM_OPTIONS = [
-  "Custom",
-  "Facebook",
-  "Instagram",
-  "LinkedIn",
-  "Pinterest",
-  "Snapchat",
-  "Telegram",
-  "Twitter",
-  "WhatsApp",
-  "YouTube",
-];
-
-export const QR_PLACEHOLDERS = {
-  URL: "https://example.com",
-  Text: "Write the text you want to encode",
-  Email: "hello@example.com",
-  Phone: "+919999999999",
-  SMS: "+919999999999",
-  WhatsApp: "+919999999999",
-  vCard: "John Doe",
-  Location: "17.385,78.4867",
-  Youtube: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
-  WIFI: "OfficeWiFi",
-  Event: "Launch Event",
-  PDF: "https://www.qrbulkgen.com/sample.pdf",
-  "Social Media": "https://www.instagram.com/yourbrand",
-  "App Store": "https://apps.apple.com/app/id123456789",
-  "Image Gallery": "https://www.qrbulkgen.com/gallery/demo",
-  Rating: "Rate your experience",
-  Feedback: "Share your feedback",
-};
-
-export const INITIAL_QR_FIELDS = {
-  url: "",
-  text: "",
-  email: "",
-  subject: "",
-  body: "",
-  phone: "",
-  smsPhone: "",
-  smsMessage: "",
-  whatsappPhone: "",
-  whatsappMessage: "",
-  firstName: "",
-  lastName: "",
-  organization: "",
-  jobTitle: "",
-  vcardPhone: "",
-  vcardEmail: "",
-  vcardUrl: "",
-  address: "",
-  latitude: "",
-  longitude: "",
-  youtubeUrl: "",
-  wifiType: "WPA",
-  wifiSsid: "",
-  wifiPassword: "",
-  wifiHidden: false,
-  eventTitle: "",
-  eventStart: "",
-  eventEnd: "",
-  eventLocation: "",
-  eventDescription: "",
-  pdfUrl: "",
-  appStoreUrl: "",
-  galleryUrl: "",
-  ratingTitle: "Rate your experience",
-  ratingStyle: "stars",
-  ratingScale: "5",
-  feedbackTitle: "Share your feedback",
-  feedbackQuestions: ["How was your experience?"],
-};
+export { INITIAL_QR_FIELDS, QR_TYPES, SOCIAL_PLATFORM_OPTIONS };
 
 export function getQrPlaceholder(qrType) {
   return QR_PLACEHOLDERS[qrType] || "Enter QR content";
@@ -269,41 +185,36 @@ export function addSocialLinkRow(socialLinks) {
 }
 
 export function hasRequiredFields(qrType, fields, ids = {}, modes = {}, socialLinks = []) {
-  if (qrType === "PDF") {
-    return modes.pdfMode === "upload" ? !!ids.pdfLinkId : !!String(fields.pdfUrl || "").trim();
-  }
-  if (qrType === "Image Gallery") {
-    return modes.galleryMode === "upload" ? !!ids.galleryLinkId : !!String(fields.galleryUrl || "").trim();
-  }
-  if (qrType === "WhatsApp") {
-    return !!String(fields.whatsappPhone || "").replace(/[^\d]/g, "");
-  }
-  if (qrType === "Social Media") {
-    return socialLinks.some((item) => {
-      const platform = item.platform === "Custom" ? item.customPlatform : item.platform;
-      return String(platform || "").trim() && String(item.url || "").trim();
-    });
-  }
-  if (qrType === "Rating") return true;
-  if (qrType === "Feedback") return (fields.feedbackQuestions || []).some((q) => String(q || "").trim());
-  if (qrType === "Location") {
-    return !!String(fields.latitude || "").trim() && !!String(fields.longitude || "").trim();
-  }
+  return validateQrFields(qrType, fields, {
+    ...ids,
+    ...modes,
+    socialLinks,
+    feedbackQuestions: fields.feedbackQuestions,
+  });
+}
 
+export function getManagedTitleForQrType(qrType, fields) {
   const map = {
     URL: fields.url,
     Text: fields.text,
-    Email: fields.email,
+    Email: fields.subject || fields.email,
     Phone: fields.phone,
-    SMS: fields.smsPhone,
+    SMS: fields.smsMessage || fields.smsPhone,
+    WhatsApp: fields.whatsappMessage || fields.whatsappPhone,
+    vCard: `${fields.firstName || ""} ${fields.lastName || ""}`.trim(),
+    Location: `${fields.latitude || ""}, ${fields.longitude || ""}`.trim(),
     Youtube: fields.youtubeUrl,
     WIFI: fields.wifiSsid,
     Event: fields.eventTitle,
+    PDF: fields.pdfUrl || "PDF Document",
+    "Social Media": "Social media links",
     "App Store": fields.appStoreUrl,
-    vCard: fields.firstName,
+    "Image Gallery": fields.galleryUrl || "Image Gallery",
+    Rating: fields.ratingTitle,
+    Feedback: fields.feedbackTitle,
   };
 
-  return !!String(map[qrType] || "").trim();
+  return String(map[qrType] || qrType || "QR Code").trim() || String(qrType || "QR Code");
 }
 
 export function buildQrContent(qrType, fields, options = {}) {
@@ -312,11 +223,7 @@ export function buildQrContent(qrType, fields, options = {}) {
     socialLinks = [],
     ids = {},
     modes = {},
-    expiryDate = "",
   } = options;
-
-  const expiryValue = parseFlexibleExpiry(expiryDate)?.toISOString() || addMonths(new Date(), 6).toISOString();
-  const expirySuffix = expiryValue ? `exp=${encodeURIComponent(expiryValue)}` : "";
 
   switch (qrType) {
     case "URL":
@@ -369,7 +276,7 @@ export function buildQrContent(qrType, fields, options = {}) {
       ].join("\n");
     case "PDF":
       return ids.pdfLinkId
-        ? `${appOrigin}/pdf/${ids.pdfLinkId}${expirySuffix ? `?${expirySuffix}` : ""}`
+        ? `${appOrigin}/pdf/${ids.pdfLinkId}`
         : String(fields.pdfUrl || "").trim();
     case "Social Media":
       return socialLinks
@@ -386,13 +293,13 @@ export function buildQrContent(qrType, fields, options = {}) {
       return String(fields.appStoreUrl || "").trim();
     case "Image Gallery":
       return ids.galleryLinkId
-        ? `${appOrigin}/gallery/${ids.galleryLinkId}${expirySuffix ? `?${expirySuffix}` : ""}`
+        ? `${appOrigin}/gallery/${ids.galleryLinkId}`
         : String(fields.galleryUrl || "").trim();
     case "Rating": {
       const title = encodeURIComponent(fields.ratingTitle || "Rate your experience");
       const style = encodeURIComponent(fields.ratingStyle || "stars");
       const scale = encodeURIComponent((fields.ratingStyle || "stars") === "stars" ? "5" : fields.ratingScale || "5");
-      return `${appOrigin}/rate?title=${title}&style=${style}&scale=${scale}${expirySuffix ? `&${expirySuffix}` : ""}`;
+      return `${appOrigin}/rate?title=${title}&style=${style}&scale=${scale}`;
     }
     case "Feedback": {
       const questions = (fields.feedbackQuestions || []).map((q) => String(q || "").trim()).filter(Boolean);
@@ -400,7 +307,7 @@ export function buildQrContent(qrType, fields, options = {}) {
         title: fields.feedbackTitle || "Share your feedback",
         questions,
       });
-      return `${appOrigin}/feedback?f=${encodeURIComponent(payload)}${expirySuffix ? `&${expirySuffix}` : ""}`;
+      return `${appOrigin}/feedback?f=${encodeURIComponent(payload)}`;
     }
     default:
       return "";

@@ -127,6 +127,19 @@ export function DashboardScreen() {
   const [refreshing, setRefreshing] = useState(false);
 
   const queryString = useMemo(() => buildQuery(filters), [filters]);
+  const scanSummary = overviewReport?.scanSummary || {
+    totalScans: 0,
+    uniqueScans: 0,
+    repeatedScans: 0,
+    lastScanAt: null,
+  };
+  const scanTrend = (overviewReport?.scanTrend || []).map((row) => ({
+    label: row.label,
+    count: row.totalScans,
+  }));
+  const topPerformingLinks = overviewReport?.topPerformingLinks || [];
+  const expiringSoon = overviewReport?.expiringSoon || [];
+  const expiredLinks = overviewReport?.expired || [];
 
   async function loadDashboard(activeQuery = queryString) {
     try {
@@ -301,6 +314,21 @@ export function DashboardScreen() {
         </Card>
       )}
 
+      <View style={{ gap: 10 }}>
+        <View style={{ flexDirection: "row", gap: 10 }}>
+          <StatCard label="TOTAL SCANS" value={scanSummary.totalScans} />
+          <StatCard label="UNIQUE SCANS" value={scanSummary.uniqueScans} tone="#1d4ed8" />
+        </View>
+        <View style={{ flexDirection: "row", gap: 10 }}>
+          <StatCard label="REPEATED SCANS" value={scanSummary.repeatedScans} />
+          <StatCard
+            label="LAST SCAN"
+            value={scanSummary.lastScanAt ? formatDateTime(scanSummary.lastScanAt) : "Not yet"}
+            tone="#047857"
+          />
+        </View>
+      </View>
+
       <BarChart
         title="Created QR Types"
         rows={overviewReport?.jobsByQrType || []}
@@ -319,6 +347,79 @@ export function DashboardScreen() {
         color="#f59e0b"
         emptyMessage="No daily activity available yet."
       />
+      <BarChart
+        title="Scan Trend"
+        rows={scanTrend}
+        color="#6366f1"
+        emptyMessage="No scan activity recorded yet."
+      />
+
+      <Card>
+        <Text style={{ fontSize: 20, fontWeight: "700", color: "#0f172a" }}>Top Performing QR Links</Text>
+        {!topPerformingLinks.length && (
+          <Text style={{ color: "#64748b" }}>No managed scan activity yet.</Text>
+        )}
+        {!!topPerformingLinks.length && (
+          <View style={{ gap: 12 }}>
+            {topPerformingLinks.map((link) => (
+              <View key={link.id} style={{ borderTopWidth: 1, borderTopColor: "#e2e8f0", paddingTop: 12, gap: 8 }}>
+                <View style={{ flexDirection: "row", justifyContent: "space-between", gap: 12 }}>
+                  <View style={{ flex: 1, gap: 4 }}>
+                    <Text style={{ color: "#0f172a", fontWeight: "700" }}>{link.title}</Text>
+                    <Text style={{ color: "#64748b" }}>{link.qrType}</Text>
+                  </View>
+                  <MetricPill label="Scans" value={link.totalScans} tone="accent" />
+                </View>
+                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+                  <MetricPill label="Unique" value={link.uniqueScans} />
+                  <MetricPill label="Repeated" value={link.repeatedScans} />
+                </View>
+                <Text style={{ color: "#475569" }}>
+                  <Text style={{ fontWeight: "700", color: "#0f172a" }}>Last scan: </Text>
+                  {formatDateTime(link.lastScanAt)}
+                </Text>
+              </View>
+            ))}
+          </View>
+        )}
+      </Card>
+
+      <Card>
+        <Text style={{ fontSize: 20, fontWeight: "700", color: "#0f172a" }}>Expiry Watch</Text>
+        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+          <MetricPill label="Expiring Soon" value={expiringSoon.length} tone="accent" />
+          <MetricPill label="Expired" value={expiredLinks.length} tone="danger" />
+        </View>
+        {!!expiringSoon.length && (
+          <View style={{ gap: 8 }}>
+            <Text style={{ color: "#b45309", fontWeight: "700", fontSize: 12 }}>EXPIRING SOON</Text>
+            {expiringSoon.map((link) => (
+              <View key={link.id} style={{ borderRadius: 16, backgroundColor: "#fffbeb", padding: 12, gap: 4 }}>
+                <Text style={{ color: "#0f172a", fontWeight: "700" }}>{link.title}</Text>
+                <Text style={{ color: "#475569" }}>
+                  {link.qrType} | {formatDateTime(link.expiresAt)}
+                </Text>
+              </View>
+            ))}
+          </View>
+        )}
+        {!!expiredLinks.length && (
+          <View style={{ gap: 8 }}>
+            <Text style={{ color: "#b91c1c", fontWeight: "700", fontSize: 12 }}>EXPIRED</Text>
+            {expiredLinks.map((link) => (
+              <View key={link.id} style={{ borderRadius: 16, backgroundColor: "#fff1f2", padding: 12, gap: 4 }}>
+                <Text style={{ color: "#0f172a", fontWeight: "700" }}>{link.title}</Text>
+                <Text style={{ color: "#475569" }}>
+                  {link.qrType} | {formatDateTime(link.expiresAt)}
+                </Text>
+              </View>
+            ))}
+          </View>
+        )}
+        {!expiringSoon.length && !expiredLinks.length && (
+          <Text style={{ color: "#64748b" }}>No managed links are close to expiry right now.</Text>
+        )}
+      </Card>
 
       <Card>
         <Text style={{ fontSize: 20, fontWeight: "700", color: "#0f172a" }}>QR Type Analysis</Text>
@@ -523,10 +624,16 @@ export function DashboardScreen() {
                         <Text style={{ color: "#0f172a", fontWeight: "700" }}>Usage Report</Text>
                         <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
                           <MetricPill label="Scans" value={analysis.engagement?.totalScans || 0} />
+                          <MetricPill label="Unique" value={analysis.engagement?.uniqueScans || 0} />
+                          <MetricPill label="Repeated" value={analysis.engagement?.repeatedScans || 0} />
                           <MetricPill
                             label="Submissions"
                             value={analysis.engagement?.totalSubmissions || 0}
                             tone="accent"
+                          />
+                          <MetricPill
+                            label="Tracked Links"
+                            value={analysis.engagement?.managedLinks || 0}
                           />
                           <MetricPill
                             label="Expiry"
@@ -558,6 +665,14 @@ export function DashboardScreen() {
                           <Text style={{ color: "#475569" }}>
                             <Text style={{ fontWeight: "700", color: "#0f172a" }}>Engagement type: </Text>
                             {analysis.engagement?.targetKind || "Direct QR / not tracked"}
+                          </Text>
+                          <Text style={{ color: "#475569" }}>
+                            <Text style={{ fontWeight: "700", color: "#0f172a" }}>Expiring soon links: </Text>
+                            {analysis.engagement?.expiringSoonLinks || 0}
+                          </Text>
+                          <Text style={{ color: "#475569" }}>
+                            <Text style={{ fontWeight: "700", color: "#0f172a" }}>Expired links: </Text>
+                            {analysis.engagement?.expiredLinks || 0}
                           </Text>
                         </View>
                       </View>

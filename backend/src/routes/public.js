@@ -1,5 +1,6 @@
 const fs = require("fs");
 const path = require("path");
+const crypto = require("crypto");
 const express = require("express");
 const multer = require("multer");
 
@@ -105,6 +106,12 @@ function normalizeTrackingUrl(url) {
   } catch {
     return raw;
   }
+}
+
+function buildVisitorKey(req, linkId = "") {
+  const userAgent = String(req.headers["user-agent"] || "").slice(0, 500);
+  const ip = getRequestIp(req).slice(0, 255);
+  return crypto.createHash("sha256").update(`${linkId}|${ip}|${userAgent}`).digest("hex");
 }
 
 publicRouter.post(
@@ -291,24 +298,77 @@ publicRouter.post("/track-view", async (req, res, next) => {
     const title = String(req.body.title || "").trim().slice(0, 255);
     const targetKind = String(req.body.targetKind || "").trim().slice(0, 64);
     const expired = Boolean(req.body.expired);
+    const linkId = String(req.body.linkId || "").trim();
 
-    if (!sourceUrl) {
-      throw createHttpError(400, "VALIDATION_ERROR", "sourceUrl is required");
+    if (!sourceUrl && !linkId) {
+      throw createHttpError(400, "VALIDATION_ERROR", "sourceUrl or linkId is required");
+    }
+
+    if (linkId) {
+      await query(
+        `UPDATE managed_qr_links
+         SET last_scanned_at = NOW(), updated_at = NOW()
+         WHERE id = $1`,
+        [linkId],
+      );
     }
 
     await trackEvent({
       eventType: "qr.public.scan",
       metadata: {
-        targetUrl: sourceUrl,
+        targetUrl: sourceUrl || null,
         title: title || null,
         targetKind: targetKind || null,
         expired,
+        linkId: linkId || null,
+        visitorKey: buildVisitorKey(req, linkId),
         userAgent: String(req.headers["user-agent"] || "").slice(0, 255),
         ipAddress: getRequestIp(req).slice(0, 255),
       },
     });
 
     res.status(201).json({ ok: true });
+  } catch (error) {
+    next(error);
+  }
+});
+
+publicRouter.get("/qr-links/:id", async (req, res, next) => {
+  try {
+    const id = String(req.params.id || "").trim();
+    if (!id) {
+      throw createHttpError(400, "VALIDATION_ERROR", "link id is required");
+    }
+
+    const result = await query(
+      `SELECT id, qr_type, title, content, target_payload, expires_at, last_scanned_at, created_at
+       FROM managed_qr_links
+       WHERE id = $1
+       LIMIT 1`,
+      [id],
+    );
+
+    const row = result.rows[0];
+    if (!row) {
+      throw createHttpError(404, "NOT_FOUND", "Managed QR link not found");
+    }
+
+    const expiresAt = row.expires_at || null;
+    const isExpired = expiresAt ? new Date(expiresAt).getTime() < Date.now() : false;
+
+    res.json({
+      link: {
+        id: row.id,
+        qrType: row.qr_type,
+        title: row.title,
+        content: row.content,
+        targetPayload: row.target_payload || null,
+        expiresAt,
+        isExpired,
+        lastScannedAt: row.last_scanned_at,
+        createdAt: row.created_at,
+      },
+    });
   } catch (error) {
     next(error);
   }

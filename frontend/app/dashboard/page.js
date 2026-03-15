@@ -92,6 +92,13 @@ function formatDateTime(value) {
   return parsed.toLocaleString()
 }
 
+function formatCompactDate(value) {
+  if (!value) return "Not set"
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) return "Not set"
+  return parsed.toLocaleDateString()
+}
+
 export default function Dashboard() {
   const router = useRouter()
   const [user, setUser] = useState(null)
@@ -146,7 +153,7 @@ export default function Dashboard() {
   async function handleDeleteJob(jobId) {
     const token = getAuthToken()
     if (!token) return
-    const confirmed = window.confirm("Delete this QR job and its saved artifact history?")
+    const confirmed = window.confirm("Archive this QR job? You can keep analytics clean without permanently removing the data.")
     if (!confirmed) return
 
     try {
@@ -206,6 +213,11 @@ export default function Dashboard() {
   const ratingCharts = engagementReport?.ratings || []
   const feedbackGroups = engagementReport?.feedback || []
   const qrTypePerformance = overviewReport?.qrTypePerformance || []
+  const scanSummary = overviewReport?.scanSummary || { totalScans: 0, uniqueScans: 0, repeatedScans: 0, lastScanAt: null }
+  const scanTrend = (overviewReport?.scanTrend || []).map((row) => ({ label: row.label, count: row.totalScans }))
+  const topPerformingLinks = overviewReport?.topPerformingLinks || []
+  const expiringSoon = overviewReport?.expiringSoon || []
+  const expiredLinks = overviewReport?.expired || []
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -261,6 +273,13 @@ export default function Dashboard() {
               <StatCard label="Failure" value={summary.totalFailure} tone="danger" />
             </section>
 
+            <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+              <StatCard label="Total Scans" value={scanSummary.totalScans} />
+              <StatCard label="Unique Scans" value={scanSummary.uniqueScans} tone="accent" />
+              <StatCard label="Repeated Scans" value={scanSummary.repeatedScans} />
+              <StatCard label="Last Scan Activity" value={scanSummary.lastScanAt ? formatCompactDate(scanSummary.lastScanAt) : "Not yet"} tone="success" />
+            </section>
+
             <section className="grid grid-cols-1 gap-6 xl:grid-cols-3">
               <BarChart
                 title="Created QR Types"
@@ -280,6 +299,77 @@ export default function Dashboard() {
                 colorClass="bg-amber-500"
                 emptyMessage="No daily activity available yet."
               />
+            </section>
+
+            <section className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+              <BarChart
+                title="Scan Trend"
+                rows={scanTrend}
+                colorClass="bg-indigo-500"
+                emptyMessage="No scan activity recorded yet."
+              />
+              <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                <h3 className="text-lg font-semibold text-slate-900">Top Performing QR Links</h3>
+                {!topPerformingLinks.length && <p className="mt-4 text-sm text-slate-500">No managed scan activity yet.</p>}
+                {!!topPerformingLinks.length && (
+                  <div className="mt-5 space-y-4">
+                    {topPerformingLinks.map((link) => (
+                      <div key={link.id} className="rounded-2xl bg-slate-50 p-4">
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <p className="font-medium text-slate-900">{link.title}</p>
+                            <p className="text-sm text-slate-500">{link.qrType}</p>
+                          </div>
+                          <MetricPill label="Scans" value={link.totalScans} tone="accent" />
+                        </div>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          <MetricPill label="Unique" value={link.uniqueScans} />
+                          <MetricPill label="Repeated" value={link.repeatedScans} />
+                          <MetricPill label="Last Scan" value={link.lastScanAt ? formatCompactDate(link.lastScanAt) : "Not yet"} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </section>
+              <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                <h3 className="text-lg font-semibold text-slate-900">Expiry Watch</h3>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <MetricPill label="Expiring Soon" value={expiringSoon.length} tone="accent" />
+                  <MetricPill label="Expired" value={expiredLinks.length} tone="danger" />
+                </div>
+                <div className="mt-5 space-y-4">
+                  {!!expiringSoon.length && (
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-600">Expiring soon</p>
+                      <div className="mt-3 space-y-2">
+                        {expiringSoon.map((link) => (
+                          <div key={link.id} className="rounded-2xl bg-amber-50 p-3 text-sm text-slate-700">
+                            <p className="font-medium text-slate-900">{link.title}</p>
+                            <p>{link.qrType} • {formatCompactDate(link.expiresAt)}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {!!expiredLinks.length && (
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-rose-600">Expired</p>
+                      <div className="mt-3 space-y-2">
+                        {expiredLinks.map((link) => (
+                          <div key={link.id} className="rounded-2xl bg-rose-50 p-3 text-sm text-slate-700">
+                            <p className="font-medium text-slate-900">{link.title}</p>
+                            <p>{link.qrType} • {formatCompactDate(link.expiresAt)}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {!expiringSoon.length && !expiredLinks.length && (
+                    <p className="text-sm text-slate-500">No managed links are close to expiry right now.</p>
+                  )}
+                </div>
+              </section>
             </section>
 
             <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -348,7 +438,7 @@ export default function Dashboard() {
                             disabled={busyJobId === job.id}
                             className="rounded-xl border border-rose-300 px-3 py-2 text-sm font-medium text-rose-700 disabled:opacity-60"
                           >
-                            {busyJobId === job.id ? "Deleting..." : "Delete"}
+                            {busyJobId === job.id ? "Archiving..." : "Archive"}
                           </button>
                         </div>
                       </div>
@@ -390,6 +480,8 @@ export default function Dashboard() {
                                   <p className="font-medium text-slate-900">Usage Report</p>
                                   <div className="mt-3 flex flex-wrap gap-2">
                                     <MetricPill label="Scans" value={analysis.engagement?.totalScans || 0} />
+                                    <MetricPill label="Unique" value={analysis.engagement?.uniqueScans || 0} tone="accent" />
+                                    <MetricPill label="Repeated" value={analysis.engagement?.repeatedScans || 0} />
                                     <MetricPill
                                       label="Submissions"
                                       value={analysis.engagement?.totalSubmissions || 0}
@@ -411,12 +503,24 @@ export default function Dashboard() {
                                       {formatDateTime(analysis.engagement?.lastSubmissionAt)}
                                     </p>
                                     <p>
+                                      <span className="font-medium text-slate-900">Tracked links:</span>{" "}
+                                      {analysis.engagement?.managedLinks || 0}
+                                    </p>
+                                    <p>
                                       <span className="font-medium text-slate-900">Expiry date:</span>{" "}
                                       {analysis.engagement?.expiryDate ? formatDateTime(analysis.engagement.expiryDate) : "Not set"}
                                     </p>
                                     <p>
                                       <span className="font-medium text-slate-900">Engagement type:</span>{" "}
                                       {analysis.engagement?.targetKind || "Direct QR / not tracked"}
+                                    </p>
+                                    <p>
+                                      <span className="font-medium text-slate-900">Expiring soon:</span>{" "}
+                                      {analysis.engagement?.expiringSoonLinks || 0}
+                                    </p>
+                                    <p>
+                                      <span className="font-medium text-slate-900">Expired links:</span>{" "}
+                                      {analysis.engagement?.expiredLinks || 0}
                                     </p>
                                   </div>
                                 </div>

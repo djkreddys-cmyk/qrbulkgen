@@ -48,6 +48,8 @@ CREATE TABLE IF NOT EXISTS qr_jobs (
   error_correction_level VARCHAR(1) NOT NULL DEFAULT 'M',
   filename_prefix VARCHAR(120),
   error_message TEXT,
+  managed_link_id UUID,
+  archived_at TIMESTAMPTZ,
   started_at TIMESTAMPTZ,
   completed_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -57,11 +59,32 @@ CREATE TABLE IF NOT EXISTS qr_jobs (
 ALTER TABLE qr_jobs
   ADD COLUMN IF NOT EXISTS bulk_qr_type VARCHAR(32) NOT NULL DEFAULT 'URL';
 
+ALTER TABLE qr_jobs
+  ADD COLUMN IF NOT EXISTS managed_link_id UUID;
+
+ALTER TABLE qr_jobs
+  ADD COLUMN IF NOT EXISTS archived_at TIMESTAMPTZ;
+
+CREATE TABLE IF NOT EXISTS managed_qr_links (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  job_id UUID REFERENCES qr_jobs(id) ON DELETE SET NULL,
+  qr_type VARCHAR(32) NOT NULL,
+  title VARCHAR(255),
+  content TEXT NOT NULL,
+  target_payload JSONB,
+  expires_at TIMESTAMPTZ,
+  last_scanned_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 CREATE TABLE IF NOT EXISTS qr_job_items (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   job_id UUID NOT NULL REFERENCES qr_jobs(id) ON DELETE CASCADE,
   row_index INTEGER NOT NULL,
   content TEXT,
+  managed_link_id UUID,
   status VARCHAR(16) NOT NULL CHECK (status IN ('queued', 'processing', 'completed', 'failed')),
   output_file_name TEXT,
   output_path TEXT,
@@ -69,6 +92,9 @@ CREATE TABLE IF NOT EXISTS qr_job_items (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+ALTER TABLE qr_job_items
+  ADD COLUMN IF NOT EXISTS managed_link_id UUID;
 
 CREATE TABLE IF NOT EXISTS job_artifacts (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -129,9 +155,14 @@ CREATE INDEX IF NOT EXISTS idx_sessions_token_hash ON sessions(token_hash);
 CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_user_id ON password_reset_tokens(user_id);
 CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_token_hash ON password_reset_tokens(token_hash);
 CREATE INDEX IF NOT EXISTS idx_qr_jobs_user_created_at ON qr_jobs(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_qr_jobs_user_archived_at ON qr_jobs(user_id, archived_at);
 CREATE INDEX IF NOT EXISTS idx_qr_job_items_job_id ON qr_job_items(job_id);
+CREATE INDEX IF NOT EXISTS idx_qr_job_items_managed_link_id ON qr_job_items(managed_link_id);
 CREATE INDEX IF NOT EXISTS idx_public_links_user_created_at ON public_links(user_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_rating_submissions_created_at ON rating_submissions(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_feedback_submissions_created_at ON feedback_submissions(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_analytics_events_user_created_at ON analytics_events(user_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_analytics_events_job_created_at ON analytics_events(job_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_managed_qr_links_user_created_at ON managed_qr_links(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_managed_qr_links_job_id ON managed_qr_links(job_id);
+CREATE INDEX IF NOT EXISTS idx_managed_qr_links_expires_at ON managed_qr_links(expires_at);

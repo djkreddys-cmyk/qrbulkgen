@@ -6,6 +6,8 @@ import { useEffect, useMemo, useState } from "react"
 
 import { apiRequest } from "../../lib/api"
 
+const MOBILE_APP_INSTALL_URL = process.env.NEXT_PUBLIC_ANDROID_APP_URL || ""
+
 export default function ResetPasswordClient() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -46,7 +48,9 @@ export default function ResetPasswordClient() {
     window.setTimeout(() => {
       if (Date.now() - startedAt >= 1200 && document.visibilityState === "visible") {
         setAppHandoffMessage(
-          "If the mobile app did not open, continue in browser or install the production mobile app build. Expo Go will not handle qrbulkgen:// links.",
+          MOBILE_APP_INSTALL_URL
+            ? "If the mobile app did not open, install the production app build or continue in browser. Expo Go will not handle qrbulkgen:// links."
+            : "If the mobile app did not open, continue in browser or install the production mobile app build. Expo Go will not handle qrbulkgen:// links.",
         )
         if (typeof onFallback === "function") {
           onFallback()
@@ -127,6 +131,16 @@ export default function ResetPasswordClient() {
               >
                 Try Again
               </button>
+              {MOBILE_APP_INSTALL_URL ? (
+                <a
+                  href={MOBILE_APP_INSTALL_URL}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="rounded border border-blue-300 px-4 py-2 text-blue-900"
+                >
+                  Install App
+                </a>
+              ) : null}
             </div>
             {appHandoffMessage ? <p className="mt-3 text-xs text-blue-900">{appHandoffMessage}</p> : null}
           </div>

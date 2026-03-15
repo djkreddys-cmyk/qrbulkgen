@@ -5,41 +5,12 @@ import QRCodeStyling from "qr-code-styling"
 import Navbar from "../../../components/Navbar"
 import { apiRequest } from "../../../lib/api"
 import { getAuthToken } from "../../../lib/auth"
-
-const QR_TYPES = [
-  "App Store",
-  "Email",
-  "Event",
-  "Rating",
-  "Feedback",
-  "Image Gallery",
-  "Location",
-  "PDF",
-  "Phone",
-  "SMS",
-  "Social Media",
-  "Text",
-  "URL",
-  "vCard",
-  "WhatsApp",
-  "WIFI",
-  "Youtube",
-]
-
-const SOCIAL_PLATFORM_OPTIONS = [
-  "Custom",
-  "Facebook",
-  "Instagram",
-  "LinkedIn",
-  "Pinterest",
-  "Snapchat",
-  "Telegram",
-  "Twitter",
-  "WhatsApp",
-  "YouTube",
-]
-
-const DOWNLOAD_RESOLUTIONS = [512, 768, 1024, 1536, 2048]
+import {
+  DOWNLOAD_RESOLUTIONS,
+  QR_TYPES,
+  SOCIAL_PLATFORM_OPTIONS,
+  validateQrFields,
+} from "../../../../shared/qr-config"
 
 function toUtcDateTime(value) {
   if (!value) return ""
@@ -132,9 +103,31 @@ function toExpiryQueryValue(value) {
   return parsed ? parsed.toISOString() : ""
 }
 
+function getManagedTitleForQrType(type, fields) {
+  const map = {
+    URL: fields.url,
+    Text: fields.text,
+    Email: fields.subject || fields.email,
+    Phone: fields.phone,
+    SMS: fields.smsMessage || fields.smsPhone,
+    WhatsApp: fields.whatsappMessage || fields.whatsappPhone,
+    vCard: `${fields.firstName || ""} ${fields.lastName || ""}`.trim(),
+    Location: `${fields.latitude || ""}, ${fields.longitude || ""}`.trim(),
+    Youtube: fields.youtubeUrl,
+    WIFI: fields.wifiSsid,
+    Event: fields.eventTitle,
+    PDF: fields.pdfUrl || "PDF Document",
+    "Social Media": "Social media links",
+    "App Store": fields.appStoreUrl,
+    "Image Gallery": fields.galleryUrl || "Image Gallery",
+    Rating: fields.ratingTitle,
+    Feedback: fields.feedbackTitle,
+  }
+
+  return String(map[type] || type || "QR Code").trim() || String(type || "QR Code")
+}
+
 function buildQrContent(type, fields, appOrigin, ids, socialLinks, expiryDate) {
-  const expiryValue = toExpiryQueryValue(expiryDate) || addMonths(new Date(), 6).toISOString()
-  const expiryParam = expiryValue ? `exp=${encodeURIComponent(expiryValue)}` : ""
   switch (type) {
     case "URL":
       return fields.url.trim()
@@ -185,7 +178,7 @@ function buildQrContent(type, fields, appOrigin, ids, socialLinks, expiryDate) {
         "END:VCALENDAR",
       ].join("\n")
     case "PDF":
-      return ids.pdfLinkId ? `${appOrigin}/pdf/${ids.pdfLinkId}${expiryParam ? `?${expiryParam}` : ""}` : fields.pdfUrl.trim()
+      return ids.pdfLinkId ? `${appOrigin}/pdf/${ids.pdfLinkId}` : fields.pdfUrl.trim()
     case "Social Media":
       return socialLinks
         .map((item) => {
@@ -200,16 +193,16 @@ function buildQrContent(type, fields, appOrigin, ids, socialLinks, expiryDate) {
     case "App Store":
       return fields.appStoreUrl.trim()
     case "Image Gallery":
-      return ids.galleryLinkId ? `${appOrigin}/gallery/${ids.galleryLinkId}${expiryParam ? `?${expiryParam}` : ""}` : fields.galleryUrl.trim()
+      return ids.galleryLinkId ? `${appOrigin}/gallery/${ids.galleryLinkId}` : fields.galleryUrl.trim()
     case "Rating": {
       const title = encodeURIComponent(fields.ratingTitle || "Rate your experience")
       const style = encodeURIComponent(fields.ratingStyle || "stars")
       const scale = encodeURIComponent((fields.ratingStyle || "stars") === "stars" ? "5" : fields.ratingScale || "5")
-      return `${appOrigin}/rate?title=${title}&style=${style}&scale=${scale}${expiryParam ? `&${expiryParam}` : ""}`
+      return `${appOrigin}/rate?title=${title}&style=${style}&scale=${scale}`
     }
     case "Feedback": {
       const qs = (fields.feedbackQuestions || []).map((q) => q.trim()).filter(Boolean)
-      return `${appOrigin}/feedback?f=${encodeURIComponent(encodePayload({ title: fields.feedbackTitle || "Share your feedback", questions: qs }))}${expiryParam ? `&${expiryParam}` : ""}`
+      return `${appOrigin}/feedback?f=${encodeURIComponent(encodePayload({ title: fields.feedbackTitle || "Share your feedback", questions: qs }))}`
     }
     default:
       return ""
@@ -217,31 +210,12 @@ function buildQrContent(type, fields, appOrigin, ids, socialLinks, expiryDate) {
 }
 
 function hasRequiredFields(type, fields, ids, modes, socialLinks) {
-  if (type === "PDF") return modes.pdfMode === "url" ? !!fields.pdfUrl.trim() : !!ids.pdfLinkId
-  if (type === "Image Gallery") return modes.galleryMode === "url" ? !!fields.galleryUrl.trim() : !!ids.galleryLinkId
-  if (type === "WhatsApp") return !!String(fields.whatsappPhone || "").replace(/[^\d]/g, "")
-  const map = {
-    URL: fields.url.trim(),
-    Text: fields.text.trim(),
-    Email: fields.email.trim(),
-    Phone: fields.phone.trim(),
-    SMS: fields.smsPhone.trim(),
-    Youtube: fields.youtubeUrl.trim(),
-    WIFI: fields.wifiSsid.trim(),
-    Event: fields.eventTitle.trim(),
-    "App Store": fields.appStoreUrl.trim(),
-    vCard: fields.firstName.trim(),
-  }
-  if (type === "Social Media") {
-    return socialLinks.some((item) => {
-      const platform = item.platform === "Custom" ? item.customPlatform : item.platform
-      return String(platform || "").trim() && String(item.url || "").trim()
-    })
-  }
-  if (type === "Rating") return true
-  if (type === "Feedback") return (fields.feedbackQuestions || []).some((q) => q.trim())
-  if (type === "Location") return !!fields.latitude.trim() && !!fields.longitude.trim()
-  return !!map[type]
+  return validateQrFields(type, fields, {
+    ...ids,
+    ...modes,
+    socialLinks,
+    feedbackQuestions: fields.feedbackQuestions,
+  })
 }
 
 export function SingleGenerateContent({ embedded = false }) {
@@ -492,12 +466,48 @@ export function SingleGenerateContent({ embedded = false }) {
     qrCodeRef.current.update(options)
   }, [generatedContent, logoDataUrl, foregroundColor, backgroundColor, dotStyle, cornerSquareStyle, cornerDotStyle, errorCorrectionLevel])
 
-  function handleDownload() {
-    if (!qrCodeRef.current || !generatedContent) return
-    const name = (filenamePrefix || "qr").replace(/[^a-zA-Z0-9-_]/g, "") || "qr"
-    qrCodeRef.current.update({ width: Number(downloadResolution), height: Number(downloadResolution) })
-    qrCodeRef.current.download({ name, extension: "png" })
-    qrCodeRef.current.update({ width: 340, height: 340 })
+  async function handleDownload() {
+    if (!generatedContent) return
+
+    try {
+      const token = getAuthToken()
+      if (!token) {
+        window.location.href = "/login"
+        return
+      }
+
+      const data = await apiRequest("/qr/single", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          content: generatedContent,
+          qrType,
+          managedTitle: getManagedTitleForQrType(qrType, fields),
+          expiresAt: toExpiryQueryValue(expiryDate) || addMonths(new Date(), 6).toISOString(),
+          filenamePrefix,
+          foregroundColor,
+          backgroundColor,
+          size: Number(downloadResolution),
+          margin: 2,
+          format: "png",
+          errorCorrectionLevel,
+        }),
+      })
+
+      const dataUrl = data?.artifact?.dataUrl || ""
+      if (!dataUrl) throw new Error("Unable to create QR download")
+
+      const link = document.createElement("a")
+      link.href = dataUrl
+      link.download = data?.artifact?.fileName || `${(filenamePrefix || "qr").replace(/[^a-zA-Z0-9-_]/g, "") || "qr"}.png`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+    } catch (downloadError) {
+      setUploadError(downloadError.message || "Failed to create QR")
+    }
   }
 
   const content = (

@@ -24,7 +24,6 @@ const BULK_QR_TYPES = new Set([
   "Youtube",
   "WIFI",
   "Event",
-  "Bitcoin",
   "PDF",
   "Social Media",
   "App Store",
@@ -45,7 +44,6 @@ const REQUIRED_HEADERS_BY_TYPE = {
   Youtube: ["url", "filename"],
   WIFI: ["ssid", "filename"],
   Event: ["title", "filename"],
-  Bitcoin: ["address", "filename"],
   PDF: ["url", "filename"],
   "Social Media": ["content", "filename"],
   "App Store": ["url", "filename"],
@@ -92,6 +90,17 @@ function parseDateFilter(value, endOfDay = false) {
   const suffix = endOfDay ? "T23:59:59.999Z" : "T00:00:00.000Z";
   const parsed = new Date(raw.includes("T") ? raw : `${raw}${suffix}`);
   return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
+}
+
+function parseBooleanFlag(value) {
+  const raw = String(value || "").trim().toLowerCase();
+  return raw === "1" || raw === "true" || raw === "yes";
+}
+
+function getQrTypeLabel(row) {
+  return row.job_type === "single"
+    ? String(row.managed_qr_type || row.bulk_qr_type || "Text")
+    : String(row.bulk_qr_type || row.managed_qr_type || "Text");
 }
 
 function extractPublicAnalysisTarget(content) {
@@ -333,6 +342,7 @@ bulkRouter.get("/jobs/summary", requireAuth, async (req, res, next) => {
     const filterBulk = jobType === "bulk";
     const startDate = parseDateFilter(req.query.startDate);
     const endDate = parseDateFilter(req.query.endDate, true);
+    const includeArchived = parseBooleanFlag(req.query.includeArchived);
     const result = await query(
       `SELECT
          COUNT(*)::int AS total_jobs,
@@ -343,6 +353,7 @@ bulkRouter.get("/jobs/summary", requireAuth, async (req, res, next) => {
          COALESCE(SUM(failure_count), 0)::int AS total_failure
        FROM qr_jobs
        WHERE user_id = $1
+         AND ($6 = true OR archived_at IS NULL)
          AND (
            $2 = false OR job_type = 'single'
          )
@@ -351,7 +362,7 @@ bulkRouter.get("/jobs/summary", requireAuth, async (req, res, next) => {
          )
          AND ($4::timestamptz IS NULL OR created_at >= $4::timestamptz)
          AND ($5::timestamptz IS NULL OR created_at <= $5::timestamptz)`,
-      [req.user.id, filterSingle, filterBulk, startDate, endDate],
+      [req.user.id, filterSingle, filterBulk, startDate, endDate, includeArchived],
     );
 
     const row = result.rows[0];
@@ -378,15 +389,18 @@ bulkRouter.get("/jobs", requireAuth, async (req, res, next) => {
     const filterBulk = jobType === "bulk";
     const startDate = parseDateFilter(req.query.startDate);
     const endDate = parseDateFilter(req.query.endDate, true);
+    const includeArchived = parseBooleanFlag(req.query.includeArchived);
 
     const result = await query(
       `SELECT
          j.id, j.job_type, j.status, j.bulk_qr_type, j.source_file_name, j.total_count, j.success_count, j.failure_count,
          j.error_message, j.created_at, j.started_at, j.completed_at,
-         j.qr_content, j.qr_size, j.foreground_color, j.background_color, j.qr_margin, j.output_format,
+         j.archived_at, j.qr_content, j.managed_link_id, j.qr_size, j.foreground_color, j.background_color, j.qr_margin, j.output_format,
          j.error_correction_level, j.filename_prefix,
+         m.qr_type AS managed_qr_type, m.title AS managed_title, m.expires_at AS managed_expires_at,
          a.artifact_type AS artifact_type, a.file_name AS artifact_file_name, a.file_path AS artifact_file_path, a.mime_type AS artifact_mime_type
        FROM qr_jobs j
+       LEFT JOIN managed_qr_links m ON m.id = j.managed_link_id
        LEFT JOIN LATERAL (
          SELECT artifact_type, file_name, file_path, mime_type
          FROM job_artifacts
@@ -395,6 +409,7 @@ bulkRouter.get("/jobs", requireAuth, async (req, res, next) => {
          LIMIT 1
        ) a ON true
        WHERE j.user_id = $1
+         AND ($7 = true OR j.archived_at IS NULL)
          AND (
            $2 = false OR j.job_type = 'single'
          )
@@ -405,7 +420,7 @@ bulkRouter.get("/jobs", requireAuth, async (req, res, next) => {
          AND ($5::timestamptz IS NULL OR j.created_at <= $5::timestamptz)
        ORDER BY j.created_at DESC
        LIMIT $6`,
-      [req.user.id, filterSingle, filterBulk, startDate, endDate, limit],
+      [req.user.id, filterSingle, filterBulk, startDate, endDate, limit, includeArchived],
     );
 
     res.json({
@@ -413,7 +428,7 @@ bulkRouter.get("/jobs", requireAuth, async (req, res, next) => {
         id: row.id,
         jobType: row.job_type,
         status: row.status,
-        qrType: row.job_type === "single" ? "Single" : row.bulk_qr_type,
+        qrType: getQrTypeLabel(row),
         sourceFileName: row.source_file_name,
         totalCount: row.total_count,
         successCount: row.success_count,
@@ -422,8 +437,18 @@ bulkRouter.get("/jobs", requireAuth, async (req, res, next) => {
         createdAt: row.created_at,
         startedAt: row.started_at,
         completedAt: row.completed_at,
+        archivedAt: row.archived_at,
+        managedLink: row.managed_link_id
+          ? {
+              id: row.managed_link_id,
+              qrType: row.managed_qr_type,
+              title: row.managed_title,
+              expiresAt: row.managed_expires_at,
+            }
+          : null,
         editPayload: {
           content: row.qr_content,
+          qrType: getQrTypeLabel(row),
           size: row.qr_size,
           foregroundColor: row.foreground_color,
           backgroundColor: row.background_color,
@@ -431,6 +456,8 @@ bulkRouter.get("/jobs", requireAuth, async (req, res, next) => {
           format: row.output_format,
           errorCorrectionLevel: row.error_correction_level,
           filenamePrefix: row.filename_prefix,
+          managedTitle: row.managed_title || getQrTypeLabel(row),
+          expiresAt: row.managed_expires_at,
         },
         artifact: row.artifact_file_path
           ? {
@@ -455,10 +482,13 @@ bulkRouter.get("/jobs/:id/edit-payload", requireAuth, async (req, res, next) => 
     }
 
     const result = await query(
-      `SELECT id, job_type, bulk_qr_type, qr_content, qr_size, foreground_color, background_color,
-              qr_margin, output_format, error_correction_level, filename_prefix
-       FROM qr_jobs
-       WHERE id = $1 AND user_id = $2
+      `SELECT
+         j.id, j.job_type, j.bulk_qr_type, j.qr_content, j.qr_size, j.foreground_color, j.background_color,
+         j.qr_margin, j.output_format, j.error_correction_level, j.filename_prefix,
+         m.qr_type AS managed_qr_type, m.title AS managed_title, m.expires_at AS managed_expires_at
+       FROM qr_jobs j
+       LEFT JOIN managed_qr_links m ON m.id = j.managed_link_id
+       WHERE j.id = $1 AND j.user_id = $2
        LIMIT 1`,
       [jobId, req.user.id],
     );
@@ -472,7 +502,7 @@ bulkRouter.get("/jobs/:id/edit-payload", requireAuth, async (req, res, next) => 
       job: {
         id: row.id,
         jobType: row.job_type,
-        qrType: row.job_type === "single" ? "URL" : row.bulk_qr_type,
+        qrType: getQrTypeLabel(row),
         content: row.qr_content || "",
         size: row.qr_size,
         foregroundColor: row.foreground_color,
@@ -481,6 +511,8 @@ bulkRouter.get("/jobs/:id/edit-payload", requireAuth, async (req, res, next) => 
         format: row.output_format,
         errorCorrectionLevel: row.error_correction_level,
         filenamePrefix: row.filename_prefix || "qr",
+        managedTitle: row.managed_title || getQrTypeLabel(row),
+        expiresAt: row.managed_expires_at,
       },
     });
   } catch (error) {
@@ -491,22 +523,43 @@ bulkRouter.get("/jobs/:id/edit-payload", requireAuth, async (req, res, next) => 
 bulkRouter.delete("/jobs/:id", requireAuth, async (req, res, next) => {
   try {
     const jobId = String(req.params.id || "").trim();
+    const forceDelete = parseBooleanFlag(req.query.force);
     if (!jobId) {
       throw createHttpError(400, "VALIDATION_ERROR", "job id is required");
     }
 
-    const deleted = await query(
-      `DELETE FROM qr_jobs
-       WHERE id = $1 AND user_id = $2
-       RETURNING id`,
-      [jobId, req.user.id],
-    );
+    const deleted = forceDelete
+      ? await query(
+          `DELETE FROM qr_jobs
+           WHERE id = $1 AND user_id = $2
+           RETURNING id`,
+          [jobId, req.user.id],
+        )
+      : await query(
+          `UPDATE qr_jobs
+           SET archived_at = NOW(), updated_at = NOW()
+           WHERE id = $1
+             AND user_id = $2
+             AND archived_at IS NULL
+           RETURNING id, archived_at`,
+          [jobId, req.user.id],
+        );
 
     if (!deleted.rows[0]) {
       throw createHttpError(404, "NOT_FOUND", "Job not found");
     }
 
-    res.status(204).send();
+    if (forceDelete) {
+      res.status(204).send();
+      return;
+    }
+
+    res.json({
+      job: {
+        id: deleted.rows[0].id,
+        archivedAt: deleted.rows[0].archived_at,
+      },
+    });
   } catch (error) {
     next(error);
   }
@@ -516,37 +569,48 @@ bulkRouter.get("/reports/overview", requireAuth, async (req, res, next) => {
   try {
     const startDate = parseDateFilter(req.query.startDate);
     const endDate = parseDateFilter(req.query.endDate, true);
-
-    const [qrTypeRows, qrTypePerformanceRows, statusRows, trendRows] = await Promise.all([
+    const [qrTypeRows, qrTypePerformanceRows, statusRows, trendRows, scanSummaryRows, scanTrendRows, topLinksRows, expiringRows] = await Promise.all([
       query(
-        `SELECT bulk_qr_type AS label, COUNT(*)::int AS count
-         FROM qr_jobs
-         WHERE user_id = $1
+        `SELECT
+           CASE
+             WHEN j.job_type = 'single' THEN COALESCE(m.qr_type, 'Text')
+             ELSE COALESCE(j.bulk_qr_type, 'Text')
+           END AS label,
+           COUNT(*)::int AS count
+         FROM qr_jobs j
+         LEFT JOIN managed_qr_links m ON m.id = j.managed_link_id
+         WHERE j.user_id = $1
+           AND j.archived_at IS NULL
            AND ($2::timestamptz IS NULL OR created_at >= $2::timestamptz)
            AND ($3::timestamptz IS NULL OR created_at <= $3::timestamptz)
-         GROUP BY bulk_qr_type
+         GROUP BY CASE
+           WHEN j.job_type = 'single' THEN COALESCE(m.qr_type, 'Text')
+           ELSE COALESCE(j.bulk_qr_type, 'Text')
+         END
          ORDER BY count DESC, label ASC`,
         [req.user.id, startDate, endDate],
       ),
       query(
         `SELECT
            CASE
-             WHEN job_type = 'single' THEN 'Single'
-             ELSE bulk_qr_type
+             WHEN j.job_type = 'single' THEN COALESCE(m.qr_type, 'Text')
+             ELSE COALESCE(j.bulk_qr_type, 'Text')
            END AS label,
            COUNT(*)::int AS jobs_count,
-           COALESCE(SUM(total_count), 0)::int AS requested_count,
-           COALESCE(SUM(success_count), 0)::int AS success_count,
-           COALESCE(SUM(failure_count), 0)::int AS failure_count,
-           COUNT(*) FILTER (WHERE status = 'completed')::int AS completed_jobs,
-           COUNT(*) FILTER (WHERE status = 'failed')::int AS failed_jobs
-         FROM qr_jobs
-         WHERE user_id = $1
-           AND ($2::timestamptz IS NULL OR created_at >= $2::timestamptz)
-           AND ($3::timestamptz IS NULL OR created_at <= $3::timestamptz)
+           COALESCE(SUM(j.total_count), 0)::int AS requested_count,
+           COALESCE(SUM(j.success_count), 0)::int AS success_count,
+           COALESCE(SUM(j.failure_count), 0)::int AS failure_count,
+           COUNT(*) FILTER (WHERE j.status = 'completed')::int AS completed_jobs,
+           COUNT(*) FILTER (WHERE j.status = 'failed')::int AS failed_jobs
+         FROM qr_jobs j
+         LEFT JOIN managed_qr_links m ON m.id = j.managed_link_id
+         WHERE j.user_id = $1
+           AND j.archived_at IS NULL
+           AND ($2::timestamptz IS NULL OR j.created_at >= $2::timestamptz)
+           AND ($3::timestamptz IS NULL OR j.created_at <= $3::timestamptz)
          GROUP BY CASE
-           WHEN job_type = 'single' THEN 'Single'
-           ELSE bulk_qr_type
+           WHEN j.job_type = 'single' THEN COALESCE(m.qr_type, 'Text')
+           ELSE COALESCE(j.bulk_qr_type, 'Text')
          END
          ORDER BY jobs_count DESC, label ASC`,
         [req.user.id, startDate, endDate],
@@ -555,6 +619,7 @@ bulkRouter.get("/reports/overview", requireAuth, async (req, res, next) => {
         `SELECT status AS label, COUNT(*)::int AS count
          FROM qr_jobs
          WHERE user_id = $1
+           AND archived_at IS NULL
            AND ($2::timestamptz IS NULL OR created_at >= $2::timestamptz)
            AND ($3::timestamptz IS NULL OR created_at <= $3::timestamptz)
          GROUP BY status
@@ -565,6 +630,7 @@ bulkRouter.get("/reports/overview", requireAuth, async (req, res, next) => {
         `SELECT TO_CHAR(DATE(created_at), 'YYYY-MM-DD') AS label, COUNT(*)::int AS count
          FROM qr_jobs
          WHERE user_id = $1
+           AND archived_at IS NULL
            AND ($2::timestamptz IS NULL OR created_at >= $2::timestamptz)
            AND ($3::timestamptz IS NULL OR created_at <= $3::timestamptz)
          GROUP BY DATE(created_at)
@@ -572,7 +638,82 @@ bulkRouter.get("/reports/overview", requireAuth, async (req, res, next) => {
          LIMIT 14`,
         [req.user.id, startDate, endDate],
       ),
+      query(
+        `SELECT
+           COUNT(*)::int AS total_scans,
+           COUNT(DISTINCT metadata->>'visitorKey')::int AS unique_scans,
+           MAX(created_at) AS last_scan_at
+         FROM analytics_events ae
+         INNER JOIN managed_qr_links m ON m.id::text = ae.metadata->>'linkId'
+         WHERE ae.event_type = 'qr.public.scan'
+           AND m.user_id = $1
+           AND ($2::timestamptz IS NULL OR ae.created_at >= $2::timestamptz)
+           AND ($3::timestamptz IS NULL OR ae.created_at <= $3::timestamptz)`,
+        [req.user.id, startDate, endDate],
+      ),
+      query(
+        `SELECT
+           TO_CHAR(DATE(ae.created_at), 'YYYY-MM-DD') AS label,
+           COUNT(*)::int AS total_scans,
+           COUNT(DISTINCT ae.metadata->>'visitorKey')::int AS unique_scans
+         FROM analytics_events ae
+         INNER JOIN managed_qr_links m ON m.id::text = ae.metadata->>'linkId'
+         WHERE ae.event_type = 'qr.public.scan'
+           AND m.user_id = $1
+           AND ($2::timestamptz IS NULL OR ae.created_at >= $2::timestamptz)
+           AND ($3::timestamptz IS NULL OR ae.created_at <= $3::timestamptz)
+         GROUP BY DATE(ae.created_at)
+         ORDER BY DATE(ae.created_at) DESC
+         LIMIT 14`,
+        [req.user.id, startDate, endDate],
+      ),
+      query(
+        `SELECT
+           m.id,
+           COALESCE(m.title, m.qr_type, 'Managed QR') AS title,
+           m.qr_type,
+           COUNT(ae.id)::int AS total_scans,
+           COUNT(DISTINCT ae.metadata->>'visitorKey')::int AS unique_scans,
+           MAX(ae.created_at) AS last_scan_at
+         FROM managed_qr_links m
+         LEFT JOIN analytics_events ae
+           ON ae.event_type = 'qr.public.scan'
+          AND ae.metadata->>'linkId' = m.id::text
+          AND ($2::timestamptz IS NULL OR ae.created_at >= $2::timestamptz)
+          AND ($3::timestamptz IS NULL OR ae.created_at <= $3::timestamptz)
+         WHERE m.user_id = $1
+         GROUP BY m.id, m.title, m.qr_type
+         HAVING COUNT(ae.id) > 0
+         ORDER BY total_scans DESC, unique_scans DESC, title ASC
+         LIMIT 6`,
+        [req.user.id, startDate, endDate],
+      ),
+      query(
+        `SELECT
+           m.id,
+           COALESCE(m.title, m.qr_type, 'Managed QR') AS title,
+           m.qr_type,
+           m.expires_at,
+           CASE
+             WHEN m.expires_at IS NOT NULL AND m.expires_at < NOW() THEN 'expired'
+             WHEN m.expires_at IS NOT NULL AND m.expires_at <= NOW() + INTERVAL '14 days' THEN 'expiring-soon'
+             ELSE 'active'
+           END AS state
+         FROM managed_qr_links m
+         WHERE m.user_id = $1
+           AND m.expires_at IS NOT NULL
+         ORDER BY m.expires_at ASC
+         LIMIT 12`,
+        [req.user.id],
+      ),
     ]);
+
+    const scanSummaryRow = scanSummaryRows.rows[0] || {};
+    const totalScans = scanSummaryRow.total_scans || 0;
+    const uniqueScans = scanSummaryRow.unique_scans || 0;
+    const repeatedScans = Math.max(totalScans - uniqueScans, 0);
+    const expiringSoon = expiringRows.rows.filter((row) => row.state === "expiring-soon");
+    const expired = expiringRows.rows.filter((row) => row.state === "expired");
 
     res.json({
       report: {
@@ -588,6 +729,40 @@ bulkRouter.get("/reports/overview", requireAuth, async (req, res, next) => {
         })),
         jobsByStatus: statusRows.rows,
         dailyJobs: [...trendRows.rows].reverse(),
+        scanSummary: {
+          totalScans,
+          uniqueScans,
+          repeatedScans,
+          lastScanAt: scanSummaryRow.last_scan_at || null,
+        },
+        scanTrend: [...scanTrendRows.rows]
+          .reverse()
+          .map((row) => ({
+            label: row.label,
+            totalScans: row.total_scans,
+            uniqueScans: row.unique_scans,
+          })),
+        topPerformingLinks: topLinksRows.rows.map((row) => ({
+          id: row.id,
+          title: row.title,
+          qrType: row.qr_type,
+          totalScans: row.total_scans,
+          uniqueScans: row.unique_scans,
+          repeatedScans: Math.max(row.total_scans - row.unique_scans, 0),
+          lastScanAt: row.last_scan_at,
+        })),
+        expiringSoon: expiringSoon.map((row) => ({
+          id: row.id,
+          title: row.title,
+          qrType: row.qr_type,
+          expiresAt: row.expires_at,
+        })),
+        expired: expired.map((row) => ({
+          id: row.id,
+          title: row.title,
+          qrType: row.qr_type,
+          expiresAt: row.expires_at,
+        })),
       },
     });
   } catch (error) {
@@ -608,20 +783,24 @@ bulkRouter.get("/reports/public-engagement", requireAuth, async (req, res, next)
            scale,
            rating,
            COUNT(*)::int AS count
-         FROM rating_submissions
-         WHERE ($1::timestamptz IS NULL OR created_at >= $1::timestamptz)
-           AND ($2::timestamptz IS NULL OR created_at <= $2::timestamptz)
+         FROM rating_submissions rs
+         INNER JOIN managed_qr_links m ON m.url = rs.source_url
+         WHERE m.user_id = $1
+           AND ($2::timestamptz IS NULL OR rs.created_at >= $2::timestamptz)
+           AND ($3::timestamptz IS NULL OR rs.created_at <= $3::timestamptz)
          GROUP BY COALESCE(title, 'Untitled rating form'), style, scale, rating
          ORDER BY title ASC, rating ASC`,
-        [startDate, endDate],
+        [req.user.id, startDate, endDate],
       ),
       query(
-        `SELECT title, questions, answers, created_at
-         FROM feedback_submissions
-         WHERE ($1::timestamptz IS NULL OR created_at >= $1::timestamptz)
-           AND ($2::timestamptz IS NULL OR created_at <= $2::timestamptz)
-         ORDER BY created_at DESC`,
-        [startDate, endDate],
+        `SELECT fs.title, fs.questions, fs.answers, fs.created_at
+         FROM feedback_submissions fs
+         INNER JOIN managed_qr_links m ON m.url = fs.source_url
+         WHERE m.user_id = $1
+           AND ($2::timestamptz IS NULL OR fs.created_at >= $2::timestamptz)
+           AND ($3::timestamptz IS NULL OR fs.created_at <= $3::timestamptz)
+         ORDER BY fs.created_at DESC`,
+        [req.user.id, startDate, endDate],
       ),
     ]);
 
@@ -695,9 +874,22 @@ bulkRouter.get("/jobs/:id/analysis", requireAuth, async (req, res, next) => {
     }
 
     const jobResult = await query(
-      `SELECT id, job_type, bulk_qr_type, qr_content, total_count, success_count, failure_count, status
-       FROM qr_jobs
-       WHERE id = $1 AND user_id = $2
+      `SELECT
+         j.id,
+         j.job_type,
+         j.bulk_qr_type,
+         j.qr_content,
+         j.total_count,
+         j.success_count,
+         j.failure_count,
+         j.status,
+         j.managed_link_id,
+         m.qr_type AS managed_qr_type,
+         m.title AS managed_title,
+         m.expires_at AS managed_expires_at
+       FROM qr_jobs j
+       LEFT JOIN managed_qr_links m ON m.id = j.managed_link_id
+       WHERE j.id = $1 AND j.user_id = $2
        LIMIT 1`,
       [jobId, req.user.id],
     );
@@ -707,7 +899,7 @@ bulkRouter.get("/jobs/:id/analysis", requireAuth, async (req, res, next) => {
       throw createHttpError(404, "NOT_FOUND", "Job not found");
     }
 
-    const typeLabel = job.job_type === "single" ? "Single" : job.bulk_qr_type;
+    const typeLabel = getQrTypeLabel(job);
 
     const typePerformanceResult = await query(
       `SELECT
@@ -719,9 +911,13 @@ bulkRouter.get("/jobs/:id/analysis", requireAuth, async (req, res, next) => {
          COUNT(*) FILTER (WHERE status = 'failed')::int AS failed_jobs
        FROM qr_jobs
        WHERE user_id = $1
+         AND archived_at IS NULL
          AND (
            CASE
-             WHEN job_type = 'single' THEN 'Single'
+             WHEN job_type = 'single' THEN COALESCE(
+               (SELECT qr_type FROM managed_qr_links WHERE id = managed_link_id),
+               'Text'
+             )
              ELSE bulk_qr_type
            END
          ) = $2`,
@@ -729,51 +925,117 @@ bulkRouter.get("/jobs/:id/analysis", requireAuth, async (req, res, next) => {
     );
 
     const typePerformanceRow = typePerformanceResult.rows[0];
-    const normalizedTracking = normalizeTrackedUrl(job.qr_content);
-    const publicTarget = extractPublicAnalysisTarget(job.qr_content);
 
     let rating = null;
     let feedback = null;
-    let engagement = {
-      targetUrl: normalizedTracking?.url || "",
-      expiryDate: normalizedTracking?.expiry || "",
-      isExpired: normalizedTracking?.isExpired || false,
-      totalScans: 0,
-      lastScanAt: null,
-      totalSubmissions: 0,
-      lastSubmissionAt: null,
-      targetKind: publicTarget?.kind || null,
-    };
+    const linkStatsResult = await query(
+      `WITH links AS (
+         SELECT id, url, qr_type, title, expires_at
+         FROM managed_qr_links
+         WHERE id = $1
+         UNION
+         SELECT m.id, m.url, m.qr_type, m.title, m.expires_at
+         FROM qr_job_items i
+         INNER JOIN managed_qr_links m ON m.id = i.managed_link_id
+         WHERE i.job_id = $2
+       )
+       SELECT
+         COUNT(ae.id)::int AS total_scans,
+         COUNT(DISTINCT ae.metadata->>'visitorKey')::int AS unique_scans,
+         MAX(ae.created_at) AS last_scan_at,
+         COUNT(DISTINCT links.id)::int AS managed_links,
+         COUNT(*) FILTER (WHERE links.expires_at IS NOT NULL AND links.expires_at < NOW())::int AS expired_links,
+         COUNT(*) FILTER (
+           WHERE links.expires_at IS NOT NULL
+             AND links.expires_at >= NOW()
+             AND links.expires_at <= NOW() + INTERVAL '14 days'
+         )::int AS expiring_soon_links,
+         MIN(links.expires_at) FILTER (WHERE links.expires_at >= NOW()) AS next_expiry_at,
+         MAX(links.expires_at) AS last_expiry_at,
+         MIN(links.url) AS sample_url,
+         MIN(links.qr_type) AS target_kind
+       FROM links
+       LEFT JOIN analytics_events ae
+         ON ae.event_type = 'qr.public.scan'
+        AND ae.metadata->>'linkId' = links.id::text`,
+      [job.managed_link_id, job.id],
+    );
 
-    if (publicTarget?.kind === "rating" && publicTarget.title) {
+    const linkStats = linkStatsResult.rows[0] || {};
+    const totalScans = linkStats.total_scans || 0;
+    const uniqueScans = linkStats.unique_scans || 0;
+    const repeatedScans = Math.max(totalScans - uniqueScans, 0);
+    const targetKind = String(linkStats.target_kind || job.managed_qr_type || typeLabel || "").trim();
+
+    let totalSubmissions = 0;
+    let lastSubmissionAt = null;
+
+    if (targetKind === "Rating") {
       const ratingRows = await query(
-        `SELECT style, scale, rating, COUNT(*)::int AS count
-         FROM rating_submissions
-         WHERE COALESCE(title, 'Untitled rating form') = $1
-         GROUP BY style, scale, rating
-         ORDER BY rating ASC`,
-        [publicTarget.title],
+        `WITH links AS (
+           SELECT url, title
+           FROM managed_qr_links
+           WHERE id = $1
+           UNION
+           SELECT m.url, m.title
+           FROM qr_job_items i
+           INNER JOIN managed_qr_links m ON m.id = i.managed_link_id
+           WHERE i.job_id = $2
+         )
+         SELECT
+           COALESCE(rs.title, MAX(links.title), 'Untitled rating form') AS title,
+           MAX(rs.style) AS style,
+           MAX(rs.scale)::int AS scale,
+           rs.rating,
+           COUNT(*)::int AS count,
+           MAX(rs.created_at) AS last_submission_at,
+           SUM(COUNT(*)) OVER ()::int AS total_submissions
+         FROM rating_submissions rs
+         INNER JOIN links ON links.url = rs.source_url
+         GROUP BY COALESCE(rs.title, links.title, 'Untitled rating form'), rs.rating
+         ORDER BY rs.rating ASC`,
+        [job.managed_link_id, job.id],
       );
 
-      rating = {
-        title: publicTarget.title,
-        style: ratingRows.rows[0]?.style || "stars",
-        scale: ratingRows.rows[0]?.scale || 5,
-        buckets: ratingRows.rows.map((row) => ({
-          label: String(row.rating),
-          count: row.count,
-        })),
-      };
+      if (ratingRows.rows.length) {
+        totalSubmissions = ratingRows.rows[0].total_submissions || 0;
+        lastSubmissionAt = ratingRows.rows.reduce((latest, row) => {
+          if (!latest) return row.last_submission_at;
+          return new Date(row.last_submission_at) > new Date(latest) ? row.last_submission_at : latest;
+        }, null);
+        rating = {
+          title: ratingRows.rows[0].title,
+          style: ratingRows.rows[0].style || "stars",
+          scale: ratingRows.rows[0].scale || 5,
+          buckets: ratingRows.rows.map((row) => ({
+            label: String(row.rating),
+            count: row.count,
+          })),
+        };
+      }
     }
 
-    if (publicTarget?.kind === "feedback" && publicTarget.title) {
+    if (targetKind === "Feedback") {
       const feedbackRows = await query(
-        `SELECT questions, answers
-         FROM feedback_submissions
-         WHERE title = $1
-         ORDER BY created_at DESC`,
-        [publicTarget.title],
+        `WITH links AS (
+           SELECT url, title
+           FROM managed_qr_links
+           WHERE id = $1
+           UNION
+           SELECT m.url, m.title
+           FROM qr_job_items i
+           INNER JOIN managed_qr_links m ON m.id = i.managed_link_id
+           WHERE i.job_id = $2
+         )
+         SELECT fs.title, fs.questions, fs.answers, fs.created_at
+         FROM feedback_submissions fs
+         INNER JOIN links ON links.url = fs.source_url
+         ORDER BY fs.created_at DESC`,
+        [job.managed_link_id, job.id],
       );
+
+      totalSubmissions = feedbackRows.rows.length;
+      lastSubmissionAt = feedbackRows.rows[0]?.created_at || null;
 
       const groupedQuestions = {};
       feedbackRows.rows.forEach((row) => {
@@ -798,55 +1060,27 @@ bulkRouter.get("/jobs/:id/analysis", requireAuth, async (req, res, next) => {
       });
 
       feedback = {
-        title: publicTarget.title,
+        title: feedbackRows.rows[0]?.title || job.managed_title || "Untitled feedback form",
         questions: Object.values(groupedQuestions),
       };
     }
 
-    if (normalizedTracking?.url) {
-      const scanRows = await query(
-        `SELECT COUNT(*)::int AS total_scans, MAX(created_at) AS last_scan_at
-         FROM analytics_events
-         WHERE event_type = 'qr.public.scan'
-           AND metadata->>'targetUrl' = $1`,
-        [normalizedTracking.url],
-      );
-
-      const scanRow = scanRows.rows[0] || {};
-      engagement = {
-        ...engagement,
-        totalScans: scanRow.total_scans || 0,
-        lastScanAt: scanRow.last_scan_at || null,
-      };
-
-      if (publicTarget?.kind === "rating") {
-        const submissionRows = await query(
-          `SELECT COUNT(*)::int AS total_submissions, MAX(created_at) AS last_submission_at
-           FROM rating_submissions
-           WHERE source_url = $1`,
-          [normalizedTracking.url],
-        );
-        const submission = submissionRows.rows[0] || {};
-        engagement = {
-          ...engagement,
-          totalSubmissions: submission.total_submissions || 0,
-          lastSubmissionAt: submission.last_submission_at || null,
-        };
-      } else if (publicTarget?.kind === "feedback") {
-        const submissionRows = await query(
-          `SELECT COUNT(*)::int AS total_submissions, MAX(created_at) AS last_submission_at
-           FROM feedback_submissions
-           WHERE source_url = $1`,
-          [normalizedTracking.url],
-        );
-        const submission = submissionRows.rows[0] || {};
-        engagement = {
-          ...engagement,
-          totalSubmissions: submission.total_submissions || 0,
-          lastSubmissionAt: submission.last_submission_at || null,
-        };
-      }
-    }
+    const engagement = {
+      targetUrl: linkStats.sample_url || "",
+      expiryDate: linkStats.last_expiry_at || job.managed_expires_at || "",
+      nextExpiryAt: linkStats.next_expiry_at || null,
+      isExpired: (linkStats.expired_links || 0) > 0 && (linkStats.expiring_soon_links || 0) === 0,
+      totalScans,
+      uniqueScans,
+      repeatedScans,
+      lastScanAt: linkStats.last_scan_at || null,
+      totalSubmissions,
+      lastSubmissionAt,
+      targetKind: targetKind || null,
+      managedLinks: linkStats.managed_links || 0,
+      expiredLinks: linkStats.expired_links || 0,
+      expiringSoonLinks: linkStats.expiring_soon_links || 0,
+    };
 
     let insight = "This QR job is generating successfully.";
     if (job.failure_count > 0) {
@@ -902,7 +1136,7 @@ bulkRouter.get("/jobs/:id", requireAuth, async (req, res, next) => {
     const result = await query(
       `SELECT
          j.id, j.status, j.bulk_qr_type, j.source_file_name, j.total_count, j.success_count, j.failure_count,
-         j.error_message, j.created_at, j.started_at, j.completed_at,
+         j.error_message, j.created_at, j.started_at, j.completed_at, j.archived_at,
          a.file_name AS artifact_file_name, a.file_path AS artifact_file_path, a.mime_type AS artifact_mime_type
        FROM qr_jobs j
        LEFT JOIN LATERAL (
@@ -937,6 +1171,7 @@ bulkRouter.get("/jobs/:id", requireAuth, async (req, res, next) => {
         createdAt: row.created_at,
         startedAt: row.started_at,
         completedAt: row.completed_at,
+        archivedAt: row.archived_at,
         artifact: row.artifact_file_path
           ? {
               fileName: row.artifact_file_name,
@@ -973,7 +1208,7 @@ bulkRouter.get("/jobs/:id/items", requireAuth, async (req, res, next) => {
     }
 
     const result = await query(
-      `SELECT row_index, content, status, output_file_name, output_path, error_message, created_at, updated_at
+      `SELECT row_index, content, managed_link_id, status, output_file_name, output_path, error_message, created_at, updated_at
        FROM qr_job_items
        WHERE job_id = $1
        ORDER BY row_index ASC`,
@@ -984,6 +1219,7 @@ bulkRouter.get("/jobs/:id/items", requireAuth, async (req, res, next) => {
       items: result.rows.map((row) => ({
         rowIndex: row.row_index,
         content: row.content,
+        managedLinkId: row.managed_link_id,
         status: row.status,
         outputFileName: row.output_file_name,
         outputPath: row.output_path,

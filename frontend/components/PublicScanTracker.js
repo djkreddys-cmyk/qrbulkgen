@@ -17,10 +17,10 @@ function normalizeTrackingUrl(value) {
   }
 }
 
-export default function PublicScanTracker({ title = "", targetKind = "", expired = false }) {
+export default function PublicScanTracker({ title = "", targetKind = "", expired = false, linkId = "" }) {
   useEffect(() => {
     const sourceUrl = normalizeTrackingUrl(window.location.href)
-    if (!sourceUrl) return
+    if (!sourceUrl && !linkId) return
 
     apiRequest("/public/track-view", {
       method: "POST",
@@ -29,9 +29,10 @@ export default function PublicScanTracker({ title = "", targetKind = "", expired
         title,
         targetKind,
         expired,
+        linkId,
       }),
     }).catch(() => {})
-  }, [title, targetKind, expired])
+  }, [title, targetKind, expired, linkId])
 
   return null
 }

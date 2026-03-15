@@ -106,18 +106,11 @@ function toExpiryIso(value) {
   return parsed ? parsed.toISOString() : "";
 }
 
-function appendExpiry(url, row) {
-  const expiresAt =
+function getExpiryForRow(row) {
+  return (
     toExpiryIso(getCell(row, "expiresAt") || getCell(row, "expiry") || getCell(row, "expiryDate")) ||
-    addMonths(new Date(), 6).toISOString();
-  if (!expiresAt) return url;
-  try {
-    const parsed = new URL(url);
-    parsed.searchParams.set("exp", expiresAt);
-    return parsed.toString();
-  } catch {
-    return url;
-  }
+    addMonths(new Date(), 6).toISOString()
+  );
 }
 
 function buildBulkContent(qrType, row) {
@@ -161,7 +154,7 @@ function buildBulkContent(qrType, row) {
       return getCell(row, "url");
     case "PDF":
     case "Image Gallery":
-      return appendExpiry(getCell(row, "url"), row);
+      return getCell(row, "url");
     case "WIFI": {
       const wifiType = getCell(row, "wifiType") || "WPA";
       const ssid = getCell(row, "ssid");
@@ -187,25 +180,13 @@ function buildBulkContent(qrType, row) {
         "END:VCALENDAR",
       ].join("\n");
     }
-    case "Bitcoin": {
-      const address = getCell(row, "address");
-      const amount = getCell(row, "amount");
-      const label = getCell(row, "label");
-      const message = getCell(row, "message");
-      const amountPart = amount ? `?amount=${amount}` : "";
-      const labelPart = label ? `${amountPart ? "&" : "?"}label=${encodeURIComponent(label)}` : "";
-      const messagePart = message
-        ? `${amountPart || labelPart ? "&" : "?"}message=${encodeURIComponent(message)}`
-        : "";
-      return `bitcoin:${address}${amountPart}${labelPart}${messagePart}`;
-    }
     case "Social Media":
       return getCell(row, "content");
     case "Rating": {
       const title = encodeURIComponent(getCell(row, "title") || "Rate your experience");
       const style = getCell(row, "style") === "numbers" ? "numbers" : "stars";
       const scale = style === "numbers" ? (getCell(row, "scale") === "10" ? "10" : "5") : "5";
-      return appendExpiry(`${frontendBaseUrl}/rate?title=${title}&style=${style}&scale=${scale}`, row);
+      return `${frontendBaseUrl}/rate?title=${title}&style=${style}&scale=${scale}`;
     }
     case "Feedback": {
       const title = getCell(row, "title") || "Share your feedback";
@@ -219,11 +200,37 @@ function buildBulkContent(qrType, row) {
           questions: questions.length ? questions : ["How was your experience?"],
         }),
       );
-      return appendExpiry(`${frontendBaseUrl}/feedback?f=${encoded}`, row);
+      return `${frontendBaseUrl}/feedback?f=${encoded}`;
     }
     default:
       return getCell(row, "content");
   }
+}
+
+async function createManagedBulkLink(job, content, row) {
+  const title =
+    getCell(row, "title") ||
+    getCell(row, "filename") ||
+    `${job.bulk_qr_type || "QR"} QR`;
+  const expiresAt = getExpiryForRow(row);
+  const result = await db.query(
+    `INSERT INTO managed_qr_links (user_id, job_id, qr_type, title, content, target_payload, expires_at)
+     VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7::timestamptz)
+     RETURNING id`,
+    [
+      job.user_id,
+      job.id,
+      job.bulk_qr_type || "URL",
+      String(title || "").trim().slice(0, 255) || null,
+      content,
+      JSON.stringify({ qrType: job.bulk_qr_type || "URL" }),
+      expiresAt,
+    ],
+  );
+  return {
+    id: result.rows[0].id,
+    url: `${frontendBaseUrl}/q/${result.rows[0].id}`,
+  };
 }
 
 async function createZipFromDir(sourceDir, zipPath) {
@@ -335,8 +342,9 @@ async function processBulkJob(jobId, queuedRows = null) {
     const filePath = path.join(outputDir, fileName);
 
     try {
+      const managedLink = await createManagedBulkLink(job, content, rows[i]);
       if ((job.output_format || "png") === "svg") {
-        const svg = await QRCode.toString(content, {
+        const svg = await QRCode.toString(managedLink.url, {
           type: "svg",
           width: job.qr_size || 512,
           margin: job.qr_margin || 2,
@@ -348,7 +356,7 @@ async function processBulkJob(jobId, queuedRows = null) {
         });
         await fsp.writeFile(filePath, svg, "utf8");
       } else {
-        await QRCode.toFile(filePath, content, {
+        await QRCode.toFile(filePath, managedLink.url, {
           width: job.qr_size || 512,
           margin: job.qr_margin || 2,
           errorCorrectionLevel: job.error_correction_level || "M",
@@ -360,12 +368,13 @@ async function processBulkJob(jobId, queuedRows = null) {
       }
       successCount += 1;
       await db.query(
-        `INSERT INTO qr_job_items (job_id, row_index, content, status, output_file_name, output_path)
-         VALUES ($1, $2, $3, 'completed', $4, $5)`,
+        `INSERT INTO qr_job_items (job_id, row_index, content, managed_link_id, status, output_file_name, output_path)
+         VALUES ($1, $2, $3, $4, 'completed', $5, $6)`,
         [
           jobId,
           i,
           content,
+          managedLink.id,
           fileName,
           path.relative(uploadsRoot, filePath).replace(/\\/g, "/"),
         ],

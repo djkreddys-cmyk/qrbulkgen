@@ -6,6 +6,8 @@ import { useEffect, useState } from "react"
 
 import { clearAuthSession, loadAuthSession } from "../lib/auth"
 
+const MOBILE_APP_INSTALL_URL = process.env.NEXT_PUBLIC_ANDROID_APP_URL || ""
+
 export default function Navbar() {
   const router = useRouter()
   const [session, setSession] = useState(null)
@@ -46,7 +48,9 @@ export default function Navbar() {
     window.setTimeout(() => {
       if (Date.now() - startedAt >= 1200 && document.visibilityState === "visible") {
         setAppPromptMessage(
-          "If the app did not open, you are likely using Expo Go or the production app is not installed yet.",
+          MOBILE_APP_INSTALL_URL
+            ? "If the app did not open, install the production build and try again."
+            : "If the app did not open, you are likely using Expo Go or the production app is not installed yet.",
         )
       }
     }, 1400)
@@ -54,12 +58,14 @@ export default function Navbar() {
 
   return (
     <>
-      {showAppPrompt && session?.user?.email ? (
+      {showAppPrompt ? (
         <div className="flex flex-col gap-3 border-b bg-slate-50 px-6 py-4 text-sm md:flex-row md:items-center md:justify-between">
           <div>
             <p className="font-semibold text-slate-900">Use QRBulkGen Mobile for a better experience.</p>
             <p className="text-slate-600">
-              Open the mobile app to manage scans, jobs, and password resets more comfortably on your phone.
+              {session?.user?.email
+                ? "Open the mobile app to manage scans, jobs, and password resets more comfortably on your phone."
+                : "Install or open QRBulkGen Mobile to scan QR codes, monitor jobs, and continue your workflow on phone."}
             </p>
           </div>
           <div className="flex gap-3">
@@ -69,6 +75,16 @@ export default function Navbar() {
             >
               Open App
             </button>
+            {MOBILE_APP_INSTALL_URL ? (
+              <a
+                href={MOBILE_APP_INSTALL_URL}
+                className="rounded border border-slate-300 px-4 py-2 text-slate-700"
+                target="_blank"
+                rel="noreferrer"
+              >
+                Install App
+              </a>
+            ) : null}
             <button
               onClick={handleDismissAppPrompt}
               className="rounded border border-slate-300 px-4 py-2 text-slate-700"

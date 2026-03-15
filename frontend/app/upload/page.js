@@ -5,97 +5,13 @@ import QRCodeStyling from "qr-code-styling"
 import Navbar from "../../components/Navbar"
 import { API_BASE_URL, apiRequest } from "../../lib/api"
 import { getAuthToken } from "../../lib/auth"
-
-const DOWNLOAD_RESOLUTIONS = [512, 768, 1024, 1536, 2048]
-const BULK_QR_TYPES = [
-  "App Store",
-  "Email",
-  "Event",
-  "Rating",
-  "Feedback",
-  "Image Gallery",
-  "Location",
-  "PDF",
-  "Phone",
-  "SMS",
-  "Social Media",
-  "Text",
-  "URL",
-  "vCard",
-  "WhatsApp",
-  "WIFI",
-  "Youtube",
-]
-
-const SAMPLE_ROWS_BY_TYPE = {
-  URL: { content: "https://example.com", filename: "qr-url-1", expiresAt: "" },
-  Text: { content: "Hello from bulk QR", filename: "qr-text-1", expiresAt: "" },
-  Email: { email: "hello@example.com", subject: "Hello", body: "Message body", filename: "qr-email-1", expiresAt: "" },
-  Phone: { phone: "+919876543210", filename: "qr-phone-1", expiresAt: "" },
-  SMS: { phone: "+919876543210", message: "Your SMS text", filename: "qr-sms-1", expiresAt: "" },
-  WhatsApp: { phone: "919876543210", message: "Hello on WhatsApp", filename: "qr-whatsapp-1", expiresAt: "" },
-  vCard: {
-    firstName: "John",
-    lastName: "Doe",
-    organization: "QRBulkGen",
-    jobTitle: "Manager",
-    phone: "+919876543210",
-    email: "john@example.com",
-    url: "https://example.com",
-    address: "Bengaluru",
-    filename: "qr-vcard-1",
-    expiresAt: "",
-  },
-  Location: { latitude: "12.9716", longitude: "77.5946", filename: "qr-location-1", expiresAt: "" },
-  Youtube: { url: "https://youtube.com/watch?v=abc123", filename: "qr-youtube-1", expiresAt: "" },
-  WIFI: { ssid: "MyWifi", password: "secret123", wifiType: "WPA", hidden: "false", filename: "qr-wifi-1", expiresAt: "" },
-  Event: {
-    title: "Launch Event",
-    start: "2026-03-20T10:00:00Z",
-    end: "2026-03-20T12:00:00Z",
-    location: "Bengaluru",
-    description: "Product launch",
-    filename: "qr-event-1",
-    expiresAt: "",
-  },
-  PDF: { url: "https://www.qrbulkgen.com/pdf/your-public-id", filename: "qr-pdf-1", expiresAt: "2026-04-30T23:59:59Z" },
-  "Social Media": {
-    content: "Instagram: https://instagram.com/yourbrand\nTwitter: https://x.com/yourbrand",
-    filename: "qr-social-1",
-    expiresAt: "",
-  },
-  "App Store": { url: "https://apps.apple.com/app/id000000", filename: "qr-appstore-1", expiresAt: "" },
-  "Image Gallery": { url: "https://www.qrbulkgen.com/gallery/your-public-id", filename: "qr-gallery-1", expiresAt: "2026-04-30T23:59:59Z" },
-  Rating: { title: "Rate your experience", style: "stars", scale: "5", filename: "qr-rating-1", expiresAt: "2026-04-30T23:59:59Z" },
-  Feedback: { title: "Share your feedback", questions: "How was your experience?|Any suggestions?", filename: "qr-feedback-1", expiresAt: "2026-04-30T23:59:59Z" },
-}
-
-const REQUIRED_COLUMNS_BY_TYPE = {
-  URL: ["content", "filename"],
-  Text: ["content", "filename"],
-  Email: ["email", "subject", "body", "filename"],
-  Phone: ["phone", "filename"],
-  SMS: ["phone", "message", "filename"],
-  WhatsApp: ["phone", "message", "filename"],
-  vCard: ["firstName", "lastName", "organization", "jobTitle", "phone", "email", "url", "address", "filename"],
-  Location: ["latitude", "longitude", "filename"],
-  Youtube: ["url", "filename"],
-  WIFI: ["ssid", "password", "wifiType", "hidden", "filename"],
-  Event: ["title", "start", "end", "location", "description", "filename"],
-  PDF: ["url", "filename"],
-  "Social Media": ["content", "filename"],
-  "App Store": ["url", "filename"],
-  "Image Gallery": ["url", "filename"],
-  Rating: ["title", "style", "scale", "filename"],
-  Feedback: ["title", "questions", "filename"],
-}
-
-const OPTIONAL_COLUMNS_BY_TYPE = {
-  PDF: ["expiresAt"],
-  "Image Gallery": ["expiresAt"],
-  Rating: ["expiresAt"],
-  Feedback: ["expiresAt"],
-}
+import {
+  BULK_OPTIONAL_COLUMNS_BY_TYPE,
+  BULK_QR_TYPES,
+  BULK_REQUIRED_COLUMNS_BY_TYPE,
+  BULK_SAMPLE_ROWS_BY_TYPE,
+  DOWNLOAD_RESOLUTIONS,
+} from "../../../shared/qr-config"
 
 function withAuthHeader() {
   const token = getAuthToken()
@@ -106,7 +22,7 @@ function withAuthHeader() {
 }
 
 function previewFromSampleType(qrType) {
-  const row = SAMPLE_ROWS_BY_TYPE[qrType] || SAMPLE_ROWS_BY_TYPE.URL
+  const row = BULK_SAMPLE_ROWS_BY_TYPE[qrType] || BULK_SAMPLE_ROWS_BY_TYPE.URL
   const firstKey = Object.keys(row)[0]
   return String(row[firstKey] || "https://example.com")
 }
@@ -317,7 +233,7 @@ export function BulkGenerateContent({ embedded = false }) {
   }
 
   function downloadSampleCsv() {
-    const baseRow = SAMPLE_ROWS_BY_TYPE[qrType] || SAMPLE_ROWS_BY_TYPE.URL
+    const baseRow = BULK_SAMPLE_ROWS_BY_TYPE[qrType] || BULK_SAMPLE_ROWS_BY_TYPE.URL
     const row = { ...baseRow, filename: baseRow.filename || `qr-${qrType.toLowerCase().replace(/\s+/g, "-")}-1` }
     const headers = Object.keys(row)
     const values = headers.map((header) => {
@@ -381,18 +297,40 @@ export function BulkGenerateContent({ embedded = false }) {
               </p>
               <div className="mt-3 p-3 border rounded bg-gray-50">
                 <p className="text-xs font-semibold text-gray-800">Required CSV columns for {qrType}</p>
-                <p className="text-xs text-gray-700 mt-1">
-                  {(REQUIRED_COLUMNS_BY_TYPE[qrType] || ["content", "filename"]).join(", ")}
-                </p>
-                {!!OPTIONAL_COLUMNS_BY_TYPE[qrType]?.length && (
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {(BULK_REQUIRED_COLUMNS_BY_TYPE[qrType] || ["content", "filename"]).map((column) => (
+                    <span key={column} className="rounded-full bg-slate-200 px-2 py-1 text-[11px] font-semibold text-slate-700">
+                      {column}
+                    </span>
+                  ))}
+                </div>
+                {!!BULK_OPTIONAL_COLUMNS_BY_TYPE[qrType]?.length && (
                   <>
                     <p className="mt-3 text-xs font-semibold text-gray-800">Optional validity column</p>
-                    <p className="text-xs text-gray-700 mt-1">
-                      {OPTIONAL_COLUMNS_BY_TYPE[qrType].join(", ")}. You can use <code>MM/DD/YYYY</code>, <code>DD/MM/YYYY</code>, or ISO format.
-                      If time is not given, the QR stays valid until the end of that day. If left blank, validity defaults to 6 months from creation.
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {BULK_OPTIONAL_COLUMNS_BY_TYPE[qrType].map((column) => (
+                        <span key={column} className="rounded-full bg-amber-100 px-2 py-1 text-[11px] font-semibold text-amber-700">
+                          {column}
+                        </span>
+                      ))}
+                    </div>
+                    <p className="text-xs text-gray-700 mt-2">
+                      Use <code>MM/DD/YYYY</code>, <code>DD/MM/YYYY</code>, or ISO format. If time is not given, the QR stays valid until the end of that day.
+                      If left blank, validity defaults to 6 months from creation.
                     </p>
                   </>
                 )}
+                <div className="mt-4 rounded-xl border border-dashed border-slate-300 bg-white p-3">
+                  <p className="text-xs font-semibold text-slate-800">Example row preview</p>
+                  <div className="mt-2 grid gap-2">
+                    {Object.entries(BULK_SAMPLE_ROWS_BY_TYPE[qrType] || BULK_SAMPLE_ROWS_BY_TYPE.URL).map(([key, value]) => (
+                      <div key={key} className="grid grid-cols-[120px,1fr] gap-3 text-xs">
+                        <span className="font-semibold text-slate-600">{key}</span>
+                        <span className="break-all text-slate-700">{String(value)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
             </div>
 
