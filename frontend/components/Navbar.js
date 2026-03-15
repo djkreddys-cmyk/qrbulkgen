@@ -26,7 +26,7 @@ export default function Navbar() {
   function handleLogout() {
     clearAuthSession()
     setSession(null)
-    router.push("/login")
+    router.push("/")
   }
 
   function handleDismissAppPrompt() {

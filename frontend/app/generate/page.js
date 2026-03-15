@@ -1,20 +1,35 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
 import Navbar from "../../components/Navbar"
 import { SingleGenerateContent } from "./single/page"
 import { BulkGenerateContent } from "../upload/page"
+import { loadAuthSession } from "../../lib/auth"
 
 export default function GeneratePage() {
+  const router = useRouter()
   const [mode, setMode] = useState("single")
+  const [isCheckingSession, setIsCheckingSession] = useState(true)
 
   useEffect(() => {
+    const session = loadAuthSession()
+    if (!session?.user?.email) {
+      router.replace("/login")
+      return
+    }
+
     const params = new URLSearchParams(window.location.search)
     const queryMode = params.get("mode")
     if (queryMode === "bulk" || queryMode === "single") {
       setMode(queryMode)
     }
-  }, [])
+    setIsCheckingSession(false)
+  }, [router])
+
+  if (isCheckingSession) {
+    return null
+  }
 
   return (
     <div>

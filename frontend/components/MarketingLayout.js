@@ -30,13 +30,13 @@ export function HeroCtaRow() {
   return (
     <div className="flex flex-col gap-3 sm:flex-row">
       <Link
-        href="/generate"
+        href="/login"
         className="rounded-full bg-slate-950 px-6 py-3 text-center text-sm font-semibold text-white transition hover:bg-slate-800"
       >
         Open Generator
       </Link>
       <Link
-        href="/register"
+        href="/login"
         className="rounded-full border border-slate-300 bg-white px-6 py-3 text-center text-sm font-semibold text-slate-900 transition hover:border-slate-950"
       >
         Create Account
