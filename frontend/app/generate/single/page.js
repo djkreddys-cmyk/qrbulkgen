@@ -329,6 +329,8 @@ export function SingleGenerateContent({ embedded = false }) {
   const [editingJobId, setEditingJobId] = useState("")
   const [analysis, setAnalysis] = useState(null)
   const [analysisLoading, setAnalysisLoading] = useState(false)
+  const isEditing = Boolean(editingJobId)
+  const lockContent = isEditing && qrType !== "Feedback"
 
   const [fields, setFields] = useState({
     url: "", text: "", email: "", subject: "", body: "", phone: "", smsPhone: "", smsMessage: "",
@@ -420,6 +422,33 @@ export function SingleGenerateContent({ embedded = false }) {
 
   function setField(name, value) {
     setFields((prev) => ({ ...prev, [name]: value }))
+  }
+
+  function renderLockedContentSummary() {
+    const entries = Object.entries(fields)
+      .filter(([key, value]) => {
+        if (key === "feedbackQuestions") return false
+        if (typeof value === "boolean") return value
+        return String(value || "").trim()
+      })
+      .slice(0, 6)
+
+    return (
+      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+        <p className="text-sm font-semibold text-slate-900">Content is locked for this QR</p>
+        <p className="mt-1 text-sm text-slate-500">You can update expiry, styling, and save a fresh QR version. QR type and core content stay unchanged.</p>
+        {!!entries.length && (
+          <div className="mt-3 grid gap-2 text-sm text-slate-600">
+            {entries.map(([key, value]) => (
+              <div key={key} className="grid grid-cols-[140px,1fr] gap-3">
+                <span className="font-semibold capitalize text-slate-500">{key}</span>
+                <span className="break-all">{String(value)}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    )
   }
 
   function updateFeedbackQuestion(index, value) {
@@ -634,33 +663,34 @@ export function SingleGenerateContent({ embedded = false }) {
         {!!editMessage && <p className="mt-3 text-sm text-blue-700">{editMessage}</p>}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mt-8">
           <section className="border rounded-lg p-6 bg-white space-y-4">
-            <select value={qrType} onChange={(e) => handleQrTypeChange(e.target.value)} className="w-full border p-2">
+            <select value={qrType} onChange={(e) => handleQrTypeChange(e.target.value)} className="w-full border p-2" disabled={isEditing}>
               {QR_TYPES.map((type) => <option key={type} value={type}>{type}</option>)}
             </select>
 
-            {qrType === "URL" && <input className="w-full border p-2" placeholder="https://example.com" value={fields.url} onChange={(e) => setField("url", e.target.value)} />}
-            {qrType === "Text" && <textarea className="w-full border p-2" rows={4} placeholder="Enter text" value={fields.text} onChange={(e) => setField("text", e.target.value)} />}
-            {qrType === "Email" && (
+            {lockContent ? renderLockedContentSummary() : null}
+            {!lockContent && qrType === "URL" && <input className="w-full border p-2" placeholder="https://example.com" value={fields.url} onChange={(e) => setField("url", e.target.value)} />}
+            {!lockContent && qrType === "Text" && <textarea className="w-full border p-2" rows={4} placeholder="Enter text" value={fields.text} onChange={(e) => setField("text", e.target.value)} />}
+            {!lockContent && qrType === "Email" && (
               <div className="space-y-2">
                 <input className="w-full border p-2" placeholder="Email" value={fields.email} onChange={(e) => setField("email", e.target.value)} />
                 <input className="w-full border p-2" placeholder="Subject (optional)" value={fields.subject} onChange={(e) => setField("subject", e.target.value)} />
                 <textarea className="w-full border p-2" rows={3} placeholder="Body (optional)" value={fields.body} onChange={(e) => setField("body", e.target.value)} />
               </div>
             )}
-            {qrType === "Phone" && <input className="w-full border p-2" placeholder="Phone" value={fields.phone} onChange={(e) => setField("phone", e.target.value)} />}
-            {qrType === "SMS" && (
+            {!lockContent && qrType === "Phone" && <input className="w-full border p-2" placeholder="Phone" value={fields.phone} onChange={(e) => setField("phone", e.target.value)} />}
+            {!lockContent && qrType === "SMS" && (
               <div className="space-y-2">
                 <input className="w-full border p-2" placeholder="SMS Phone" value={fields.smsPhone} onChange={(e) => setField("smsPhone", e.target.value)} />
                 <textarea className="w-full border p-2" rows={3} placeholder="SMS Message" value={fields.smsMessage} onChange={(e) => setField("smsMessage", e.target.value)} />
               </div>
             )}
-            {qrType === "WhatsApp" && (
+            {!lockContent && qrType === "WhatsApp" && (
               <div className="space-y-2">
                 <input className="w-full border p-2" placeholder="WhatsApp Number" value={fields.whatsappPhone} onChange={(e) => setField("whatsappPhone", e.target.value)} />
                 <textarea className="w-full border p-2" rows={3} placeholder="Message (optional)" value={fields.whatsappMessage} onChange={(e) => setField("whatsappMessage", e.target.value)} />
               </div>
             )}
-            {qrType === "vCard" && (
+            {!lockContent && qrType === "vCard" && (
               <div className="space-y-2">
                 <input className="w-full border p-2" placeholder="First name" value={fields.firstName} onChange={(e) => setField("firstName", e.target.value)} />
                 <input className="w-full border p-2" placeholder="Last name" value={fields.lastName} onChange={(e) => setField("lastName", e.target.value)} />
@@ -672,13 +702,13 @@ export function SingleGenerateContent({ embedded = false }) {
                 <input className="w-full border p-2" placeholder="Address" value={fields.address} onChange={(e) => setField("address", e.target.value)} />
               </div>
             )}
-            {qrType === "Location" && (
+            {!lockContent && qrType === "Location" && (
               <div className="grid grid-cols-2 gap-2">
                 <input className="w-full border p-2" placeholder="Latitude" value={fields.latitude} onChange={(e) => setField("latitude", e.target.value)} />
                 <input className="w-full border p-2" placeholder="Longitude" value={fields.longitude} onChange={(e) => setField("longitude", e.target.value)} />
               </div>
             )}
-            {["Youtube", "App Store"].includes(qrType) && (
+            {!lockContent && ["Youtube", "App Store"].includes(qrType) && (
               <input
                 className="w-full border p-2"
                 placeholder="Paste URL"
@@ -689,7 +719,7 @@ export function SingleGenerateContent({ embedded = false }) {
                 }}
               />
             )}
-            {qrType === "WIFI" && (
+            {!lockContent && qrType === "WIFI" && (
               <div className="space-y-2">
                 <input className="w-full border p-2" placeholder="SSID" value={fields.wifiSsid} onChange={(e) => setField("wifiSsid", e.target.value)} />
                 <input className="w-full border p-2" placeholder="Password" value={fields.wifiPassword} onChange={(e) => setField("wifiPassword", e.target.value)} />
@@ -700,7 +730,7 @@ export function SingleGenerateContent({ embedded = false }) {
                 </select>
               </div>
             )}
-            {qrType === "Event" && (
+            {!lockContent && qrType === "Event" && (
               <div className="space-y-2">
                 <input className="w-full border p-2" placeholder="Event title" value={fields.eventTitle} onChange={(e) => setField("eventTitle", e.target.value)} />
                 <label className="block text-sm">Start</label>
@@ -711,7 +741,7 @@ export function SingleGenerateContent({ embedded = false }) {
                 <textarea className="w-full border p-2" rows={3} placeholder="Description" value={fields.eventDescription} onChange={(e) => setField("eventDescription", e.target.value)} />
               </div>
             )}
-            {qrType === "Social Media" && (
+            {!lockContent && qrType === "Social Media" && (
               <div className="space-y-3 border p-3 rounded">
                 {socialLinks.map((item, index) => (
                   <div key={index} className="grid grid-cols-1 md:grid-cols-12 gap-2">
@@ -756,7 +786,7 @@ export function SingleGenerateContent({ embedded = false }) {
               </div>
             )}
 
-            {qrType === "Rating" && (
+            {!lockContent && qrType === "Rating" && (
               <div className="space-y-2 border p-3 rounded">
                 <input
                   className="w-full border p-2"
@@ -800,6 +830,7 @@ export function SingleGenerateContent({ embedded = false }) {
                   placeholder="Feedback form title"
                   value={fields.feedbackTitle}
                   onChange={(e) => setField("feedbackTitle", e.target.value)}
+                  readOnly={isEditing}
                 />
                 {fields.feedbackQuestions.map((question, index) => (
                   <div key={index} className="flex gap-2">
@@ -809,7 +840,7 @@ export function SingleGenerateContent({ embedded = false }) {
                       value={question}
                       onChange={(e) => updateFeedbackQuestion(index, e.target.value)}
                     />
-                    {fields.feedbackQuestions.length > 1 && (
+                    {fields.feedbackQuestions.length > 1 && !isEditing && (
                       <button
                         type="button"
                         onClick={() => removeFeedbackQuestion(index)}
@@ -826,7 +857,7 @@ export function SingleGenerateContent({ embedded = false }) {
               </div>
             )}
 
-            {qrType === "PDF" && (
+            {!lockContent && qrType === "PDF" && (
               <div className="space-y-2 border p-3 rounded">
                 <div className="flex gap-2">
                   <button type="button" className={`px-3 py-1 border ${pdfMode === "url" ? "bg-black text-white" : ""}`} onClick={() => setPdfMode("url")}>URL</button>
@@ -843,7 +874,7 @@ export function SingleGenerateContent({ embedded = false }) {
               </div>
             )}
 
-            {qrType === "Image Gallery" && (
+            {!lockContent && qrType === "Image Gallery" && (
               <div className="space-y-2 border p-3 rounded">
                 <div className="flex gap-2">
                   <button type="button" className={`px-3 py-1 border ${galleryMode === "url" ? "bg-black text-white" : ""}`} onClick={() => setGalleryMode("url")}>URL</button>

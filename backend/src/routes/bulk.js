@@ -343,7 +343,7 @@ bulkRouter.put("/jobs/:id/bulk", requireAuth, upload.single("file"), async (req,
     }
 
     const existingResult = await query(
-      `SELECT id, source_file_name, source_file_path
+      `SELECT id, source_file_name, source_file_path, bulk_qr_type
        FROM qr_jobs
        WHERE id = $1
          AND user_id = $2
@@ -357,7 +357,7 @@ bulkRouter.put("/jobs/:id/bulk", requireAuth, upload.single("file"), async (req,
       throw createHttpError(404, "NOT_FOUND", "Bulk job not found");
     }
 
-    const options = normalizeBulkOptions(req.body || {});
+    const options = normalizeBulkOptions({ ...(req.body || {}), qrType: existing.bulk_qr_type });
     const file = req.file;
     const csvAbsolutePath = file
       ? file.path
@@ -368,7 +368,14 @@ bulkRouter.put("/jobs/:id/bulk", requireAuth, upload.single("file"), async (req,
     }
 
     const csvInfo = await inspectCsv(csvAbsolutePath);
-    const csvRows = await parseCsvRows(csvAbsolutePath);
+    let csvRows = await parseCsvRows(csvAbsolutePath);
+    const expiryOverride = String(req.body.expiresAt || "").trim();
+    if (expiryOverride) {
+      csvRows = csvRows.map((row) => ({
+        ...row,
+        expiresat: expiryOverride,
+      }));
+    }
     const actualHeaders = new Set((csvInfo.headers || []).map((h) => h.toLowerCase()));
     const required = REQUIRED_HEADERS_BY_TYPE[options.qrType] || ["content"];
     const missing = required.filter((header) => !actualHeaders.has(header.toLowerCase()));

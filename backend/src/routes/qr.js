@@ -1,6 +1,7 @@
 const express = require("express");
 
 const { query } = require("../db/postgres");
+const { loadEnv } = require("../config/env");
 const { requireAuth } = require("../middleware/auth");
 const { trackEvent } = require("../services/analytics");
 const { createManagedQrLink } = require("../services/managed-links");
@@ -21,6 +22,10 @@ function buildSingleTargetPayload(body, qrType) {
     },
     expiresAt: body.expiresAt || "",
   };
+}
+
+function encodeFeedbackPayload(payload) {
+  return Buffer.from(JSON.stringify(payload), "utf8").toString("base64");
 }
 
 async function upsertSingleJob({
@@ -109,8 +114,9 @@ async function upsertSingleJob({
   }
 
   const existingResult = await query(
-    `SELECT id, managed_link_id
-     FROM qr_jobs
+    `SELECT j.id, j.managed_link_id, m.qr_type AS managed_qr_type, m.title AS managed_title, m.content AS managed_content, m.target_payload
+     FROM qr_jobs j
+     LEFT JOIN managed_qr_links m ON m.id = j.managed_link_id
      WHERE id = $1
        AND user_id = $2
        AND job_type = 'single'
@@ -122,6 +128,41 @@ async function upsertSingleJob({
     const error = new Error("Single QR job not found");
     error.status = 404;
     throw error;
+  }
+
+  const lockedQrType = String(existing.managed_qr_type || qrType || "Text").trim() || "Text";
+  const existingTargetPayload = existing.target_payload || { qrType: lockedQrType, fields: {} };
+  let nextTargetPayload = existingTargetPayload;
+  let nextContent = String(existing.managed_content || payload.content || "").trim();
+  let nextManagedTitle = String(existing.managed_title || managedTitle || lockedQrType).trim() || lockedQrType;
+
+  if (lockedQrType === "Feedback") {
+    const existingQuestions = Array.isArray(existingTargetPayload?.fields?.feedbackQuestions)
+      ? existingTargetPayload.fields.feedbackQuestions
+      : [];
+    const requestedQuestions = Array.isArray(body?.fields?.feedbackQuestions)
+      ? body.fields.feedbackQuestions.map((question) => String(question || "").trim()).filter(Boolean)
+      : [];
+    const mergedQuestions = Array.from(new Set([...existingQuestions, ...requestedQuestions])).filter(Boolean);
+    const feedbackTitle = String(existingTargetPayload?.fields?.feedbackTitle || existing.managed_title || "Share your feedback").trim() || "Share your feedback";
+    nextTargetPayload = {
+      ...existingTargetPayload,
+      qrType: lockedQrType,
+      expiresAt: body.expiresAt || existingTargetPayload.expiresAt || "",
+      fields: {
+        ...existingTargetPayload.fields,
+        feedbackTitle,
+        feedbackQuestions: mergedQuestions.length ? mergedQuestions : existingQuestions,
+      },
+    };
+    const frontendUrl = String(loadEnv().frontendUrl || "http://localhost:3000").replace(/\/$/, "");
+    nextContent = `${frontendUrl}/feedback?f=${encodeURIComponent(
+      encodeFeedbackPayload({
+        title: feedbackTitle,
+        questions: nextTargetPayload.fields.feedbackQuestions,
+      }),
+    )}`;
+    nextManagedTitle = feedbackTitle;
   }
 
   let managedLink;
@@ -137,10 +178,10 @@ async function upsertSingleJob({
        WHERE id = $1`,
       [
         existing.managed_link_id,
-        qrType,
-        String(managedTitle || "").trim().slice(0, 255) || null,
-        payload.content,
-        JSON.stringify(targetPayload),
+        lockedQrType,
+        String(nextManagedTitle || "").trim().slice(0, 255) || null,
+        nextContent,
+        JSON.stringify(nextTargetPayload),
         expiresAt || null,
       ],
     );
@@ -165,10 +206,10 @@ async function upsertSingleJob({
     managedLink = await createManagedQrLink({
       userId,
       jobId,
-      qrType,
-      title: managedTitle,
-      content: payload.content,
-      targetPayload,
+      qrType: lockedQrType,
+      title: nextManagedTitle,
+      content: nextContent,
+      targetPayload: nextTargetPayload,
       expiresAt,
     });
   }

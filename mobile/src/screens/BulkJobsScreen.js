@@ -60,6 +60,7 @@ export function BulkJobsScreen() {
   const [editingJobId, setEditingJobId] = useState("");
   const [jobAnalysis, setJobAnalysis] = useState(null);
   const [analysisLoading, setAnalysisLoading] = useState(false);
+  const [expiryOverride, setExpiryOverride] = useState("");
   const [busy, setBusy] = useState(true);
   const [detailBusy, setDetailBusy] = useState(false);
   const [error, setError] = useState("");
@@ -171,6 +172,7 @@ export function BulkJobsScreen() {
           setCreateForegroundColor(nextJob.foregroundColor || "#000000");
           setCreateBackgroundColor(nextJob.backgroundColor || "#ffffff");
           setCreateFilenamePrefix(nextJob.filenamePrefix || "qr");
+          setExpiryOverride(nextJob.expiresAt || "");
           setSelectedJobId(nextJob.id || bulkDraft.editJobId);
           setAnalysisLoading(true);
           const analysisData = await apiRequest(`/qr/jobs/${bulkDraft.editJobId}/analysis`, {
@@ -246,6 +248,7 @@ export function BulkJobsScreen() {
       formData.append("filenamePrefix", createFilenamePrefix);
       formData.append("foregroundColor", createForegroundColor);
       formData.append("backgroundColor", createBackgroundColor);
+      formData.append("expiresAt", expiryOverride);
 
       const data = await apiRequest(editingJobId ? `/qr/jobs/${editingJobId}/bulk` : "/qr/bulk/upload", {
         method: editingJobId ? "PUT" : "POST",
@@ -320,8 +323,9 @@ export function BulkJobsScreen() {
       <Card>
         <Text style={{ fontSize: 20, fontWeight: "700", color: "#0f172a" }}>{editingJobId ? "Update Bulk Job" : "Create Bulk Job"}</Text>
         <Text style={{ color: "#64748b" }}>
-          Use the same QR type list as web. Your CSV should follow the matching sample columns from the
-          web bulk page.
+          {editingJobId
+            ? "This bulk update keeps the same QR type and CSV. You can adjust expiry and styling, then save a fresh run for the same job."
+            : "Use the same QR type list as web. Your CSV should follow the matching sample columns from the web bulk page."}
         </Text>
         <View
           style={{
@@ -354,11 +358,17 @@ export function BulkJobsScreen() {
             overflow: "hidden",
           }}
         >
-          <Picker selectedValue={createQrType} onValueChange={setCreateQrType}>
-            {QR_TYPES.map((option) => (
-              <Picker.Item key={option} label={option} value={option} />
-            ))}
-          </Picker>
+          {editingJobId ? (
+            <View style={{ paddingHorizontal: 14, paddingVertical: 16 }}>
+              <Text style={{ color: "#0f172a", fontWeight: "700" }}>{createQrType}</Text>
+            </View>
+          ) : (
+            <Picker selectedValue={createQrType} onValueChange={setCreateQrType}>
+              {QR_TYPES.map((option) => (
+                <Picker.Item key={option} label={option} value={option} />
+              ))}
+            </Picker>
+          )}
         </View>
         <View
           style={{
@@ -370,16 +380,33 @@ export function BulkJobsScreen() {
           }}
         >
           <Text style={{ color: "#0f172a", fontWeight: "600" }}>
-            {selectedFile?.name || "No CSV selected"}
+            {selectedFile?.name || (editingJobId ? "Using existing CSV from this job" : "No CSV selected")}
           </Text>
           <TouchableOpacity
             onPress={handlePickCsv}
+            disabled={Boolean(editingJobId)}
             style={{ backgroundColor: "#e2e8f0", paddingVertical: 12, borderRadius: 14 }}
           >
             <Text style={{ color: "#0f172a", textAlign: "center", fontWeight: "700" }}>
               Choose CSV File
             </Text>
           </TouchableOpacity>
+        </View>
+        <View style={{ gap: 6 }}>
+          <Text style={{ color: "#64748b", fontSize: 12, fontWeight: "700" }}>LAST SCAN DATE / EXPIRY OVERRIDE</Text>
+          <TextInput
+            value={expiryOverride}
+            onChangeText={setExpiryOverride}
+            placeholder="MM/DD/YYYY or DD/MM/YYYY"
+            style={{
+              borderWidth: 1,
+              borderColor: "#cbd5e1",
+              borderRadius: 16,
+              paddingHorizontal: 14,
+              paddingVertical: 12,
+              color: "#0f172a",
+            }}
+          />
         </View>
         <View style={{ flexDirection: "row", gap: 12 }}>
           <View style={{ flex: 1, gap: 6 }}>

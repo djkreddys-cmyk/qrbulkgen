@@ -55,6 +55,7 @@ export function BulkGenerateContent({ embedded = false }) {
   const [editingJobId, setEditingJobId] = useState("")
   const [jobAnalysis, setJobAnalysis] = useState(null)
   const [analysisLoading, setAnalysisLoading] = useState(false)
+  const [expiryOverride, setExpiryOverride] = useState("")
 
   useEffect(() => {
     setPreviewContent(previewFromSampleType(qrType))
@@ -87,6 +88,7 @@ export function BulkGenerateContent({ embedded = false }) {
         setFilenamePrefix(job.filenamePrefix || "qr")
         setForegroundColor(job.foregroundColor || "#000000")
         setBackgroundColor(job.backgroundColor || "#ffffff")
+        setExpiryOverride(job.expiresAt || "")
         setSuccess("Loaded this bulk job for update. Change the settings and save a fresh run.")
         setAnalysisLoading(true)
         const analysisData = await apiRequest(`/qr/jobs/${editJob}/analysis`, {
@@ -255,6 +257,7 @@ export function BulkGenerateContent({ embedded = false }) {
       formData.append("filenamePrefix", filenamePrefix)
       formData.append("foregroundColor", foregroundColor)
       formData.append("backgroundColor", backgroundColor)
+      formData.append("expiresAt", expiryOverride)
 
       const data = await apiRequest(editingJobId ? `/qr/jobs/${editingJobId}/bulk` : "/qr/bulk/upload", {
         method: editingJobId ? "PUT" : "POST",
@@ -311,7 +314,7 @@ export function BulkGenerateContent({ embedded = false }) {
 
             <div>
               <label className="block mb-1 text-sm">QR Type</label>
-              <select value={qrType} onChange={(e) => setQrType(e.target.value)} className="w-full border p-2">
+              <select value={qrType} onChange={(e) => setQrType(e.target.value)} className="w-full border p-2" disabled={Boolean(editingJobId)}>
                 {BULK_QR_TYPES.map((type) => (
                   <option key={type} value={type}>{type}</option>
                 ))}
@@ -325,7 +328,9 @@ export function BulkGenerateContent({ embedded = false }) {
                 value={previewContent}
                 onChange={(e) => setPreviewContent(e.target.value)}
                 className="w-full border p-2"
+                readOnly={Boolean(editingJobId)}
               />
+              {editingJobId && <p className="mt-2 text-xs text-slate-500">Preview content is locked for updates. You can adjust expiry and styling, then save a fresh run for this same bulk job.</p>}
             </div>
 
             <div>
@@ -336,7 +341,9 @@ export function BulkGenerateContent({ embedded = false }) {
                 accept=".csv"
                 onChange={(e) => setFile(e.target.files?.[0] || null)}
                 className="w-full border p-2"
+                disabled={Boolean(editingJobId)}
               />
+              {editingJobId && <p className="mt-2 text-xs text-slate-500">Updating keeps the existing CSV for this job.</p>}
               <button type="button" className="mt-2 border px-3 py-2" onClick={downloadSampleCsv}>Download Sample CSV</button>
               <p className="mt-2 text-xs text-gray-600">
                 CSV must include a <code>filename</code> column. Each row uses that value as the downloaded QR file name.
@@ -381,6 +388,10 @@ export function BulkGenerateContent({ embedded = false }) {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div>
+                <label className="block mb-1 text-sm">Last Scan Date / Expiry Override</label>
+                <input value={expiryOverride} onChange={(e) => setExpiryOverride(e.target.value)} placeholder="MM/DD/YYYY or DD/MM/YYYY" className="w-full border p-2" />
+              </div>
               <div>
                 <label className="block mb-1 text-sm">Error Correction</label>
                 <select value={errorCorrectionLevel} onChange={(e) => setErrorCorrectionLevel(e.target.value)} className="w-full border p-2">

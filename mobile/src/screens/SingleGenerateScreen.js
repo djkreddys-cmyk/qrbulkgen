@@ -186,6 +186,8 @@ export function SingleGenerateScreen() {
   const [editingJobId, setEditingJobId] = useState("");
   const [analysis, setAnalysis] = useState(null);
   const [analysisLoading, setAnalysisLoading] = useState(false);
+  const isEditing = Boolean(editingJobId);
+  const lockContent = isEditing && qrType !== "Feedback";
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [shareMessage, setShareMessage] = useState("");
@@ -221,6 +223,31 @@ export function SingleGenerateScreen() {
 
   function setField(name, value) {
     setFields((prev) => ({ ...prev, [name]: value }));
+  }
+
+  function renderLockedContentSummary() {
+    const entries = Object.entries(fields)
+      .filter(([key, value]) => {
+        if (key === "feedbackQuestions") return false;
+        if (typeof value === "boolean") return value;
+        return String(value || "").trim();
+      })
+      .slice(0, 6);
+
+    return (
+      <View style={{ borderWidth: 1, borderColor: "#dbe3f0", borderRadius: 16, padding: 12, backgroundColor: "#f8fafc", gap: 8 }}>
+        <Text style={{ color: "#0f172a", fontWeight: "700" }}>Content is locked for this QR</Text>
+        <Text style={{ color: "#64748b", lineHeight: 20 }}>
+          You can update expiry and styling, then save a fresh version. QR type and core content stay unchanged.
+        </Text>
+        {entries.map(([key, value]) => (
+          <View key={key} style={{ flexDirection: "row", gap: 10 }}>
+            <Text style={{ width: 120, color: "#64748b", fontWeight: "700" }}>{key}</Text>
+            <Text style={{ flex: 1, color: "#475569" }}>{String(value)}</Text>
+          </View>
+        ))}
+      </View>
+    );
   }
 
   useEffect(() => {
@@ -464,6 +491,9 @@ export function SingleGenerateScreen() {
   }
 
   function renderTypeFields() {
+    if (lockContent) {
+      return renderLockedContentSummary();
+    }
     if (qrType === "URL") {
       return <InputField label="URL" value={fields.url} onChangeText={(value) => setField("url", value)} placeholder="https://example.com" />;
     }
@@ -670,7 +700,7 @@ export function SingleGenerateScreen() {
     if (qrType === "Feedback") {
       return (
         <View style={{ gap: 10 }}>
-          <InputField label="Feedback Form Title" value={fields.feedbackTitle} onChangeText={(value) => setField("feedbackTitle", value)} placeholder="Share your feedback" />
+          <InputField label="Feedback Form Title" value={fields.feedbackTitle} onChangeText={(value) => setField("feedbackTitle", value)} placeholder="Share your feedback" editable={!isEditing} />
           {fields.feedbackQuestions.map((question, index) => (
             <View key={`feedback-${index}`} style={{ gap: 8 }}>
               <InputField
@@ -685,7 +715,7 @@ export function SingleGenerateScreen() {
                 }
                 placeholder={`Question ${index + 1}`}
               />
-              {fields.feedbackQuestions.length > 1 && (
+              {fields.feedbackQuestions.length > 1 && !isEditing && (
                 <ActionButton
                   title="Remove Question"
                   onPress={() =>
@@ -734,7 +764,11 @@ export function SingleGenerateScreen() {
       </Card>
 
       <Card>
-        <PickerField label="QR TYPE" value={qrType} options={QR_TYPES} onChange={setQrType} />
+        {isEditing ? (
+          <InputField label="QR TYPE" value={qrType} onChangeText={() => {}} editable={false} />
+        ) : (
+          <PickerField label="QR TYPE" value={qrType} options={QR_TYPES} onChange={setQrType} />
+        )}
 
         {renderTypeFields()}
 
