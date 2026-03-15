@@ -58,7 +58,7 @@ function addMonths(date, months) {
   return copy;
 }
 
-function parseFlexibleDate(value) {
+function parseExpiryDate(value) {
   const raw = String(value || "").trim();
   if (!raw) return null;
 
@@ -67,42 +67,26 @@ function parseFlexibleDate(value) {
     return Number.isNaN(parsed.getTime()) ? null : parsed;
   }
 
-  const slashMatch = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-  if (slashMatch) {
-    const first = Number(slashMatch[1]);
-    const second = Number(slashMatch[2]);
-    const year = Number(slashMatch[3]);
-
-    let month;
-    let day;
-
-    if (first > 12 && second <= 12) {
-      day = first;
-      month = second;
-    } else if (second > 12 && first <= 12) {
-      month = first;
-      day = second;
-    } else {
-      month = first;
-      day = second;
-    }
-
+  const dashMatch = raw.match(/^(\d{2})-(\d{2})-(\d{4})$/);
+  if (dashMatch) {
+    const day = Number(dashMatch[1]);
+    const month = Number(dashMatch[2]);
+    const year = Number(dashMatch[3]);
     const parsed = new Date(Date.UTC(year, month - 1, day, 23, 59, 59, 999));
     return Number.isNaN(parsed.getTime()) ? null : parsed;
   }
 
-  const dashMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  if (dashMatch) {
+  const isoDateMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (isoDateMatch) {
     const parsed = new Date(`${raw}T23:59:59.999Z`);
     return Number.isNaN(parsed.getTime()) ? null : parsed;
   }
 
-  const fallback = new Date(raw);
-  return Number.isNaN(fallback.getTime()) ? null : fallback;
+  return null;
 }
 
 function toExpiryIso(value) {
-  const parsed = parseFlexibleDate(value);
+  const parsed = parseExpiryDate(value);
   return parsed ? parsed.toISOString() : "";
 }
 

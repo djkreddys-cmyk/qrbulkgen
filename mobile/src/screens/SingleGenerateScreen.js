@@ -16,13 +16,16 @@ import { shareDataUrlFile } from "../lib/files";
 import {
   addSocialLinkRow,
   buildQrContent,
+  formatExpiryDateForInput,
   getManagedTitleForQrType,
   getAvailableSocialPlatforms,
   getQrPlaceholder,
   hasRequiredFields,
   INITIAL_QR_FIELDS,
+  QR_FIELD_DEFINITIONS,
   QR_TYPES,
   SOCIAL_PLATFORM_OPTIONS,
+  parseExpiryDate,
   supportsExpiry,
 } from "../lib/qr";
 
@@ -226,13 +229,13 @@ export function SingleGenerateScreen() {
   }
 
   function renderLockedContentSummary() {
-    const entries = Object.entries(fields)
-      .filter(([key, value]) => {
-        if (key === "feedbackQuestions") return false;
+    const entries = (QR_FIELD_DEFINITIONS[qrType] || [])
+      .filter((field) => field.key !== "feedbackQuestions" && field.key !== "socialLinks")
+      .map((field) => [field.label, fields[field.key]])
+      .filter(([, value]) => {
         if (typeof value === "boolean") return value;
         return String(value || "").trim();
-      })
-      .slice(0, 6);
+      });
 
     return (
       <View style={{ borderWidth: 1, borderColor: "#dbe3f0", borderRadius: 16, padding: 12, backgroundColor: "#f8fafc", gap: 8 }}>
@@ -240,9 +243,9 @@ export function SingleGenerateScreen() {
         <Text style={{ color: "#64748b", lineHeight: 20 }}>
           You can update expiry and styling, then save a fresh version. QR type and core content stay unchanged.
         </Text>
-        {entries.map(([key, value]) => (
-          <View key={key} style={{ flexDirection: "row", gap: 10 }}>
-            <Text style={{ width: 120, color: "#64748b", fontWeight: "700" }}>{key}</Text>
+        {entries.map(([label, value]) => (
+          <View key={label} style={{ flexDirection: "row", gap: 10 }}>
+            <Text style={{ width: 120, color: "#64748b", fontWeight: "700" }}>{label}</Text>
             <Text style={{ flex: 1, color: "#475569" }}>{String(value)}</Text>
           </View>
         ))}
@@ -279,7 +282,7 @@ export function SingleGenerateScreen() {
             setBackgroundColor(nextJob.backgroundColor || "#ffffff");
             setFilenamePrefix(nextJob.filenamePrefix || "mobile-qr");
             setErrorCorrectionLevel(nextJob.errorCorrectionLevel || "M");
-            setExpiryDate(targetPayload.expiresAt || nextJob.expiresAt || "");
+            setExpiryDate(formatExpiryDateForInput(targetPayload.expiresAt || nextJob.expiresAt || ""));
             setAnalysisLoading(true);
             const analysisData = await apiRequest(`/qr/jobs/${singleDraft.editJobId}/analysis`, {
               headers: createAuthHeaders(token),
@@ -451,7 +454,7 @@ export function SingleGenerateScreen() {
           galleryLinkId,
           pdfLinkId,
           managedTitle: getManagedTitleForQrType(qrType, fields),
-          expiresAt: expiryDate,
+          expiresAt: (parseExpiryDate(expiryDate) || addMonths(new Date(), 6)).toISOString(),
           filenamePrefix,
           foregroundColor,
           backgroundColor,
@@ -779,13 +782,13 @@ export function SingleGenerateScreen() {
           label="LAST SCAN DATE / EXPIRY"
           value={expiryDate}
           onChangeText={setExpiryDate}
-          placeholder="MM/DD/YYYY or DD/MM/YYYY"
+          placeholder="DD-MM-YYYY"
         />
         <Text style={{ color: "#64748b", fontSize: 12, lineHeight: 18 }}>
-          Leave blank to default validity to 6 months from creation for app-hosted QR flows.{" "}
+          Leave blank to default validity to 6 months from creation. Use DD-MM-YYYY only.{" "}
           {!supportsExpiry(qrType, generatedContent)
-            ? "Direct QR content types may not honor expiry after scan yet."
-            : "This QR type supports app-hosted expiry handling."}
+            ? "Direct QR content types store the date here, while hosted experiences enforce expiry after scan."
+            : "This QR type enforces expiry through the hosted experience."}
         </Text>
 
         <InputField

@@ -9,6 +9,38 @@ const { createSingleQrDataUrl, normalizeSingleQrPayload } = require("../services
 
 const qrRouter = express.Router();
 
+function parseExpiryDate(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return null;
+
+  if (raw.includes("T")) {
+    const parsed = new Date(raw);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+
+  const dashMatch = raw.match(/^(\d{2})-(\d{2})-(\d{4})$/);
+  if (dashMatch) {
+    const day = Number(dashMatch[1]);
+    const month = Number(dashMatch[2]);
+    const year = Number(dashMatch[3]);
+    const parsed = new Date(Date.UTC(year, month - 1, day, 23, 59, 59, 999));
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+
+  const isoDateMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (isoDateMatch) {
+    const parsed = new Date(`${raw}T23:59:59.999Z`);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+
+  return null;
+}
+
+function toExpiryIso(value) {
+  const parsed = parseExpiryDate(value);
+  return parsed ? parsed.toISOString() : "";
+}
+
 function buildSingleTargetPayload(body, qrType) {
   return {
     qrType,
@@ -20,7 +52,7 @@ function buildSingleTargetPayload(body, qrType) {
       galleryLinkId: body.galleryLinkId || "",
       pdfLinkId: body.pdfLinkId || "",
     },
-    expiresAt: body.expiresAt || "",
+    expiresAt: toExpiryIso(body.expiresAt) || "",
   };
 }
 
@@ -36,7 +68,7 @@ async function upsertSingleJob({
   const payload = normalizeSingleQrPayload(body);
   const qrType = String(body.qrType || "Text").trim() || "Text";
   const managedTitle = body.managedTitle || qrType;
-  const expiresAt = body.expiresAt || null;
+  const expiresAt = toExpiryIso(body.expiresAt) || null;
   const targetPayload = buildSingleTargetPayload(body, qrType);
 
   if (!jobId) {
@@ -148,7 +180,7 @@ async function upsertSingleJob({
     nextTargetPayload = {
       ...existingTargetPayload,
       qrType: lockedQrType,
-      expiresAt: body.expiresAt || existingTargetPayload.expiresAt || "",
+      expiresAt: toExpiryIso(body.expiresAt) || existingTargetPayload.expiresAt || "",
       fields: {
         ...existingTargetPayload.fields,
         feedbackTitle,

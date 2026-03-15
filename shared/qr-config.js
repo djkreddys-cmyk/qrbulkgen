@@ -241,7 +241,7 @@ export const BULK_SAMPLE_ROWS_BY_TYPE = {
   PDF: {
     url: "https://www.qrbulkgen.com/pdf/your-public-id",
     filename: "qr-pdf-1",
-    expiresAt: "2026-04-30T23:59:59Z",
+    expiresAt: "30-04-2026",
   },
   "Social Media": {
     content: "Instagram: https://instagram.com/yourbrand\nTwitter: https://x.com/yourbrand",
@@ -256,7 +256,7 @@ export const BULK_SAMPLE_ROWS_BY_TYPE = {
   "Image Gallery": {
     url: "https://www.qrbulkgen.com/gallery/your-public-id",
     filename: "qr-gallery-1",
-    expiresAt: "2026-04-30T23:59:59Z",
+    expiresAt: "30-04-2026",
   },
   Rating: {
     title: "Rate your experience",

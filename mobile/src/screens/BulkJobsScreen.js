@@ -6,7 +6,7 @@ import * as DocumentPicker from "expo-document-picker";
 import { useAuth } from "../context/AuthContext";
 import { apiRequest, createAuthHeaders } from "../lib/api";
 import { shareDataUrlFile } from "../lib/files";
-import { QR_TYPES } from "../lib/qr";
+import { formatExpiryDateForInput, QR_TYPES } from "../lib/qr";
 
 function Card({ children }) {
   return (
@@ -172,7 +172,7 @@ export function BulkJobsScreen() {
           setCreateForegroundColor(nextJob.foregroundColor || "#000000");
           setCreateBackgroundColor(nextJob.backgroundColor || "#ffffff");
           setCreateFilenamePrefix(nextJob.filenamePrefix || "qr");
-          setExpiryOverride(nextJob.expiresAt || "");
+          setExpiryOverride(formatExpiryDateForInput(nextJob.expiresAt || ""));
           setSelectedJobId(nextJob.id || bulkDraft.editJobId);
           setAnalysisLoading(true);
           const analysisData = await apiRequest(`/qr/jobs/${bulkDraft.editJobId}/analysis`, {
@@ -397,7 +397,7 @@ export function BulkJobsScreen() {
           <TextInput
             value={expiryOverride}
             onChangeText={setExpiryOverride}
-            placeholder="MM/DD/YYYY or DD/MM/YYYY"
+            placeholder="DD-MM-YYYY"
             style={{
               borderWidth: 1,
               borderColor: "#cbd5e1",

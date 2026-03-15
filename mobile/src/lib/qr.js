@@ -1,12 +1,13 @@
 import {
   INITIAL_QR_FIELDS,
+  QR_FIELD_DEFINITIONS,
   QR_PLACEHOLDERS,
   QR_TYPES,
   SOCIAL_PLATFORM_OPTIONS,
   validateQrFields,
 } from "../../../shared/qr-config";
 
-export { INITIAL_QR_FIELDS, QR_TYPES, SOCIAL_PLATFORM_OPTIONS };
+export { INITIAL_QR_FIELDS, QR_FIELD_DEFINITIONS, QR_TYPES, SOCIAL_PLATFORM_OPTIONS };
 
 export function getQrPlaceholder(qrType) {
   return QR_PLACEHOLDERS[qrType] || "Enter QR content";
@@ -22,7 +23,7 @@ export function addMonths(date, months) {
   return copy;
 }
 
-export function parseFlexibleExpiry(value) {
+export function parseExpiryDate(value) {
   const raw = String(value || "").trim();
   if (!raw) return null;
 
@@ -31,26 +32,11 @@ export function parseFlexibleExpiry(value) {
     return Number.isNaN(parsed.getTime()) ? null : parsed;
   }
 
-  const slashMatch = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-  if (slashMatch) {
-    const first = Number(slashMatch[1]);
-    const second = Number(slashMatch[2]);
-    const year = Number(slashMatch[3]);
-
-    let month;
-    let day;
-
-    if (first > 12 && second <= 12) {
-      day = first;
-      month = second;
-    } else if (second > 12 && first <= 12) {
-      month = first;
-      day = second;
-    } else {
-      month = first;
-      day = second;
-    }
-
+  const dashMatch = raw.match(/^(\d{2})-(\d{2})-(\d{4})$/);
+  if (dashMatch) {
+    const day = Number(dashMatch[1]);
+    const month = Number(dashMatch[2]);
+    const year = Number(dashMatch[3]);
     const parsed = new Date(Date.UTC(year, month - 1, day, 23, 59, 59, 999));
     return Number.isNaN(parsed.getTime()) ? null : parsed;
   }
@@ -61,8 +47,16 @@ export function parseFlexibleExpiry(value) {
     return Number.isNaN(parsed.getTime()) ? null : parsed;
   }
 
-  const fallback = new Date(raw);
-  return Number.isNaN(fallback.getTime()) ? null : fallback;
+  return null;
+}
+
+export function formatExpiryDateForInput(value) {
+  const parsed = parseExpiryDate(value);
+  if (!parsed) return "";
+  const day = String(parsed.getUTCDate()).padStart(2, "0");
+  const month = String(parsed.getUTCMonth() + 1).padStart(2, "0");
+  const year = parsed.getUTCFullYear();
+  return `${day}-${month}-${year}`;
 }
 
 function toUtcDateTime(value) {

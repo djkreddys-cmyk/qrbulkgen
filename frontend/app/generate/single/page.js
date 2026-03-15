@@ -7,6 +7,7 @@ import { apiRequest } from "../../../lib/api"
 import { getAuthToken } from "../../../lib/auth"
 import {
   DOWNLOAD_RESOLUTIONS,
+  QR_FIELD_DEFINITIONS,
   QR_TYPES,
   SOCIAL_PLATFORM_OPTIONS,
   validateQrFields,
@@ -55,7 +56,7 @@ function addMonths(date, months) {
   return copy
 }
 
-function parseFlexibleExpiry(value) {
+function parseExpiryDate(value) {
   const raw = String(value || "").trim()
   if (!raw) return null
 
@@ -64,42 +65,35 @@ function parseFlexibleExpiry(value) {
     return Number.isNaN(parsed.getTime()) ? null : parsed
   }
 
-  const slashMatch = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/)
-  if (slashMatch) {
-    const first = Number(slashMatch[1])
-    const second = Number(slashMatch[2])
-    const year = Number(slashMatch[3])
-
-    let month
-    let day
-
-    if (first > 12 && second <= 12) {
-      day = first
-      month = second
-    } else if (second > 12 && first <= 12) {
-      month = first
-      day = second
-    } else {
-      month = first
-      day = second
-    }
-
+  const dashMatch = raw.match(/^(\d{2})-(\d{2})-(\d{4})$/)
+  if (dashMatch) {
+    const day = Number(dashMatch[1])
+    const month = Number(dashMatch[2])
+    const year = Number(dashMatch[3])
     const parsed = new Date(Date.UTC(year, month - 1, day, 23, 59, 59, 999))
     return Number.isNaN(parsed.getTime()) ? null : parsed
   }
 
-  const dashMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/)
-  if (dashMatch) {
+  const isoDateMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  if (isoDateMatch) {
     const parsed = new Date(`${raw}T23:59:59.999Z`)
     return Number.isNaN(parsed.getTime()) ? null : parsed
   }
 
-  const fallback = new Date(raw)
-  return Number.isNaN(fallback.getTime()) ? null : fallback
+  return null
+}
+
+function formatExpiryDateForInput(value) {
+  const parsed = parseExpiryDate(value)
+  if (!parsed) return ""
+  const day = String(parsed.getUTCDate()).padStart(2, "0")
+  const month = String(parsed.getUTCMonth() + 1).padStart(2, "0")
+  const year = parsed.getUTCFullYear()
+  return `${day}-${month}-${year}`
 }
 
 function toExpiryQueryValue(value) {
-  const parsed = parseFlexibleExpiry(value)
+  const parsed = parseExpiryDate(value)
   return parsed ? parsed.toISOString() : ""
 }
 
@@ -384,7 +378,7 @@ export function SingleGenerateContent({ embedded = false }) {
         setBackgroundColor(job.backgroundColor || "#ffffff")
         setErrorCorrectionLevel(job.errorCorrectionLevel || "M")
         setFilenamePrefix(job.filenamePrefix || "qr")
-        setExpiryDate(targetPayload.expiresAt || job.expiresAt || "")
+        setExpiryDate(formatExpiryDateForInput(targetPayload.expiresAt || job.expiresAt || ""))
         setEditMessage("Loaded settings from selected QR job. Update and save a fresh version anytime.")
         setAnalysisLoading(true)
         const analysisData = await apiRequest(`/qr/jobs/${editJob}/analysis`, {
@@ -425,13 +419,13 @@ export function SingleGenerateContent({ embedded = false }) {
   }
 
   function renderLockedContentSummary() {
-    const entries = Object.entries(fields)
-      .filter(([key, value]) => {
-        if (key === "feedbackQuestions") return false
+    const entries = (QR_FIELD_DEFINITIONS[qrType] || [])
+      .filter((field) => field.key !== "feedbackQuestions" && field.key !== "socialLinks")
+      .map((field) => [field.label, fields[field.key]])
+      .filter(([, value]) => {
         if (typeof value === "boolean") return value
         return String(value || "").trim()
       })
-      .slice(0, 6)
 
     return (
       <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
@@ -439,9 +433,9 @@ export function SingleGenerateContent({ embedded = false }) {
         <p className="mt-1 text-sm text-slate-500">You can update expiry, styling, and save a fresh QR version. QR type and core content stay unchanged.</p>
         {!!entries.length && (
           <div className="mt-3 grid gap-2 text-sm text-slate-600">
-            {entries.map(([key, value]) => (
-              <div key={key} className="grid grid-cols-[140px,1fr] gap-3">
-                <span className="font-semibold capitalize text-slate-500">{key}</span>
+            {entries.map(([label, value]) => (
+              <div key={label} className="grid grid-cols-[140px,1fr] gap-3">
+                <span className="font-semibold text-slate-500">{label}</span>
                 <span className="break-all">{String(value)}</span>
               </div>
             ))}
@@ -904,13 +898,11 @@ export function SingleGenerateContent({ embedded = false }) {
                 type="text"
                 value={expiryDate}
                 onChange={(e) => setExpiryDate(e.target.value)}
-                placeholder="MM/DD/YYYY or DD/MM/YYYY"
+                placeholder="DD-MM-YYYY"
                 className="w-full border p-2"
               />
               <p className="mt-1 text-xs text-slate-500">
-                Leave blank to default validity to 6 months from creation for app-hosted QR flows. Direct QR
-                content types can store the date here now, but strict expiry warnings are currently enforced on
-                app-hosted destinations like Rating, Feedback, PDF, and Image Gallery.
+                Leave this blank to default validity to 6 months from creation. Use DD-MM-YYYY only. The QR stays valid until the end of the selected day.
               </p>
             </div>
 

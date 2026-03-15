@@ -57,6 +57,17 @@ export function BulkGenerateContent({ embedded = false }) {
   const [analysisLoading, setAnalysisLoading] = useState(false)
   const [expiryOverride, setExpiryOverride] = useState("")
 
+  function formatExpiryDateForInput(value) {
+    const raw = String(value || "").trim()
+    if (!raw) return ""
+    const parsed = new Date(raw)
+    if (Number.isNaN(parsed.getTime())) return raw
+    const day = String(parsed.getUTCDate()).padStart(2, "0")
+    const month = String(parsed.getUTCMonth() + 1).padStart(2, "0")
+    const year = parsed.getUTCFullYear()
+    return `${day}-${month}-${year}`
+  }
+
   useEffect(() => {
     setPreviewContent(previewFromSampleType(qrType))
     if (!editingJobId) {
@@ -88,7 +99,7 @@ export function BulkGenerateContent({ embedded = false }) {
         setFilenamePrefix(job.filenamePrefix || "qr")
         setForegroundColor(job.foregroundColor || "#000000")
         setBackgroundColor(job.backgroundColor || "#ffffff")
-        setExpiryOverride(job.expiresAt || "")
+        setExpiryOverride(formatExpiryDateForInput(job.expiresAt || ""))
         setSuccess("Loaded this bulk job for update. Change the settings and save a fresh run.")
         setAnalysisLoading(true)
         const analysisData = await apiRequest(`/qr/jobs/${editJob}/analysis`, {
@@ -368,7 +379,7 @@ export function BulkGenerateContent({ embedded = false }) {
                       ))}
                     </div>
                     <p className="text-xs text-gray-700 mt-2">
-                      Use <code>MM/DD/YYYY</code>, <code>DD/MM/YYYY</code>, or ISO format. If time is not given, the QR stays valid until the end of that day.
+                      Use <code>DD-MM-YYYY</code>. If you leave it blank, the QR defaults to 6 months from creation and stays valid until the end of the selected day.
                       If left blank, validity defaults to 6 months from creation.
                     </p>
                   </>
@@ -390,7 +401,7 @@ export function BulkGenerateContent({ embedded = false }) {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
                 <label className="block mb-1 text-sm">Last Scan Date / Expiry Override</label>
-                <input value={expiryOverride} onChange={(e) => setExpiryOverride(e.target.value)} placeholder="MM/DD/YYYY or DD/MM/YYYY" className="w-full border p-2" />
+                <input value={expiryOverride} onChange={(e) => setExpiryOverride(e.target.value)} placeholder="DD-MM-YYYY" className="w-full border p-2" />
               </div>
               <div>
                 <label className="block mb-1 text-sm">Error Correction</label>
