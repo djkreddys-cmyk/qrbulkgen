@@ -7,37 +7,36 @@ import { apiRequest } from "../../../lib/api"
 import { getAuthToken } from "../../../lib/auth"
 
 const QR_TYPES = [
-  "URL",
-  "Text",
-  "Email",
-  "Phone",
-  "SMS",
-  "WhatsApp",
-  "vCard",
-  "Location",
-  "Youtube",
-  "WIFI",
-  "Event",
-  "Bitcoin",
-  "PDF",
-  "Social Media",
   "App Store",
-  "Image Gallery",
+  "Email",
+  "Event",
   "Rating",
   "Feedback",
+  "Image Gallery",
+  "Location",
+  "PDF",
+  "Phone",
+  "SMS",
+  "Social Media",
+  "Text",
+  "URL",
+  "vCard",
+  "WhatsApp",
+  "WIFI",
+  "Youtube",
 ]
 
 const SOCIAL_PLATFORM_OPTIONS = [
-  "Instagram",
-  "Facebook",
-  "Twitter",
-  "LinkedIn",
-  "YouTube",
-  "WhatsApp",
-  "Telegram",
-  "Snapchat",
-  "Pinterest",
   "Custom",
+  "Facebook",
+  "Instagram",
+  "LinkedIn",
+  "Pinterest",
+  "Snapchat",
+  "Telegram",
+  "Twitter",
+  "WhatsApp",
+  "YouTube",
 ]
 
 const DOWNLOAD_RESOLUTIONS = [512, 768, 1024, 1536, 2048]
@@ -185,17 +184,6 @@ function buildQrContent(type, fields, appOrigin, ids, socialLinks, expiryDate) {
         "END:VEVENT",
         "END:VCALENDAR",
       ].join("\n")
-    case "Bitcoin":
-      {
-        const amount = fields.bitcoinAmount ? `?amount=${fields.bitcoinAmount}` : ""
-        const label = fields.bitcoinLabel
-          ? `${amount ? "&" : "?"}label=${encodeURIComponent(fields.bitcoinLabel)}`
-          : ""
-        const message = fields.bitcoinMessage
-          ? `${amount || label ? "&" : "?"}message=${encodeURIComponent(fields.bitcoinMessage)}`
-          : ""
-        return `bitcoin:${fields.bitcoinAddress.trim()}${amount}${label}${message}`
-      }
     case "PDF":
       return ids.pdfLinkId ? `${appOrigin}/pdf/${ids.pdfLinkId}${expiryParam ? `?${expiryParam}` : ""}` : fields.pdfUrl.trim()
     case "Social Media":
@@ -241,7 +229,6 @@ function hasRequiredFields(type, fields, ids, modes, socialLinks) {
     Youtube: fields.youtubeUrl.trim(),
     WIFI: fields.wifiSsid.trim(),
     Event: fields.eventTitle.trim(),
-    Bitcoin: fields.bitcoinAddress.trim(),
     "App Store": fields.appStoreUrl.trim(),
     vCard: fields.firstName.trim(),
   }
@@ -525,9 +512,20 @@ export function SingleGenerateContent({ embedded = false }) {
 
             {qrType === "URL" && <input className="w-full border p-2" placeholder="https://example.com" value={fields.url} onChange={(e) => setField("url", e.target.value)} />}
             {qrType === "Text" && <textarea className="w-full border p-2" rows={4} placeholder="Enter text" value={fields.text} onChange={(e) => setField("text", e.target.value)} />}
-            {qrType === "Email" && <input className="w-full border p-2" placeholder="Email" value={fields.email} onChange={(e) => setField("email", e.target.value)} />}
+            {qrType === "Email" && (
+              <div className="space-y-2">
+                <input className="w-full border p-2" placeholder="Email" value={fields.email} onChange={(e) => setField("email", e.target.value)} />
+                <input className="w-full border p-2" placeholder="Subject (optional)" value={fields.subject} onChange={(e) => setField("subject", e.target.value)} />
+                <textarea className="w-full border p-2" rows={3} placeholder="Body (optional)" value={fields.body} onChange={(e) => setField("body", e.target.value)} />
+              </div>
+            )}
             {qrType === "Phone" && <input className="w-full border p-2" placeholder="Phone" value={fields.phone} onChange={(e) => setField("phone", e.target.value)} />}
-            {qrType === "SMS" && <input className="w-full border p-2" placeholder="SMS Phone" value={fields.smsPhone} onChange={(e) => setField("smsPhone", e.target.value)} />}
+            {qrType === "SMS" && (
+              <div className="space-y-2">
+                <input className="w-full border p-2" placeholder="SMS Phone" value={fields.smsPhone} onChange={(e) => setField("smsPhone", e.target.value)} />
+                <textarea className="w-full border p-2" rows={3} placeholder="SMS Message" value={fields.smsMessage} onChange={(e) => setField("smsMessage", e.target.value)} />
+              </div>
+            )}
             {qrType === "WhatsApp" && (
               <div className="space-y-2">
                 <input className="w-full border p-2" placeholder="WhatsApp Number" value={fields.whatsappPhone} onChange={(e) => setField("whatsappPhone", e.target.value)} />
@@ -585,15 +583,6 @@ export function SingleGenerateContent({ embedded = false }) {
                 <textarea className="w-full border p-2" rows={3} placeholder="Description" value={fields.eventDescription} onChange={(e) => setField("eventDescription", e.target.value)} />
               </div>
             )}
-            {qrType === "Bitcoin" && (
-              <div className="space-y-2">
-                <input className="w-full border p-2" placeholder="Bitcoin wallet address" value={fields.bitcoinAddress} onChange={(e) => setField("bitcoinAddress", e.target.value)} />
-                <input className="w-full border p-2" placeholder="Amount (optional)" value={fields.bitcoinAmount} onChange={(e) => setField("bitcoinAmount", e.target.value)} />
-                <input className="w-full border p-2" placeholder="Label (optional)" value={fields.bitcoinLabel} onChange={(e) => setField("bitcoinLabel", e.target.value)} />
-                <input className="w-full border p-2" placeholder="Message (optional)" value={fields.bitcoinMessage} onChange={(e) => setField("bitcoinMessage", e.target.value)} />
-              </div>
-            )}
-
             {qrType === "Social Media" && (
               <div className="space-y-3 border p-3 rounded">
                 {socialLinks.map((item, index) => (

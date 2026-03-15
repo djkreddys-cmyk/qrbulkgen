@@ -1,35 +1,34 @@
 export const QR_TYPES = [
-  "URL",
-  "Text",
-  "Email",
-  "Phone",
-  "SMS",
-  "WhatsApp",
-  "vCard",
-  "Location",
-  "Youtube",
-  "WIFI",
-  "Event",
-  "Bitcoin",
-  "PDF",
-  "Social Media",
   "App Store",
-  "Image Gallery",
+  "Email",
+  "Event",
   "Rating",
   "Feedback",
+  "Image Gallery",
+  "Location",
+  "PDF",
+  "Phone",
+  "SMS",
+  "Social Media",
+  "Text",
+  "URL",
+  "vCard",
+  "WhatsApp",
+  "WIFI",
+  "Youtube",
 ];
 
 export const SOCIAL_PLATFORM_OPTIONS = [
-  "Instagram",
-  "Facebook",
-  "Twitter",
-  "LinkedIn",
-  "YouTube",
-  "WhatsApp",
-  "Telegram",
-  "Snapchat",
-  "Pinterest",
   "Custom",
+  "Facebook",
+  "Instagram",
+  "LinkedIn",
+  "Pinterest",
+  "Snapchat",
+  "Telegram",
+  "Twitter",
+  "WhatsApp",
+  "YouTube",
 ];
 
 export const QR_PLACEHOLDERS = {
@@ -44,7 +43,6 @@ export const QR_PLACEHOLDERS = {
   Youtube: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
   WIFI: "OfficeWiFi",
   Event: "Launch Event",
-  Bitcoin: "1BoatSLRHtKNngkdXEeobR76b53LETtpyT",
   PDF: "https://www.qrbulkgen.com/sample.pdf",
   "Social Media": "https://www.instagram.com/yourbrand",
   "App Store": "https://apps.apple.com/app/id123456789",
@@ -84,10 +82,6 @@ export const INITIAL_QR_FIELDS = {
   eventEnd: "",
   eventLocation: "",
   eventDescription: "",
-  bitcoinAddress: "",
-  bitcoinAmount: "",
-  bitcoinLabel: "",
-  bitcoinMessage: "",
   pdfUrl: "",
   appStoreUrl: "",
   galleryUrl: "",
@@ -305,7 +299,6 @@ export function hasRequiredFields(qrType, fields, ids = {}, modes = {}, socialLi
     Youtube: fields.youtubeUrl,
     WIFI: fields.wifiSsid,
     Event: fields.eventTitle,
-    Bitcoin: fields.bitcoinAddress,
     "App Store": fields.appStoreUrl,
     vCard: fields.firstName,
   };
@@ -374,16 +367,6 @@ export function buildQrContent(qrType, fields, options = {}) {
         "END:VEVENT",
         "END:VCALENDAR",
       ].join("\n");
-    case "Bitcoin": {
-      const amount = fields.bitcoinAmount ? `?amount=${fields.bitcoinAmount}` : "";
-      const label = fields.bitcoinLabel
-        ? `${amount ? "&" : "?"}label=${encodeURIComponent(fields.bitcoinLabel)}`
-        : "";
-      const message = fields.bitcoinMessage
-        ? `${amount || label ? "&" : "?"}message=${encodeURIComponent(fields.bitcoinMessage)}`
-        : "";
-      return `bitcoin:${String(fields.bitcoinAddress || "").trim()}${amount}${label}${message}`;
-    }
     case "PDF":
       return ids.pdfLinkId
         ? `${appOrigin}/pdf/${ids.pdfLinkId}${expirySuffix ? `?${expirySuffix}` : ""}`

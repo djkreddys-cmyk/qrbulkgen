@@ -470,16 +470,6 @@ export function SingleGenerateScreen() {
         </>
       );
     }
-    if (qrType === "Bitcoin") {
-      return (
-        <>
-          <InputField label="Wallet Address" value={fields.bitcoinAddress} onChangeText={(value) => setField("bitcoinAddress", value)} placeholder="1BoatSLR..." />
-          <InputField label="Amount (optional)" value={fields.bitcoinAmount} onChangeText={(value) => setField("bitcoinAmount", value)} placeholder="0.001" keyboardType="decimal-pad" />
-          <InputField label="Label (optional)" value={fields.bitcoinLabel} onChangeText={(value) => setField("bitcoinLabel", value)} placeholder="Invoice 1001" />
-          <InputField label="Message (optional)" value={fields.bitcoinMessage} onChangeText={(value) => setField("bitcoinMessage", value)} placeholder="Payment note" />
-        </>
-      );
-    }
     if (qrType === "PDF") {
       return (
         <View style={{ gap: 10 }}>
