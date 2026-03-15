@@ -44,7 +44,7 @@ function StatPill({ label, value, tone }) {
 }
 
 export function BulkJobsScreen() {
-  const { token } = useAuth();
+  const { token, bulkDraft, setBulkDraft } = useAuth();
   const [jobs, setJobs] = useState([]);
   const [createQrType, setCreateQrType] = useState("URL");
   const [createErrorCorrectionLevel, setCreateErrorCorrectionLevel] = useState("M");
@@ -57,6 +57,9 @@ export function BulkJobsScreen() {
   const [selectedJobId, setSelectedJobId] = useState("");
   const [selectedJob, setSelectedJob] = useState(null);
   const [items, setItems] = useState([]);
+  const [editingJobId, setEditingJobId] = useState("");
+  const [jobAnalysis, setJobAnalysis] = useState(null);
+  const [analysisLoading, setAnalysisLoading] = useState(false);
   const [busy, setBusy] = useState(true);
   const [detailBusy, setDetailBusy] = useState(false);
   const [error, setError] = useState("");
@@ -152,6 +155,41 @@ export function BulkJobsScreen() {
 
   const recentFailures = useMemo(() => items.filter((item) => item.status === "failed").slice(0, 5), [items]);
 
+  useEffect(() => {
+    if (!bulkDraft?.editJobId) return;
+
+    async function loadEditDraft() {
+      try {
+        const payloadData = await apiRequest(`/qr/jobs/${bulkDraft.editJobId}/edit-payload`, {
+          headers: createAuthHeaders(token),
+        });
+        const nextJob = payloadData?.job;
+        if (nextJob?.jobType === "bulk") {
+          setEditingJobId(nextJob.id || bulkDraft.editJobId);
+          setCreateQrType(nextJob.qrType || "URL");
+          setCreateErrorCorrectionLevel(nextJob.errorCorrectionLevel || "M");
+          setCreateForegroundColor(nextJob.foregroundColor || "#000000");
+          setCreateBackgroundColor(nextJob.backgroundColor || "#ffffff");
+          setCreateFilenamePrefix(nextJob.filenamePrefix || "qr");
+          setSelectedJobId(nextJob.id || bulkDraft.editJobId);
+          setAnalysisLoading(true);
+          const analysisData = await apiRequest(`/qr/jobs/${bulkDraft.editJobId}/analysis`, {
+            headers: createAuthHeaders(token),
+          });
+          setJobAnalysis(analysisData.analysis || null);
+          setShareMessage("Loaded this bulk job for update. Change the settings and save a fresh run.");
+        }
+      } catch (requestError) {
+        setError(requestError.message || "Failed to load bulk job for editing");
+      } finally {
+        setAnalysisLoading(false);
+        setBulkDraft(null);
+      }
+    }
+
+    loadEditDraft();
+  }, [bulkDraft, setBulkDraft, token]);
+
   async function handlePickCsv() {
     const result = await DocumentPicker.getDocumentAsync({
       type: ["text/csv", "text/comma-separated-values", "application/csv", "application/vnd.ms-excel", "*/*"],
@@ -209,13 +247,13 @@ export function BulkJobsScreen() {
       formData.append("foregroundColor", createForegroundColor);
       formData.append("backgroundColor", createBackgroundColor);
 
-      const data = await apiRequest("/qr/bulk/upload", {
-        method: "POST",
+      const data = await apiRequest(editingJobId ? `/qr/jobs/${editingJobId}/bulk` : "/qr/bulk/upload", {
+        method: editingJobId ? "PUT" : "POST",
         headers: createAuthHeaders(token),
         body: formData,
       });
 
-      setShareMessage(`Bulk job queued: ${data?.job?.id || "created"}`);
+      setShareMessage(editingJobId ? `Bulk job updated: ${data?.job?.id || editingJobId}` : `Bulk job queued: ${data?.job?.id || "created"}`);
       setSelectedFile(null);
       setCreateFilenamePrefix("qr");
       await new Promise((resolve) => setTimeout(resolve, 200));
@@ -229,8 +267,14 @@ export function BulkJobsScreen() {
       } else if (nextJobs[0]?.id) {
         setSelectedJobId(nextJobs[0].id);
       }
+      if (editingJobId) {
+        const analysisData = await apiRequest(`/qr/jobs/${editingJobId}/analysis`, {
+          headers: createAuthHeaders(token),
+        });
+        setJobAnalysis(analysisData.analysis || null);
+      }
     } catch (requestError) {
-      setError(requestError.message || "Failed to create bulk job");
+      setError(requestError.message || `Failed to ${editingJobId ? "update" : "create"} bulk job`);
     } finally {
       setCreatingJob(false);
     }
@@ -274,7 +318,7 @@ export function BulkJobsScreen() {
       )}
 
       <Card>
-        <Text style={{ fontSize: 20, fontWeight: "700", color: "#0f172a" }}>Create Bulk Job</Text>
+        <Text style={{ fontSize: 20, fontWeight: "700", color: "#0f172a" }}>{editingJobId ? "Update Bulk Job" : "Create Bulk Job"}</Text>
         <Text style={{ color: "#64748b" }}>
           Use the same QR type list as web. Your CSV should follow the matching sample columns from the
           web bulk page.
@@ -405,7 +449,7 @@ export function BulkJobsScreen() {
           }}
         >
           <Text style={{ color: "#ffffff", textAlign: "center", fontWeight: "700" }}>
-            {creatingJob ? "Queuing..." : "Queue Bulk Job"}
+            {creatingJob ? (editingJobId ? "Updating..." : "Queuing...") : (editingJobId ? "Update Bulk Job" : "Queue Bulk Job")}
           </Text>
         </TouchableOpacity>
       </Card>
@@ -527,6 +571,26 @@ export function BulkJobsScreen() {
           <Text style={{ color: "#64748b" }}>Select a job to view details.</Text>
         )}
       </Card>
+
+      {analysisLoading ? (
+        <Card>
+          <Text style={{ color: "#64748b" }}>Loading analysis...</Text>
+        </Card>
+      ) : jobAnalysis ? (
+        <Card>
+          <Text style={{ fontSize: 20, fontWeight: "700", color: "#0f172a" }}>Analysis for this QR job</Text>
+          <Text style={{ color: "#64748b" }}>{jobAnalysis.insight}</Text>
+          <View style={{ flexDirection: "row", gap: 10 }}>
+            <StatPill label="Requested" value={jobAnalysis.job?.totalCount || 0} />
+            <StatPill label="Success" value={jobAnalysis.job?.successCount || 0} tone="#047857" />
+            <StatPill label="Failure" value={jobAnalysis.job?.failureCount || 0} tone="#b91c1c" />
+          </View>
+          <View style={{ flexDirection: "row", gap: 10 }}>
+            <StatPill label="Scans" value={jobAnalysis.engagement?.totalScans || 0} />
+            <StatPill label="Submissions" value={jobAnalysis.engagement?.totalSubmissions || 0} tone="#047857" />
+          </View>
+        </Card>
+      ) : null}
     </ScrollView>
   );
 }

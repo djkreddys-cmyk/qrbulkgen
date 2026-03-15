@@ -219,7 +219,7 @@ function getJobTitle(job) {
 }
 
 export function DashboardScreen() {
-  const { token } = useAuth();
+  const { token, navigate, setSingleDraft, setBulkDraft } = useAuth();
   const [filters, setFilters] = useState({ startDate: "", endDate: "", qrType: "all", status: "active" });
   const [jobs, setJobs] = useState([]);
   const [expandedJobId, setExpandedJobId] = useState("");
@@ -380,6 +380,17 @@ export function DashboardScreen() {
       return true;
     });
   }, [filters.qrType, filters.status, jobs]);
+
+  function handleEditJob(job) {
+    if (job.jobType === "single") {
+      setSingleDraft({ editJobId: job.id });
+      navigate("single-generate");
+      return;
+    }
+
+    setBulkDraft({ editJobId: job.id });
+    navigate("bulk-jobs");
+  }
 
   return (
     <ScrollView contentContainerStyle={{ gap: 16, paddingBottom: 36 }}>
@@ -585,6 +596,22 @@ export function DashboardScreen() {
                   </View>
 
                   <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10, paddingTop: 2 }}>
+                    <TouchableOpacity
+                      onPress={() => handleEditJob(job)}
+                      style={{
+                        alignSelf: "flex-start",
+                        borderWidth: 1,
+                        borderColor: "#cbd5e1",
+                        borderRadius: 999,
+                        paddingHorizontal: 12,
+                        paddingVertical: 8,
+                        backgroundColor: "#ffffff",
+                      }}
+                    >
+                      <Text style={{ color: "#0f172a", fontWeight: "700" }}>
+                        {job.jobType === "single" ? "Edit QR" : "Edit Bulk"}
+                      </Text>
+                    </TouchableOpacity>
                     <TouchableOpacity
                       onPress={() => handleToggleAnalysis(job.id)}
                       style={{

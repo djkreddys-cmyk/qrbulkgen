@@ -218,6 +218,83 @@ function hasRequiredFields(type, fields, ids, modes, socialLinks) {
   })
 }
 
+function AnalysisPanel({ analysis }) {
+  if (!analysis) return null
+
+  const totalCount = analysis.job?.totalCount || 0
+  const successCount = analysis.job?.successCount || 0
+  const failureCount = analysis.job?.failureCount || 0
+  const scanTrend = Array.isArray(analysis.scanTrend) ? analysis.scanTrend : []
+  const maxScanCount = Math.max(...scanTrend.map((point) => point.count || 0), 1)
+
+  return (
+    <section className="mt-8 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Analysis for this QR job</p>
+      <div className="mt-4 rounded-2xl border border-sky-200 bg-sky-50 p-4">
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-700">Quick Insight</p>
+        <p className="mt-2 text-sm font-medium text-slate-800">{analysis.insight}</p>
+      </div>
+
+      <div className="mt-5 grid gap-4 lg:grid-cols-2">
+        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+          <p className="font-semibold text-slate-900">Generation Report</p>
+          <div className="mt-4 grid gap-3 sm:grid-cols-3">
+            <div className="rounded-2xl border border-slate-200 bg-white p-4">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Requested</p>
+              <p className="mt-2 text-2xl font-semibold text-slate-900">{totalCount}</p>
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-white p-4">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Success</p>
+              <p className="mt-2 text-2xl font-semibold text-emerald-600">{successCount}</p>
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-white p-4">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Failure</p>
+              <p className="mt-2 text-2xl font-semibold text-rose-600">{failureCount}</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+          <p className="font-semibold text-slate-900">Usage Report</p>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <div className="rounded-2xl border border-slate-200 bg-white p-4">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Scans</p>
+              <p className="mt-2 text-2xl font-semibold text-slate-900">{analysis.engagement?.totalScans || 0}</p>
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-white p-4">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Submissions</p>
+              <p className="mt-2 text-2xl font-semibold text-emerald-600">{analysis.engagement?.totalSubmissions || 0}</p>
+            </div>
+          </div>
+          <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-4">
+            <p className="text-sm font-semibold text-slate-900">Scan Trend</p>
+            {scanTrend.length ? (
+              <div className="mt-3 space-y-2">
+                <div className="flex h-14 items-end gap-2">
+                  {scanTrend.map((point) => (
+                    <div key={point.label} className="flex-1">
+                      <div
+                        className="w-full rounded-full bg-sky-500"
+                        style={{ height: `${Math.max(((point.count || 0) / maxScanCount) * 56, point.count ? 8 : 4)}px` }}
+                      />
+                    </div>
+                  ))}
+                </div>
+                <div className="flex items-center justify-between text-[11px] text-slate-400">
+                  <span>{scanTrend[0]?.label || ""}</span>
+                  <span>{scanTrend[scanTrend.length - 1]?.label || ""}</span>
+                </div>
+              </div>
+            ) : (
+              <p className="mt-2 text-sm text-slate-500">No scan activity yet.</p>
+            )}
+          </div>
+        </div>
+      </div>
+    </section>
+  )
+}
+
 export function SingleGenerateContent({ embedded = false }) {
   const previewRef = useRef(null)
   const qrCodeRef = useRef(null)
@@ -249,6 +326,9 @@ export function SingleGenerateContent({ embedded = false }) {
     { platform: "Instagram", customPlatform: "", url: "" },
   ])
   const [editMessage, setEditMessage] = useState("")
+  const [editingJobId, setEditingJobId] = useState("")
+  const [analysis, setAnalysis] = useState(null)
+  const [analysisLoading, setAnalysisLoading] = useState(false)
 
   const [fields, setFields] = useState({
     url: "", text: "", email: "", subject: "", body: "", phone: "", smsPhone: "", smsMessage: "",
@@ -280,16 +360,39 @@ export function SingleGenerateContent({ embedded = false }) {
         })
         const job = data?.job
         if (!job || job.jobType !== "single") return
-        const nextType = /^https?:\/\//i.test(job.content || "") ? "URL" : "Text"
+        const targetPayload = job.targetPayload || {}
+        const nextType = targetPayload.qrType || job.qrType || "Text"
+        setEditingJobId(job.id)
         setQrType(nextType)
-        setField(nextType === "URL" ? "url" : "text", job.content || "")
+        setFields((prev) => ({
+          ...prev,
+          ...prev,
+          ...(targetPayload.fields || {}),
+        }))
+        setSocialLinks(
+          Array.isArray(targetPayload.socialLinks) && targetPayload.socialLinks.length
+            ? targetPayload.socialLinks
+            : [{ platform: "Instagram", customPlatform: "", url: "" }],
+        )
+        setGalleryMode(targetPayload.galleryMode || "url")
+        setPdfMode(targetPayload.pdfMode || "url")
+        setGalleryLinkId(targetPayload.uploadIds?.galleryLinkId || "")
+        setPdfLinkId(targetPayload.uploadIds?.pdfLinkId || "")
         setForegroundColor(job.foregroundColor || "#000000")
         setBackgroundColor(job.backgroundColor || "#ffffff")
         setErrorCorrectionLevel(job.errorCorrectionLevel || "M")
         setFilenamePrefix(job.filenamePrefix || "qr")
-        setEditMessage("Loaded settings from selected QR job. Update and download a fresh version anytime.")
+        setExpiryDate(targetPayload.expiresAt || job.expiresAt || "")
+        setEditMessage("Loaded settings from selected QR job. Update and save a fresh version anytime.")
+        setAnalysisLoading(true)
+        const analysisData = await apiRequest(`/qr/jobs/${editJob}/analysis`, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+        setAnalysis(analysisData.analysis || null)
       } catch {
         setEditMessage("Unable to load that QR for editing.")
+      } finally {
+        setAnalysisLoading(false)
       }
     }
 
@@ -476,14 +579,22 @@ export function SingleGenerateContent({ embedded = false }) {
         return
       }
 
-      const data = await apiRequest("/qr/single", {
-        method: "POST",
+      const requestPath = editingJobId ? `/qr/jobs/${editingJobId}/single` : "/qr/single"
+      const requestMethod = editingJobId ? "PUT" : "POST"
+      const data = await apiRequest(requestPath, {
+        method: requestMethod,
         headers: {
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
           content: generatedContent,
           qrType,
+          fields,
+          socialLinks,
+          galleryMode,
+          pdfMode,
+          galleryLinkId,
+          pdfLinkId,
           managedTitle: getManagedTitleForQrType(qrType, fields),
           expiresAt: toExpiryQueryValue(expiryDate) || addMonths(new Date(), 6).toISOString(),
           filenamePrefix,
@@ -505,6 +616,13 @@ export function SingleGenerateContent({ embedded = false }) {
       document.body.appendChild(link)
       link.click()
       document.body.removeChild(link)
+      if (editingJobId) {
+        const analysisData = await apiRequest(`/qr/jobs/${editingJobId}/analysis`, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+        setAnalysis(analysisData.analysis || null)
+        setEditMessage("QR updated successfully. A fresh artifact has been saved for this job.")
+      }
     } catch (downloadError) {
       setUploadError(downloadError.message || "Failed to create QR")
     }
@@ -824,9 +942,11 @@ export function SingleGenerateContent({ embedded = false }) {
                 {DOWNLOAD_RESOLUTIONS.map((res) => <option key={res} value={res}>{res} x {res}</option>)}
               </select>
             </div>
-            {generatedContent && <button type="button" onClick={handleDownload} className="inline-block mt-4 px-4 py-2 bg-black text-white rounded">Download QR</button>}
+            {generatedContent && <button type="button" onClick={handleDownload} className="inline-block mt-4 px-4 py-2 bg-black text-white rounded">{editingJobId ? "Update QR" : "Download QR"}</button>}
           </section>
         </div>
+        {analysisLoading && <p className="mt-6 text-sm text-slate-500">Loading analysis...</p>}
+        {!analysisLoading && analysis && <AnalysisPanel analysis={analysis} />}
       </main>
   )
 

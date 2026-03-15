@@ -295,9 +295,7 @@ export default function Dashboard() {
   function handleEditJob(job) {
     const mode = job.jobType === "bulk" ? "bulk" : "single"
     const params = new URLSearchParams({ mode })
-    if (job.jobType === "single") {
-      params.set("editJob", job.id)
-    }
+    params.set("editJob", job.id)
     router.push(`/generate?${params.toString()}`)
   }
   const qrTypeOptions = useMemo(() => {

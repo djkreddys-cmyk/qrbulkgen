@@ -335,6 +335,137 @@ bulkRouter.post("/bulk/upload", requireAuth, upload.single("file"), async (req, 
   }
 });
 
+bulkRouter.put("/jobs/:id/bulk", requireAuth, upload.single("file"), async (req, res, next) => {
+  try {
+    const jobId = String(req.params.id || "").trim();
+    if (!jobId) {
+      throw createHttpError(400, "VALIDATION_ERROR", "job id is required");
+    }
+
+    const existingResult = await query(
+      `SELECT id, source_file_name, source_file_path
+       FROM qr_jobs
+       WHERE id = $1
+         AND user_id = $2
+         AND job_type = 'bulk'
+       LIMIT 1`,
+      [jobId, req.user.id],
+    );
+
+    const existing = existingResult.rows[0];
+    if (!existing) {
+      throw createHttpError(404, "NOT_FOUND", "Bulk job not found");
+    }
+
+    const options = normalizeBulkOptions(req.body || {});
+    const file = req.file;
+    const csvAbsolutePath = file
+      ? file.path
+      : path.join(uploadsRoot, String(existing.source_file_path || "").replace(/\//g, path.sep));
+
+    if (!fs.existsSync(csvAbsolutePath)) {
+      throw createHttpError(400, "VALIDATION_ERROR", "Bulk source CSV is no longer available for this job");
+    }
+
+    const csvInfo = await inspectCsv(csvAbsolutePath);
+    const csvRows = await parseCsvRows(csvAbsolutePath);
+    const actualHeaders = new Set((csvInfo.headers || []).map((h) => h.toLowerCase()));
+    const required = REQUIRED_HEADERS_BY_TYPE[options.qrType] || ["content"];
+    const missing = required.filter((header) => !actualHeaders.has(header.toLowerCase()));
+    if (missing.length) {
+      throw createHttpError(
+        400,
+        "VALIDATION_ERROR",
+        `CSV missing required column(s) for ${options.qrType}: ${missing.join(", ")}`,
+      );
+    }
+
+    if (csvInfo.rowCount <= 0) {
+      throw createHttpError(400, "VALIDATION_ERROR", "CSV must include at least one data row");
+    }
+
+    await query(`DELETE FROM qr_job_items WHERE job_id = $1`, [jobId]);
+    await query(`DELETE FROM job_artifacts WHERE job_id = $1`, [jobId]);
+
+    const updated = await query(
+      `UPDATE qr_jobs
+       SET status = 'queued',
+           source_file_name = $2,
+           source_file_path = $3,
+           total_count = $4,
+           success_count = 0,
+           failure_count = 0,
+           bulk_qr_type = $5,
+           qr_size = $6,
+           foreground_color = $7,
+           background_color = $8,
+           qr_margin = $9,
+           output_format = $10,
+           error_correction_level = $11,
+           filename_prefix = $12,
+           error_message = NULL,
+           archived_at = NULL,
+           started_at = NULL,
+           completed_at = NULL,
+           updated_at = NOW()
+       WHERE id = $1
+       RETURNING id, status, total_count, bulk_qr_type, created_at, updated_at`,
+      [
+        jobId,
+        file ? file.originalname : existing.source_file_name,
+        path.relative(uploadsRoot, csvAbsolutePath).replace(/\\/g, "/"),
+        csvInfo.rowCount,
+        options.qrType,
+        options.size,
+        options.foregroundColor,
+        options.backgroundColor,
+        options.margin,
+        options.format,
+        options.errorCorrectionLevel,
+        options.filenamePrefix,
+      ],
+    );
+
+    const job = updated.rows[0];
+
+    try {
+      await enqueueBulkQrJob(job.id, { rows: csvRows });
+    } catch (enqueueError) {
+      await query(
+        `UPDATE qr_jobs
+         SET status = 'failed', error_message = $2, updated_at = NOW(), completed_at = NOW()
+         WHERE id = $1`,
+        [job.id, `Failed to enqueue job: ${enqueueError.message}`],
+      );
+      throw createHttpError(500, "QUEUE_ERROR", "Failed to enqueue bulk generation job");
+    }
+
+    await trackEvent({
+      userId: req.user.id,
+      jobId: job.id,
+      eventType: "qr.bulk.updated",
+      eventValue: csvInfo.rowCount,
+      metadata: {
+        qrType: options.qrType,
+        format: options.format,
+      },
+    });
+
+    res.json({
+      job: {
+        id: job.id,
+        status: job.status,
+        qrType: job.bulk_qr_type,
+        totalCount: job.total_count,
+        createdAt: job.created_at,
+        updatedAt: job.updated_at,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 bulkRouter.get("/jobs/summary", requireAuth, async (req, res, next) => {
   try {
     const jobType = String(req.query.jobType || "").trim().toLowerCase();
@@ -485,7 +616,8 @@ bulkRouter.get("/jobs/:id/edit-payload", requireAuth, async (req, res, next) => 
       `SELECT
          j.id, j.job_type, j.bulk_qr_type, j.qr_content, j.qr_size, j.foreground_color, j.background_color,
          j.qr_margin, j.output_format, j.error_correction_level, j.filename_prefix,
-         m.qr_type AS managed_qr_type, m.title AS managed_title, m.expires_at AS managed_expires_at
+         m.qr_type AS managed_qr_type, m.title AS managed_title, m.expires_at AS managed_expires_at,
+         m.target_payload
        FROM qr_jobs j
        LEFT JOIN managed_qr_links m ON m.id = j.managed_link_id
        WHERE j.id = $1 AND j.user_id = $2
@@ -513,6 +645,7 @@ bulkRouter.get("/jobs/:id/edit-payload", requireAuth, async (req, res, next) => 
         filenamePrefix: row.filename_prefix || "qr",
         managedTitle: row.managed_title || getQrTypeLabel(row),
         expiresAt: row.managed_expires_at,
+        targetPayload: row.target_payload || null,
       },
     });
   } catch (error) {

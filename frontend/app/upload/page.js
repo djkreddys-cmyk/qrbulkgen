@@ -52,16 +52,56 @@ export function BulkGenerateContent({ embedded = false }) {
   const [success, setSuccess] = useState("")
   const [recentJobs, setRecentJobs] = useState([])
   const [loadingJobs, setLoadingJobs] = useState(false)
+  const [editingJobId, setEditingJobId] = useState("")
+  const [jobAnalysis, setJobAnalysis] = useState(null)
+  const [analysisLoading, setAnalysisLoading] = useState(false)
 
   useEffect(() => {
     setPreviewContent(previewFromSampleType(qrType))
-    setFile(null)
+    if (!editingJobId) {
+      setFile(null)
+    }
     setError("")
     setSuccess("")
     if (csvInputRef.current) {
       csvInputRef.current.value = ""
     }
   }, [qrType])
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const editJob = params.get("editJob")
+    if (!editJob) return
+
+    async function loadEditPayload() {
+      try {
+        const data = await apiRequest(`/qr/jobs/${editJob}/edit-payload`, {
+          headers: withAuthHeader(),
+        })
+        const job = data?.job
+        if (!job || job.jobType !== "bulk") return
+        setEditingJobId(job.id)
+        setQrType(job.qrType || "URL")
+        setFormat(job.format || "png")
+        setErrorCorrectionLevel(job.errorCorrectionLevel || "M")
+        setFilenamePrefix(job.filenamePrefix || "qr")
+        setForegroundColor(job.foregroundColor || "#000000")
+        setBackgroundColor(job.backgroundColor || "#ffffff")
+        setSuccess("Loaded this bulk job for update. Change the settings and save a fresh run.")
+        setAnalysisLoading(true)
+        const analysisData = await apiRequest(`/qr/jobs/${editJob}/analysis`, {
+          headers: withAuthHeader(),
+        })
+        setJobAnalysis(analysisData.analysis || null)
+      } catch (requestError) {
+        setError(requestError.message || "Unable to load that bulk job for editing.")
+      } finally {
+        setAnalysisLoading(false)
+      }
+    }
+
+    loadEditPayload()
+  }, [])
 
   function getBackendOrigin() {
     const apiBase = String(API_BASE_URL || "").trim()
@@ -216,17 +256,23 @@ export function BulkGenerateContent({ embedded = false }) {
       formData.append("foregroundColor", foregroundColor)
       formData.append("backgroundColor", backgroundColor)
 
-      const data = await apiRequest("/qr/bulk/upload", {
-        method: "POST",
+      const data = await apiRequest(editingJobId ? `/qr/jobs/${editingJobId}/bulk` : "/qr/bulk/upload", {
+        method: editingJobId ? "PUT" : "POST",
         headers: withAuthHeader(),
         body: formData,
       })
 
-      setSuccess(`Bulk job queued: ${data?.job?.id || "created"}`)
+      setSuccess(editingJobId ? `Bulk job updated: ${data?.job?.id || editingJobId}` : `Bulk job queued: ${data?.job?.id || "created"}`)
       setFile(null)
       fetchBulkJobs()
+      if (editingJobId) {
+        const analysisData = await apiRequest(`/qr/jobs/${editingJobId}/analysis`, {
+          headers: withAuthHeader(),
+        })
+        setJobAnalysis(analysisData.analysis || null)
+      }
     } catch (submitError) {
-      setError(submitError.message || "Failed to create bulk job")
+      setError(submitError.message || `Failed to ${editingJobId ? "update" : "create"} bulk job`)
     } finally {
       setIsSubmitting(false)
     }
@@ -261,7 +307,7 @@ export function BulkGenerateContent({ embedded = false }) {
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mt-8">
           <form onSubmit={handleSubmit} className="border rounded-lg p-6 bg-white space-y-4">
-            <h2 className="text-xl font-semibold">Create Bulk Job</h2>
+            <h2 className="text-xl font-semibold">{editingJobId ? "Update Bulk Job" : "Create Bulk Job"}</h2>
 
             <div>
               <label className="block mb-1 text-sm">QR Type</label>
@@ -401,7 +447,7 @@ export function BulkGenerateContent({ embedded = false }) {
             {!!success && <p className="text-sm text-green-700">{success}</p>}
 
             <button type="submit" disabled={isSubmitting} className="px-4 py-2 bg-black text-white rounded disabled:opacity-60">
-              {isSubmitting ? "Queuing..." : "Queue Bulk Job"}
+              {isSubmitting ? (editingJobId ? "Updating..." : "Queuing...") : (editingJobId ? "Update Bulk Job" : "Queue Bulk Job")}
             </button>
           </form>
 
@@ -481,6 +527,30 @@ export function BulkGenerateContent({ embedded = false }) {
             </div>
           )}
         </section>
+        {analysisLoading && <p className="mt-6 text-sm text-slate-500">Loading analysis...</p>}
+        {!analysisLoading && jobAnalysis && (
+          <section className="mt-8 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Analysis for this QR job</p>
+            <div className="mt-4 rounded-2xl border border-sky-200 bg-sky-50 p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-700">Quick Insight</p>
+              <p className="mt-2 text-sm font-medium text-slate-800">{jobAnalysis.insight}</p>
+            </div>
+            <div className="mt-5 grid gap-4 md:grid-cols-3">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Requested</p>
+                <p className="mt-2 text-2xl font-semibold text-slate-900">{jobAnalysis.job?.totalCount || 0}</p>
+              </div>
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Success</p>
+                <p className="mt-2 text-2xl font-semibold text-emerald-600">{jobAnalysis.job?.successCount || 0}</p>
+              </div>
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Failure</p>
+                <p className="mt-2 text-2xl font-semibold text-rose-600">{jobAnalysis.job?.failureCount || 0}</p>
+              </div>
+            </div>
+          </section>
+        )}
       </main>
   )
 

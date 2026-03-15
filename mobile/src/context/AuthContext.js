@@ -15,6 +15,7 @@ export function AuthProvider({ children }) {
   const [isBootstrapping, setIsBootstrapping] = useState(true);
   const [error, setError] = useState("");
   const [singleDraft, setSingleDraft] = useState(null);
+  const [bulkDraft, setBulkDraft] = useState(null);
   const [resetPasswordToken, setResetPasswordToken] = useState("");
   const [resetNotice, setResetNotice] = useState("");
 
@@ -38,6 +39,7 @@ export function AuthProvider({ children }) {
       setScreen("app");
       setActiveRoute("dashboard");
       setSingleDraft(null);
+      setBulkDraft(null);
       } catch {
         await clearStoredSession();
       } finally {
@@ -67,6 +69,7 @@ export function AuthProvider({ children }) {
       setScreen("app");
       setActiveRoute("dashboard");
       setSingleDraft(null);
+      setBulkDraft(null);
       await saveStoredSession({
         token: data.token || "",
         user: data.user || null,
@@ -148,6 +151,7 @@ export function AuthProvider({ children }) {
     setToken("");
     setActiveRoute("dashboard");
     setSingleDraft(null);
+    setBulkDraft(null);
     setResetPasswordToken("");
     setResetNotice("Password reset successful. Please log in.");
     setScreen("login");
@@ -192,6 +196,8 @@ export function AuthProvider({ children }) {
       navigate,
       singleDraft,
       setSingleDraft,
+      bulkDraft,
+      setBulkDraft,
       resetPasswordToken,
       setResetPasswordToken,
       resetNotice,
@@ -208,7 +214,7 @@ export function AuthProvider({ children }) {
       refreshSession,
       logout,
     }),
-    [user, token, screen, activeRoute, singleDraft, resetPasswordToken, resetNotice, isSubmitting, isBootstrapping, error],
+    [user, token, screen, activeRoute, singleDraft, bulkDraft, resetPasswordToken, resetNotice, isSubmitting, isBootstrapping, error],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

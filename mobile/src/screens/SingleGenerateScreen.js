@@ -51,6 +51,24 @@ function Card({ children }) {
   );
 }
 
+function StatPill({ label, value, tone }) {
+  return (
+    <View
+      style={{
+        flex: 1,
+        borderWidth: 1,
+        borderColor: "#dbe3f0",
+        borderRadius: 16,
+        padding: 12,
+        backgroundColor: "#f8fafc",
+      }}
+    >
+      <Text style={{ color: "#64748b", fontSize: 12, fontWeight: "700" }}>{label}</Text>
+      <Text style={{ marginTop: 4, fontSize: 20, fontWeight: "800", color: tone || "#0f172a" }}>{value}</Text>
+    </View>
+  );
+}
+
 function InputField({ label, value, onChangeText, placeholder, multiline = false, keyboardType = "default", editable = true }) {
   return (
     <View style={{ gap: 6 }}>
@@ -165,6 +183,9 @@ export function SingleGenerateScreen() {
   const [uploadingPdf, setUploadingPdf] = useState(false);
   const [artifact, setArtifact] = useState(null);
   const [job, setJob] = useState(null);
+  const [editingJobId, setEditingJobId] = useState("");
+  const [analysis, setAnalysis] = useState(null);
+  const [analysisLoading, setAnalysisLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [shareMessage, setShareMessage] = useState("");
@@ -206,15 +227,59 @@ export function SingleGenerateScreen() {
     if (!singleDraft) return;
 
     skipQrTypeResetRef.current = true;
-    if (singleDraft.qrType) {
-      setQrType(singleDraft.qrType);
-      if (singleDraft.qrType === "URL") {
-        setFields((prev) => ({ ...prev, url: singleDraft.content || "" }));
-      } else if (singleDraft.qrType === "Text") {
-        setFields((prev) => ({ ...prev, text: singleDraft.content || "" }));
+    async function loadDraft() {
+      if (singleDraft.editJobId) {
+        try {
+          const payloadData = await apiRequest(`/qr/jobs/${singleDraft.editJobId}/edit-payload`, {
+            headers: createAuthHeaders(token),
+          });
+          const nextJob = payloadData?.job;
+          if (nextJob?.jobType === "single") {
+            const targetPayload = nextJob.targetPayload || {};
+            setEditingJobId(nextJob.id || singleDraft.editJobId);
+            setQrType(targetPayload.qrType || nextJob.qrType || "URL");
+            setFields((prev) => ({ ...prev, ...(targetPayload.fields || {}) }));
+            setSocialLinks(
+              Array.isArray(targetPayload.socialLinks) && targetPayload.socialLinks.length
+                ? targetPayload.socialLinks
+                : [{ platform: "Instagram", customPlatform: "", url: "" }],
+            );
+            setGalleryMode(targetPayload.galleryMode || "url");
+            setPdfMode(targetPayload.pdfMode || "url");
+            setGalleryLinkId(targetPayload.uploadIds?.galleryLinkId || "");
+            setPdfLinkId(targetPayload.uploadIds?.pdfLinkId || "");
+            setForegroundColor(nextJob.foregroundColor || "#000000");
+            setBackgroundColor(nextJob.backgroundColor || "#ffffff");
+            setFilenamePrefix(nextJob.filenamePrefix || "mobile-qr");
+            setErrorCorrectionLevel(nextJob.errorCorrectionLevel || "M");
+            setExpiryDate(targetPayload.expiresAt || nextJob.expiresAt || "");
+            setAnalysisLoading(true);
+            const analysisData = await apiRequest(`/qr/jobs/${singleDraft.editJobId}/analysis`, {
+              headers: createAuthHeaders(token),
+            });
+            setAnalysis(analysisData.analysis || null);
+          }
+        } catch (requestError) {
+          setError(requestError.message || "Failed to load QR for editing");
+        } finally {
+          setAnalysisLoading(false);
+          setSingleDraft(null);
+        }
+        return;
       }
+
+      if (singleDraft.qrType) {
+        setQrType(singleDraft.qrType);
+        if (singleDraft.qrType === "URL") {
+          setFields((prev) => ({ ...prev, url: singleDraft.content || "" }));
+        } else if (singleDraft.qrType === "Text") {
+          setFields((prev) => ({ ...prev, text: singleDraft.content || "" }));
+        }
+      }
+      setSingleDraft(null);
     }
-    setSingleDraft(null);
+
+    loadDraft();
   }, [singleDraft, setSingleDraft]);
 
   useEffect(() => {
@@ -238,6 +303,8 @@ export function SingleGenerateScreen() {
     setUploadMessage("");
     setArtifact(null);
     setJob(null);
+    setAnalysis(null);
+    setEditingJobId("");
     setError("");
     setShareMessage("");
     setExpiryDate("");
@@ -344,12 +411,18 @@ export function SingleGenerateScreen() {
     setError("");
     setShareMessage("");
     try {
-      const data = await apiRequest("/qr/single", {
-        method: "POST",
+      const data = await apiRequest(editingJobId ? `/qr/jobs/${editingJobId}/single` : "/qr/single", {
+        method: editingJobId ? "PUT" : "POST",
         headers: createAuthHeaders(token),
         body: JSON.stringify({
           content: generatedContent,
           qrType,
+          fields,
+          socialLinks,
+          galleryMode,
+          pdfMode,
+          galleryLinkId,
+          pdfLinkId,
           managedTitle: getManagedTitleForQrType(qrType, fields),
           expiresAt: expiryDate,
           filenamePrefix,
@@ -364,6 +437,12 @@ export function SingleGenerateScreen() {
 
       setArtifact(data.artifact || null);
       setJob(data.job || null);
+      if (editingJobId) {
+        const analysisData = await apiRequest(`/qr/jobs/${editingJobId}/analysis`, {
+          headers: createAuthHeaders(token),
+        });
+        setAnalysis(analysisData.analysis || null);
+      }
     } catch (requestError) {
       setError(requestError.message || "Failed to generate QR");
     } finally {
@@ -704,7 +783,7 @@ export function SingleGenerateScreen() {
         <PickerField label="FORMAT" value={format} options={FORMATS} onChange={setFormat} />
         <PickerField label="ERROR CORRECTION" value={errorCorrectionLevel} options={EC_LEVELS} onChange={setErrorCorrectionLevel} />
 
-        <ActionButton title={busy ? "Generating..." : "Generate QR"} onPress={handleGenerate} disabled={busy} />
+        <ActionButton title={busy ? (editingJobId ? "Updating..." : "Generating...") : (editingJobId ? "Update QR" : "Generate QR")} onPress={handleGenerate} disabled={busy} />
       </Card>
 
       <Card>
@@ -745,6 +824,26 @@ export function SingleGenerateScreen() {
 
         <ActionButton title="Share / Download File" onPress={handleShare} disabled={!artifact?.dataUrl} tone="light" />
       </Card>
+
+      {analysisLoading ? (
+        <Card>
+          <Text style={{ color: "#64748b" }}>Loading analysis...</Text>
+        </Card>
+      ) : analysis ? (
+        <Card>
+          <Text style={{ fontSize: 20, fontWeight: "700", color: "#0f172a" }}>Analysis for this QR job</Text>
+          <Text style={{ color: "#64748b" }}>{analysis.insight}</Text>
+          <View style={{ flexDirection: "row", gap: 10 }}>
+            <StatPill label="Requested" value={analysis.job?.totalCount || 0} />
+            <StatPill label="Success" value={analysis.job?.successCount || 0} tone="#047857" />
+            <StatPill label="Failure" value={analysis.job?.failureCount || 0} tone="#b91c1c" />
+          </View>
+          <View style={{ flexDirection: "row", gap: 10 }}>
+            <StatPill label="Scans" value={analysis.engagement?.totalScans || 0} />
+            <StatPill label="Submissions" value={analysis.engagement?.totalSubmissions || 0} tone="#047857" />
+          </View>
+        </Card>
+      ) : null}
     </ScrollView>
   );
 }
