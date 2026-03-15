@@ -39,6 +39,73 @@ function StatCard({ label, value, tone = "default" }) {
   )
 }
 
+function AnalysisStat({ label, value, tone = "default" }) {
+  const toneClass =
+    tone === "success"
+      ? "text-emerald-600"
+      : tone === "danger"
+        ? "text-rose-600"
+        : tone === "accent"
+          ? "text-sky-700"
+          : "text-slate-900"
+
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">{label}</p>
+      <p className={`mt-2 text-2xl font-semibold ${toneClass}`}>{value}</p>
+    </div>
+  )
+}
+
+function ProgressBar({ label, value, total, colorClass = "bg-sky-500", helper }) {
+  const percent = total ? Math.max(Math.round((value / total) * 100), value > 0 ? 4 : 0) : 0
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between gap-3 text-sm">
+        <span className="font-medium text-slate-700">{label}</span>
+        <span className="text-slate-500">
+          {value}
+          {helper ? ` • ${helper}` : ""}
+        </span>
+      </div>
+      <div className="h-2 overflow-hidden rounded-full bg-slate-100">
+        <div className={`h-full rounded-full ${colorClass}`} style={{ width: `${percent}%` }} />
+      </div>
+    </div>
+  )
+}
+
+function getStatusAccent(status) {
+  if (status === "completed") {
+    return "bg-emerald-500"
+  }
+  if (status === "processing" || status === "queued") {
+    return "bg-amber-500"
+  }
+  if (status === "failed") {
+    return "bg-rose-500"
+  }
+  return "bg-slate-400"
+}
+
+function PerformanceBadge({ label, tone = "default" }) {
+  const toneClass =
+    tone === "success"
+      ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+      : tone === "warning"
+        ? "bg-amber-50 text-amber-700 border-amber-200"
+        : tone === "danger"
+          ? "bg-rose-50 text-rose-700 border-rose-200"
+          : "bg-slate-100 text-slate-700 border-slate-200"
+
+  return (
+    <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${toneClass}`}>
+      {label}
+    </span>
+  )
+}
+
 function BarChart({ title, rows, colorClass = "bg-sky-500", emptyMessage }) {
   const max = Math.max(...rows.map((row) => row.count), 0)
 
@@ -113,6 +180,7 @@ export default function Dashboard() {
   const [analysisJobId, setAnalysisJobId] = useState("")
   const [jobAnalysisById, setJobAnalysisById] = useState({})
   const [analysisLoadingId, setAnalysisLoadingId] = useState("")
+  const [analysisTabByJobId, setAnalysisTabByJobId] = useState({})
 
   const queryString = useMemo(() => buildQuery(filters), [filters])
 
@@ -204,6 +272,17 @@ export default function Dashboard() {
     }
   }
 
+  function getAnalysisTab(jobId) {
+    return analysisTabByJobId[jobId] || "overview"
+  }
+
+  function setAnalysisTab(jobId, tab) {
+    setAnalysisTabByJobId((prev) => ({
+      ...prev,
+      [jobId]: tab,
+    }))
+  }
+
   function handleEditJob(job) {
     const mode = job.jobType === "bulk" ? "bulk" : "single"
     const params = new URLSearchParams({ mode })
@@ -267,20 +346,21 @@ export default function Dashboard() {
 
         {!isLoading && summary && (
           <>
-            <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-6">
-              <StatCard label="Total Jobs" value={summary.totalJobs} />
-              <StatCard label="Single Jobs" value={summary.singleJobs} tone="accent" />
-              <StatCard label="Bulk Jobs" value={summary.bulkJobs} />
-              <StatCard label="Requested" value={summary.totalRequested} />
-              <StatCard label="Success" value={summary.totalSuccess} tone="success" />
-              <StatCard label="Failure" value={summary.totalFailure} tone="danger" />
-            </section>
-
-            <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-              <StatCard label="Total Scans" value={scanSummary.totalScans} />
-              <StatCard label="Unique Scans" value={scanSummary.uniqueScans} tone="accent" />
-              <StatCard label="Repeated Scans" value={scanSummary.repeatedScans} />
-              <StatCard label="Last Scan Activity" value={scanSummary.lastScanAt ? formatCompactDate(scanSummary.lastScanAt) : "Not yet"} tone="success" />
+            <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                <div>
+                  <h2 className="text-2xl font-semibold text-slate-900">Created QR Jobs</h2>
+                  <p className="mt-1 text-sm text-slate-500">
+                    Open analysis on any QR job to inspect scan behavior, generation quality, expiry state, rating patterns, and feedback performance in one place.
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <MetricPill label="Jobs" value={summary.totalJobs} />
+                  <MetricPill label="Bulk" value={summary.bulkJobs} tone="accent" />
+                  <MetricPill label="Single" value={summary.singleJobs} />
+                  <MetricPill label="Scans" value={scanSummary.totalScans} tone="success" />
+                </div>
+              </div>
             </section>
 
             <section className="grid grid-cols-1 gap-6 xl:grid-cols-3">
@@ -376,19 +456,13 @@ export default function Dashboard() {
             </section>
 
             <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <h2 className="text-2xl font-semibold text-slate-900">Created QR Jobs</h2>
-                  <p className="mt-1 text-sm text-slate-500">Edit single QR setups, remove old artifacts, and keep active campaigns tidy.</p>
-                </div>
-              </div>
-
-              {!jobs.length && <p className="mt-5 text-slate-500">No jobs found for the selected dates.</p>}
+              {!jobs.length && <p className="text-slate-500">No jobs found for the selected dates.</p>}
 
               {!!jobs.length && (
-                <div className="mt-6 grid gap-4">
+                <div className="grid gap-4">
                   {jobs.map((job) => (
-                    <article key={job.id} className="rounded-2xl border border-slate-200 p-5">
+                    <article key={job.id} className="relative overflow-hidden rounded-2xl border border-slate-200 p-5">
+                      <div className={`absolute inset-y-0 left-0 w-1.5 ${getStatusAccent(job.status)}`} />
                       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                         <div className="space-y-2">
                           <div className="flex flex-wrap items-center gap-2">
@@ -398,6 +472,15 @@ export default function Dashboard() {
                             <span className="rounded-full bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-700">
                               {job.jobType === "single" ? "Single QR" : `${job.qrType} Bulk`}
                             </span>
+                            {job.status === "completed" && job.successCount > 0 ? (
+                              <PerformanceBadge label="Ready to share" tone="success" />
+                            ) : null}
+                            {job.failureCount > 0 ? (
+                              <PerformanceBadge label="Needs review" tone="danger" />
+                            ) : null}
+                            {job.status === "completed" && job.successCount > 0 && !job.failureCount ? (
+                              <PerformanceBadge label="Clean output" tone="success" />
+                            ) : null}
                           </div>
                           <p className="font-mono text-xs text-slate-500">{job.id}</p>
                           <div className="grid gap-1 text-sm text-slate-600 sm:grid-cols-2">
@@ -456,8 +539,53 @@ export default function Dashboard() {
                           ) : jobAnalysisById[job.id] ? (
                             (() => {
                               const analysis = jobAnalysisById[job.id]
+                              const totalRequested = analysis.job?.totalCount || job.totalCount || 0
+                              const totalSuccess = analysis.job?.successCount || job.successCount || 0
+                              const totalFailure = analysis.job?.failureCount || job.failureCount || 0
+                              const totalScans = analysis.engagement?.totalScans || 0
+                              const uniqueScans = analysis.engagement?.uniqueScans || 0
+                              const repeatedScans = analysis.engagement?.repeatedScans || 0
+                              const totalSubmissions = analysis.engagement?.totalSubmissions || 0
+                              const hasTrackedEngagement = analysis.engagement?.managedLinks > 0
+                              const currentTab = getAnalysisTab(job.id)
+                              const extraInsights = [
+                                totalFailure > 0
+                                  ? `${totalFailure} output${totalFailure === 1 ? "" : "s"} failed during generation and may need a rerun.`
+                                  : "Generation quality is clean with no failed outputs recorded.",
+                                totalScans > 0
+                                  ? `This QR has ${uniqueScans} unique scan${uniqueScans === 1 ? "" : "s"} and ${repeatedScans} repeated visit${repeatedScans === 1 ? "" : "s"}.`
+                                  : "No scan activity yet. Share or print this QR to start collecting engagement.",
+                                analysis.engagement?.expiryDate
+                                  ? `Expiry is ${analysis.engagement?.isExpired ? "already reached" : `set for ${formatDateTime(analysis.engagement.expiryDate)}`}.`
+                                  : "No expiry date is set for this QR yet.",
+                              ]
                               return (
                                 <div className="mt-4 space-y-4">
+                                <div className="flex flex-wrap gap-2">
+                                  {[
+                                    ["overview", "Overview"],
+                                    ["scans", "Scans"],
+                                    ["responses", "Responses"],
+                                    ["expiry", "Expiry"],
+                                  ].map(([tabValue, tabLabel]) => {
+                                    const active = currentTab === tabValue
+                                    return (
+                                      <button
+                                        key={`${job.id}-${tabValue}`}
+                                        type="button"
+                                        onClick={() => setAnalysisTab(job.id, tabValue)}
+                                        className={`rounded-full px-4 py-2 text-sm font-medium ${
+                                          active
+                                            ? "bg-slate-950 text-white"
+                                            : "border border-slate-300 bg-white text-slate-700"
+                                        }`}
+                                      >
+                                        {tabLabel}
+                                      </button>
+                                    )
+                                  })}
+                                </div>
+
                                 <div className="rounded-2xl border border-sky-200 bg-sky-50 p-4">
                                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-700">
                                     Quick Insight
@@ -465,35 +593,81 @@ export default function Dashboard() {
                                   <p className="mt-2 text-sm font-medium text-slate-800">{analysis.insight}</p>
                                 </div>
 
+                                {(currentTab === "overview" || currentTab === "scans") && (
                                 <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                                  <p className="font-medium text-slate-900">Generation Report</p>
-                                  <div className="mt-3 flex flex-wrap gap-2">
-                                    <MetricPill label="Requested" value={job.totalCount} />
-                                    <MetricPill label="Success" value={job.successCount} tone="success" />
-                                    <MetricPill label="Failure" value={job.failureCount} tone="danger" />
+                                  <div className="flex items-start justify-between gap-4">
+                                    <div>
+                                      <p className="font-medium text-slate-900">Generation Report</p>
+                                      <p className="mt-1 text-sm text-slate-500">Output quality and completion performance for this QR job.</p>
+                                    </div>
                                     <MetricPill
                                       label="Success Rate"
-                                      value={job.totalCount ? `${Math.round((job.successCount / job.totalCount) * 100)}%` : "0%"}
+                                      value={totalRequested ? `${Math.round((totalSuccess / totalRequested) * 100)}%` : "0%"}
                                       tone="accent"
                                     />
                                   </div>
-                                </div>
-
-                                <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                                  <p className="font-medium text-slate-900">Usage Report</p>
-                                  <div className="mt-3 flex flex-wrap gap-2">
-                                    <MetricPill label="Scans" value={analysis.engagement?.totalScans || 0} />
-                                    <MetricPill label="Unique" value={analysis.engagement?.uniqueScans || 0} tone="accent" />
-                                    <MetricPill label="Repeated" value={analysis.engagement?.repeatedScans || 0} />
-                                    <MetricPill
-                                      label="Submissions"
-                                      value={analysis.engagement?.totalSubmissions || 0}
-                                      tone="accent"
+                                  <div className="mt-4 grid gap-3 md:grid-cols-4">
+                                    <AnalysisStat label="Requested" value={totalRequested} />
+                                    <AnalysisStat label="Success" value={totalSuccess} tone="success" />
+                                    <AnalysisStat label="Failure" value={totalFailure} tone="danger" />
+                                    <AnalysisStat
+                                      label="Artifact"
+                                      value={job.artifact?.filePath ? "Ready" : "Pending"}
+                                      tone={job.artifact?.filePath ? "accent" : "default"}
                                     />
+                                  </div>
+                                  <div className="mt-4 space-y-3">
+                                    <ProgressBar
+                                      label="Successful outputs"
+                                      value={totalSuccess}
+                                      total={Math.max(totalRequested, 1)}
+                                      colorClass="bg-emerald-500"
+                                      helper={totalRequested ? `${Math.round((totalSuccess / totalRequested) * 100)}%` : "0%"}
+                                    />
+                                    <ProgressBar
+                                      label="Failed outputs"
+                                      value={totalFailure}
+                                      total={Math.max(totalRequested, 1)}
+                                      colorClass="bg-rose-500"
+                                      helper={totalRequested ? `${Math.round((totalFailure / totalRequested) * 100)}%` : "0%"}
+                                    />
+                                  </div>
+                                </div>
+                                )}
+
+                                {(currentTab === "overview" || currentTab === "scans" || currentTab === "expiry") && (
+                                <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                                  <div className="flex items-start justify-between gap-4">
+                                    <div>
+                                      <p className="font-medium text-slate-900">Usage Report</p>
+                                      <p className="mt-1 text-sm text-slate-500">Scan volume, returning visitors, submissions, and expiry health for this QR.</p>
+                                    </div>
                                     <MetricPill
-                                      label="Expiry"
-                                      value={analysis.engagement?.expiryDate ? (analysis.engagement?.isExpired ? "Expired" : "Active") : "Not set"}
-                                      tone={analysis.engagement?.isExpired ? "danger" : "success"}
+                                      label="Tracked"
+                                      value={hasTrackedEngagement ? "Yes" : "No"}
+                                      tone={hasTrackedEngagement ? "success" : "default"}
+                                    />
+                                  </div>
+                                  <div className="mt-4 grid gap-3 md:grid-cols-4">
+                                    <AnalysisStat label="Scans" value={totalScans} />
+                                    <AnalysisStat label="Unique" value={uniqueScans} tone="accent" />
+                                    <AnalysisStat label="Repeated" value={repeatedScans} />
+                                    <AnalysisStat label="Submissions" value={totalSubmissions} tone="success" />
+                                  </div>
+                                  <div className="mt-4 space-y-3">
+                                    <ProgressBar
+                                      label="Unique visitor share"
+                                      value={uniqueScans}
+                                      total={Math.max(totalScans, 1)}
+                                      colorClass="bg-sky-500"
+                                      helper={totalScans ? `${Math.round((uniqueScans / totalScans) * 100)}%` : "0%"}
+                                    />
+                                    <ProgressBar
+                                      label="Repeat visitor share"
+                                      value={repeatedScans}
+                                      total={Math.max(totalScans, 1)}
+                                      colorClass="bg-violet-500"
+                                      helper={totalScans ? `${Math.round((repeatedScans / totalScans) * 100)}%` : "0%"}
                                     />
                                   </div>
                                   <div className="mt-3 grid gap-2 text-sm text-slate-600 md:grid-cols-2">
@@ -527,20 +701,50 @@ export default function Dashboard() {
                                     </p>
                                   </div>
                                 </div>
+                                )}
 
-                                {analysis.typePerformance && (
+                                {currentTab === "overview" && (
+                                <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                                  <p className="font-medium text-slate-900">Actionable Insights</p>
+                                  <ul className="mt-3 list-disc space-y-2 pl-5 text-sm text-slate-600">
+                                    {extraInsights.map((insight, index) => (
+                                      <li key={`${job.id}-insight-${index}`}>{insight}</li>
+                                    ))}
+                                  </ul>
+                                </div>
+                                )}
+
+                                {analysis.typePerformance && (currentTab === "overview" || currentTab === "scans") && (
                                   <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                                    <p className="font-medium text-slate-900">{job.qrType} overall performance</p>
-                                    <div className="mt-3 flex flex-wrap gap-2">
+                                    <div className="flex items-start justify-between gap-4">
+                                      <div>
+                                        <p className="font-medium text-slate-900">{job.qrType} overall performance</p>
+                                        <p className="mt-1 text-sm text-slate-500">Compare this job against all created QRs of the same type.</p>
+                                      </div>
                                       <MetricPill label="Jobs" value={analysis.typePerformance.jobsCount} />
-                                      <MetricPill label="Requested" value={analysis.typePerformance.requestedCount} />
-                                      <MetricPill label="Success" value={analysis.typePerformance.successCount} tone="success" />
-                                      <MetricPill label="Failure" value={analysis.typePerformance.failureCount} tone="danger" />
+                                    </div>
+                                    <div className="mt-4 grid gap-3 md:grid-cols-3">
+                                      <AnalysisStat label="Requested" value={analysis.typePerformance.requestedCount} />
+                                      <AnalysisStat label="Success" value={analysis.typePerformance.successCount} tone="success" />
+                                      <AnalysisStat label="Failure" value={analysis.typePerformance.failureCount} tone="danger" />
+                                    </div>
+                                    <div className="mt-4 space-y-3">
+                                      <ProgressBar
+                                        label={`${job.qrType} success rate`}
+                                        value={analysis.typePerformance.successCount}
+                                        total={Math.max(analysis.typePerformance.requestedCount, 1)}
+                                        colorClass="bg-emerald-500"
+                                        helper={
+                                          analysis.typePerformance.requestedCount
+                                            ? `${Math.round((analysis.typePerformance.successCount / analysis.typePerformance.requestedCount) * 100)}%`
+                                            : "0%"
+                                        }
+                                      />
                                     </div>
                                   </div>
                                 )}
 
-                                {analysis.rating && (
+                                {analysis.rating && (currentTab === "overview" || currentTab === "responses") && (
                                   <div className="rounded-2xl border border-slate-200 bg-white p-4">
                                     <p className="font-medium text-slate-900">Rating response breakdown</p>
                                     <div className="mt-3 space-y-2">
@@ -567,7 +771,7 @@ export default function Dashboard() {
                                   </div>
                                 )}
 
-                                {analysis.feedback && (
+                                {analysis.feedback && (currentTab === "overview" || currentTab === "responses") && (
                                   <div className="rounded-2xl border border-slate-200 bg-white p-4">
                                     <p className="font-medium text-slate-900">Feedback question summary</p>
                                     <div className="mt-3 space-y-3">
@@ -586,6 +790,49 @@ export default function Dashboard() {
                                           )}
                                         </div>
                                       ))}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {currentTab === "expiry" && (
+                                  <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                                    <p className="font-medium text-slate-900">Expiry Focus</p>
+                                    <div className="mt-4 grid gap-3 md:grid-cols-3">
+                                      <AnalysisStat
+                                        label="Expiry State"
+                                        value={
+                                          analysis.engagement?.expiryDate
+                                            ? analysis.engagement?.isExpired
+                                              ? "Expired"
+                                              : "Active"
+                                            : "Not set"
+                                        }
+                                        tone={analysis.engagement?.isExpired ? "danger" : "success"}
+                                      />
+                                      <AnalysisStat
+                                        label="Expiring Soon"
+                                        value={analysis.engagement?.expiringSoonLinks || 0}
+                                        tone="accent"
+                                      />
+                                      <AnalysisStat
+                                        label="Expired Links"
+                                        value={analysis.engagement?.expiredLinks || 0}
+                                        tone="danger"
+                                      />
+                                    </div>
+                                    <div className="mt-4 space-y-3">
+                                      <ProgressBar
+                                        label="Expiring soon share"
+                                        value={analysis.engagement?.expiringSoonLinks || 0}
+                                        total={Math.max(analysis.engagement?.managedLinks || 1, 1)}
+                                        colorClass="bg-amber-500"
+                                      />
+                                      <ProgressBar
+                                        label="Expired share"
+                                        value={analysis.engagement?.expiredLinks || 0}
+                                        total={Math.max(analysis.engagement?.managedLinks || 1, 1)}
+                                        colorClass="bg-rose-500"
+                                      />
                                     </div>
                                   </div>
                                 )}
