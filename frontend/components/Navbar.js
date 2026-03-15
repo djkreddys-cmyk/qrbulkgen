@@ -99,8 +99,7 @@ export default function Navbar() {
             </>
           ) : (
             <>
-              <Link href="/login">Login</Link>
-              <Link href="/register">Register</Link>
+              <Link href="/login">Login/Register</Link>
             </>
           )}
         </div>
