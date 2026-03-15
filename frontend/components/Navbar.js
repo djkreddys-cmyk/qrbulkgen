@@ -14,6 +14,7 @@ export default function Navbar() {
   const [showAppPrompt, setShowAppPrompt] = useState(false)
   const [appPromptMessage, setAppPromptMessage] = useState("")
   const authed = isAuthenticated()
+  const user = session?.user || getAuthUser()
 
   useEffect(() => {
     const loadedSession = loadAuthSession()
@@ -110,7 +111,7 @@ export default function Navbar() {
           {authed ? (
             <>
               <span className="text-sm text-gray-600">
-                {session.user.name || session.user.email}
+                {user?.name || user?.email || "Account"}
               </span>
               <button onClick={handleLogout} className="underline">
                 Logout
