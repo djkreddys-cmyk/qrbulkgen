@@ -175,58 +175,60 @@ export default function HomePageClient() {
           <h1 className="max-w-3xl text-[clamp(3.2rem,7vw,6.2rem)] font-black leading-[0.92] tracking-tight text-slate-950">
             Build branded QR journeys, bulk delivery, and scan analysis in one polished product.
           </h1>
-          <p className="max-w-2xl text-[1.05rem] leading-8 text-slate-600 md:text-lg">
+          <p className="max-w-[58rem] text-[1.05rem] leading-8 text-slate-600 md:text-lg">
             QRBulkGen gives teams one place for single QR creation, bulk CSV operations, tracked public
             scan experiences, mobile visibility, and dashboard reporting. No more one tool for design,
             one for feedback, and another for monitoring.
           </p>
-          <div className="grid gap-4 md:grid-cols-3">
-            {homepageStats.map((stat) => (
-              <button
-                key={stat.id}
-                type="button"
-                onClick={() => setActiveStatCard(stat.id)}
-                className={`min-h-[164px] rounded-[1.75rem] border px-5 py-5 text-left shadow-[0_16px_45px_rgba(15,23,42,0.08)] backdrop-blur transition ${
-                  activeStatCard === stat.id
-                    ? "border-slate-950 bg-slate-950 text-white"
-                    : "border-white/90 bg-white/85 text-slate-950 hover:-translate-y-1"
-                }`}
-              >
-                <p
-                  className={`text-sm font-semibold uppercase tracking-[0.22em] ${
-                    activeStatCard === stat.id ? "text-slate-300" : "text-slate-500"
+          <div className="grid gap-5 xl:grid-cols-[1.15fr_0.85fr] xl:items-stretch">
+            <div className="grid gap-4 md:grid-cols-3">
+              {homepageStats.map((stat) => (
+                <button
+                  key={stat.id}
+                  type="button"
+                  onClick={() => setActiveStatCard(stat.id)}
+                  className={`min-h-[164px] rounded-[1.75rem] border px-5 py-5 text-left shadow-[0_16px_45px_rgba(15,23,42,0.08)] backdrop-blur transition ${
+                    activeStatCard === stat.id
+                      ? "border-slate-950 bg-slate-950 text-white"
+                      : "border-white/90 bg-white/85 text-slate-950 hover:-translate-y-1"
                   }`}
                 >
-                  {stat.label}
-                </p>
-                <p
-                  className={`mt-4 text-[2rem] font-black leading-[1.08] md:text-[2.2rem] ${
-                    activeStatCard === stat.id ? "text-white" : "text-slate-950"
-                  }`}
-                >
-                  {stat.value}
-                </p>
-              </button>
-            ))}
-          </div>
-          <div className="rounded-[1.9rem] border border-white/85 bg-white/85 px-6 py-6 shadow-[0_18px_60px_rgba(15,23,42,0.08)] backdrop-blur">
-            <p className="text-sm font-semibold uppercase tracking-[0.22em] text-slate-500">
-              {activeStatContent.label}
-            </p>
-            <h2 className="mt-3 max-w-[15ch] text-[2rem] font-black leading-[1.04] tracking-tight text-slate-950 md:text-[2.4rem]">
-              {activeStatContent.title}
-            </h2>
-            <p className="mt-4 max-w-2xl leading-8 text-slate-600">{activeStatContent.body}</p>
-            <ul className="mt-6 grid gap-3 sm:grid-cols-3">
-              {activeStatContent.bullets.map((bullet) => (
-                <li
-                  key={bullet}
-                  className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm font-medium text-slate-700"
-                >
-                  {bullet}
-                </li>
+                  <p
+                    className={`text-sm font-semibold uppercase tracking-[0.22em] ${
+                      activeStatCard === stat.id ? "text-slate-300" : "text-slate-500"
+                    }`}
+                  >
+                    {stat.label}
+                  </p>
+                  <p
+                    className={`mt-4 text-[2rem] font-black leading-[1.08] md:text-[2.2rem] ${
+                      activeStatCard === stat.id ? "text-white" : "text-slate-950"
+                    }`}
+                  >
+                    {stat.value}
+                  </p>
+                </button>
               ))}
-            </ul>
+            </div>
+            <div className="rounded-[1.9rem] border border-white/85 bg-white/85 px-6 py-6 shadow-[0_18px_60px_rgba(15,23,42,0.08)] backdrop-blur">
+              <p className="text-sm font-semibold uppercase tracking-[0.22em] text-slate-500">
+                {activeStatContent.label}
+              </p>
+              <h2 className="mt-3 max-w-[13ch] text-[1.9rem] font-black leading-[1.04] tracking-tight text-slate-950 md:text-[2.2rem]">
+                {activeStatContent.title}
+              </h2>
+              <p className="mt-4 leading-8 text-slate-600">{activeStatContent.body}</p>
+              <ul className="mt-6 grid gap-3">
+                {activeStatContent.bullets.map((bullet) => (
+                  <li
+                    key={bullet}
+                    className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm font-medium text-slate-700"
+                  >
+                    {bullet}
+                  </li>
+                ))}
+              </ul>
+            </div>
           </div>
         </div>
 
