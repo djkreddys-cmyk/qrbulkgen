@@ -154,7 +154,7 @@ export function BulkJobsScreen() {
 
   async function handlePickCsv() {
     const result = await DocumentPicker.getDocumentAsync({
-      type: "text/csv",
+      type: ["text/csv", "text/comma-separated-values", "application/csv", "application/vnd.ms-excel", "*/*"],
       copyToCacheDirectory: true,
       multiple: false,
     });
@@ -165,6 +165,12 @@ export function BulkJobsScreen() {
 
     const asset = result.assets?.[0];
     if (!asset) {
+      return;
+    }
+
+    const fileName = String(asset.name || "");
+    if (!fileName.toLowerCase().endsWith(".csv")) {
+      setError("Please choose a .csv file.");
       return;
     }
 
@@ -184,10 +190,15 @@ export function BulkJobsScreen() {
 
     try {
       const formData = new FormData();
+      const normalizedName = selectedFile.name || `bulk-${Date.now()}.csv`;
+      const normalizedType =
+        selectedFile.mimeType ||
+        (normalizedName.toLowerCase().endsWith(".csv") ? "text/csv" : "application/octet-stream");
+
       formData.append("file", {
         uri: selectedFile.uri,
-        name: selectedFile.name || "bulk.csv",
-        type: selectedFile.mimeType || "text/csv",
+        name: normalizedName,
+        type: normalizedType,
       });
       formData.append("qrType", createQrType);
       formData.append("size", "512");
