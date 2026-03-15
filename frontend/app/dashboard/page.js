@@ -85,6 +85,13 @@ function MetricPill({ label, value, tone = "default" }) {
   )
 }
 
+function formatDateTime(value) {
+  if (!value) return "Not yet"
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) return "Not yet"
+  return parsed.toLocaleString()
+}
+
 export default function Dashboard() {
   const router = useRouter()
   const [user, setUser] = useState(null)
@@ -97,6 +104,8 @@ export default function Dashboard() {
   const [filters, setFilters] = useState({ startDate: "", endDate: "" })
   const [busyJobId, setBusyJobId] = useState("")
   const [analysisJobId, setAnalysisJobId] = useState("")
+  const [jobAnalysisById, setJobAnalysisById] = useState({})
+  const [analysisLoadingId, setAnalysisLoadingId] = useState("")
 
   const queryString = useMemo(() => buildQuery(filters), [filters])
 
@@ -154,6 +163,37 @@ export default function Dashboard() {
     }
   }
 
+  async function handleToggleAnalysis(jobId) {
+    const token = getAuthToken()
+    if (!token) return
+
+    if (analysisJobId === jobId) {
+      setAnalysisJobId("")
+      return
+    }
+
+    setAnalysisJobId(jobId)
+
+    if (jobAnalysisById[jobId]) {
+      return
+    }
+
+    try {
+      setAnalysisLoadingId(jobId)
+      const data = await apiRequest(`/qr/jobs/${jobId}/analysis`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      setJobAnalysisById((prev) => ({
+        ...prev,
+        [jobId]: data.analysis,
+      }))
+    } catch (requestError) {
+      setError(requestError.message)
+    } finally {
+      setAnalysisLoadingId("")
+    }
+  }
+
   function handleEditJob(job) {
     const mode = job.jobType === "bulk" ? "bulk" : "single"
     const params = new URLSearchParams({ mode })
@@ -166,33 +206,6 @@ export default function Dashboard() {
   const ratingCharts = engagementReport?.ratings || []
   const feedbackGroups = engagementReport?.feedback || []
   const qrTypePerformance = overviewReport?.qrTypePerformance || []
-
-  function getJobAnalysis(job) {
-    const typeEntry = qrTypePerformance.find((entry) => entry.label === (job.jobType === "single" ? "Single" : job.qrType))
-    const content = job?.editPayload?.content || ""
-    let linkedTitle = ""
-    try {
-      if (content && /^https?:\/\//i.test(content)) {
-        const parsed = new URL(content)
-        if (parsed.pathname === "/rate") {
-          linkedTitle = parsed.searchParams.get("title") || ""
-        }
-        if (parsed.pathname === "/feedback") {
-          const encoded = parsed.searchParams.get("f") || ""
-          if (encoded) {
-            linkedTitle = JSON.parse(decodeURIComponent(escape(atob(encoded)))).title || ""
-          }
-        }
-      }
-    } catch {
-      linkedTitle = ""
-    }
-
-    const ratingEntry = linkedTitle ? ratingCharts.find((entry) => entry.title === linkedTitle) : null
-    const feedbackEntry = linkedTitle ? feedbackGroups.find((entry) => entry.title === linkedTitle) : null
-
-    return { typeEntry, ratingEntry, feedbackEntry }
-  }
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -313,7 +326,7 @@ export default function Dashboard() {
                           </button>
                           <button
                             type="button"
-                            onClick={() => setAnalysisJobId((current) => (current === job.id ? "" : job.id))}
+                            onClick={() => handleToggleAnalysis(job.id)}
                             className="rounded-xl border border-sky-300 px-3 py-2 text-sm font-medium text-sky-700"
                           >
                             {analysisJobId === job.id ? "Hide Analysis" : "Analysis"}
@@ -345,38 +358,86 @@ export default function Dashboard() {
                           <h4 className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">
                             Analysis for this QR Job
                           </h4>
-                          {(() => {
-                            const analysis = getJobAnalysis(job)
-                            return (
-                              <div className="mt-4 space-y-4">
-                                <div className="flex flex-wrap gap-2">
-                                  <MetricPill label="Requested" value={job.totalCount} />
-                                  <MetricPill label="Success" value={job.successCount} tone="success" />
-                                  <MetricPill label="Failure" value={job.failureCount} tone="danger" />
-                                  <MetricPill
-                                    label="Success Rate"
-                                    value={job.totalCount ? `${Math.round((job.successCount / job.totalCount) * 100)}%` : "0%"}
-                                    tone="accent"
-                                  />
+                          {analysisLoadingId === job.id ? (
+                            <p className="mt-4 text-sm text-slate-500">Loading analysis...</p>
+                          ) : jobAnalysisById[job.id] ? (
+                            (() => {
+                              const analysis = jobAnalysisById[job.id]
+                              return (
+                                <div className="mt-4 space-y-4">
+                                <div className="rounded-2xl border border-sky-200 bg-sky-50 p-4">
+                                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-700">
+                                    Quick Insight
+                                  </p>
+                                  <p className="mt-2 text-sm font-medium text-slate-800">{analysis.insight}</p>
                                 </div>
 
-                                {analysis.typeEntry && (
+                                <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                                  <p className="font-medium text-slate-900">Generation Report</p>
+                                  <div className="mt-3 flex flex-wrap gap-2">
+                                    <MetricPill label="Requested" value={job.totalCount} />
+                                    <MetricPill label="Success" value={job.successCount} tone="success" />
+                                    <MetricPill label="Failure" value={job.failureCount} tone="danger" />
+                                    <MetricPill
+                                      label="Success Rate"
+                                      value={job.totalCount ? `${Math.round((job.successCount / job.totalCount) * 100)}%` : "0%"}
+                                      tone="accent"
+                                    />
+                                  </div>
+                                </div>
+
+                                <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                                  <p className="font-medium text-slate-900">Usage Report</p>
+                                  <div className="mt-3 flex flex-wrap gap-2">
+                                    <MetricPill label="Scans" value={analysis.engagement?.totalScans || 0} />
+                                    <MetricPill
+                                      label="Submissions"
+                                      value={analysis.engagement?.totalSubmissions || 0}
+                                      tone="accent"
+                                    />
+                                    <MetricPill
+                                      label="Expiry"
+                                      value={analysis.engagement?.expiryDate ? (analysis.engagement?.isExpired ? "Expired" : "Active") : "Not set"}
+                                      tone={analysis.engagement?.isExpired ? "danger" : "success"}
+                                    />
+                                  </div>
+                                  <div className="mt-3 grid gap-2 text-sm text-slate-600 md:grid-cols-2">
+                                    <p>
+                                      <span className="font-medium text-slate-900">Last scan:</span>{" "}
+                                      {formatDateTime(analysis.engagement?.lastScanAt)}
+                                    </p>
+                                    <p>
+                                      <span className="font-medium text-slate-900">Last submission:</span>{" "}
+                                      {formatDateTime(analysis.engagement?.lastSubmissionAt)}
+                                    </p>
+                                    <p>
+                                      <span className="font-medium text-slate-900">Expiry date:</span>{" "}
+                                      {analysis.engagement?.expiryDate ? formatDateTime(analysis.engagement.expiryDate) : "Not set"}
+                                    </p>
+                                    <p>
+                                      <span className="font-medium text-slate-900">Engagement type:</span>{" "}
+                                      {analysis.engagement?.targetKind || "Direct QR / not tracked"}
+                                    </p>
+                                  </div>
+                                </div>
+
+                                {analysis.typePerformance && (
                                   <div className="rounded-2xl border border-slate-200 bg-white p-4">
                                     <p className="font-medium text-slate-900">{job.qrType} overall performance</p>
                                     <div className="mt-3 flex flex-wrap gap-2">
-                                      <MetricPill label="Jobs" value={analysis.typeEntry.jobsCount} />
-                                      <MetricPill label="Requested" value={analysis.typeEntry.requestedCount} />
-                                      <MetricPill label="Success" value={analysis.typeEntry.successCount} tone="success" />
-                                      <MetricPill label="Failure" value={analysis.typeEntry.failureCount} tone="danger" />
+                                      <MetricPill label="Jobs" value={analysis.typePerformance.jobsCount} />
+                                      <MetricPill label="Requested" value={analysis.typePerformance.requestedCount} />
+                                      <MetricPill label="Success" value={analysis.typePerformance.successCount} tone="success" />
+                                      <MetricPill label="Failure" value={analysis.typePerformance.failureCount} tone="danger" />
                                     </div>
                                   </div>
                                 )}
 
-                                {analysis.ratingEntry && (
+                                {analysis.rating && (
                                   <div className="rounded-2xl border border-slate-200 bg-white p-4">
                                     <p className="font-medium text-slate-900">Rating response breakdown</p>
                                     <div className="mt-3 space-y-2">
-                                      {analysis.ratingEntry.buckets.map((bucket) => (
+                                      {analysis.rating.buckets.map((bucket) => (
                                         <div key={bucket.label}>
                                           <div className="flex items-center justify-between text-sm">
                                             <span className="text-slate-700">{bucket.label}</span>
@@ -387,7 +448,7 @@ export default function Dashboard() {
                                               className="h-full rounded-full bg-fuchsia-500"
                                               style={{
                                                 width: `${Math.max(
-                                                  (bucket.count / Math.max(...analysis.ratingEntry.buckets.map((entry) => entry.count), 1)) * 100,
+                                                  (bucket.count / Math.max(...analysis.rating.buckets.map((entry) => entry.count), 1)) * 100,
                                                   6,
                                                 )}%`,
                                               }}
@@ -399,11 +460,11 @@ export default function Dashboard() {
                                   </div>
                                 )}
 
-                                {analysis.feedbackEntry && (
+                                {analysis.feedback && (
                                   <div className="rounded-2xl border border-slate-200 bg-white p-4">
                                     <p className="font-medium text-slate-900">Feedback question summary</p>
                                     <div className="mt-3 space-y-3">
-                                      {analysis.feedbackEntry.questions.map((question) => (
+                                      {analysis.feedback.questions.map((question) => (
                                         <div key={question.label} className="rounded-2xl bg-slate-50 p-3">
                                           <div className="flex items-center justify-between gap-3">
                                             <span className="font-medium text-slate-800">{question.label}</span>
@@ -421,9 +482,12 @@ export default function Dashboard() {
                                     </div>
                                   </div>
                                 )}
-                              </div>
-                            )
-                          })()}
+                                </div>
+                              )
+                            })()
+                          ) : (
+                            <p className="mt-4 text-sm text-slate-500">Analysis unavailable for this QR job right now.</p>
+                          )}
                         </div>
                       )}
                     </article>

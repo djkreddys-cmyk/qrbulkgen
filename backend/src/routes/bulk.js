@@ -131,6 +131,26 @@ function extractPublicAnalysisTarget(content) {
   return null;
 }
 
+function normalizeTrackedUrl(url) {
+  const raw = String(url || "").trim();
+  if (!/^https?:\/\//i.test(raw)) {
+    return raw;
+  }
+
+  try {
+    const parsed = new URL(raw);
+    const expiry = parsed.searchParams.get("exp") || "";
+    parsed.searchParams.delete("exp");
+    return {
+      url: parsed.toString(),
+      expiry,
+      isExpired: expiry ? new Date(expiry).getTime() < Date.now() : false,
+    };
+  } catch (_error) {
+    return { url: raw, expiry: "", isExpired: false };
+  }
+}
+
 function normalizeBulkOptions(body) {
   const fakePayload = {
     content: "csv-placeholder",
@@ -709,10 +729,21 @@ bulkRouter.get("/jobs/:id/analysis", requireAuth, async (req, res, next) => {
     );
 
     const typePerformanceRow = typePerformanceResult.rows[0];
+    const normalizedTracking = normalizeTrackedUrl(job.qr_content);
     const publicTarget = extractPublicAnalysisTarget(job.qr_content);
 
     let rating = null;
     let feedback = null;
+    let engagement = {
+      targetUrl: normalizedTracking?.url || "",
+      expiryDate: normalizedTracking?.expiry || "",
+      isExpired: normalizedTracking?.isExpired || false,
+      totalScans: 0,
+      lastScanAt: null,
+      totalSubmissions: 0,
+      lastSubmissionAt: null,
+      targetKind: publicTarget?.kind || null,
+    };
 
     if (publicTarget?.kind === "rating" && publicTarget.title) {
       const ratingRows = await query(
@@ -772,6 +803,62 @@ bulkRouter.get("/jobs/:id/analysis", requireAuth, async (req, res, next) => {
       };
     }
 
+    if (normalizedTracking?.url) {
+      const scanRows = await query(
+        `SELECT COUNT(*)::int AS total_scans, MAX(created_at) AS last_scan_at
+         FROM analytics_events
+         WHERE event_type = 'qr.public.scan'
+           AND metadata->>'targetUrl' = $1`,
+        [normalizedTracking.url],
+      );
+
+      const scanRow = scanRows.rows[0] || {};
+      engagement = {
+        ...engagement,
+        totalScans: scanRow.total_scans || 0,
+        lastScanAt: scanRow.last_scan_at || null,
+      };
+
+      if (publicTarget?.kind === "rating") {
+        const submissionRows = await query(
+          `SELECT COUNT(*)::int AS total_submissions, MAX(created_at) AS last_submission_at
+           FROM rating_submissions
+           WHERE source_url = $1`,
+          [normalizedTracking.url],
+        );
+        const submission = submissionRows.rows[0] || {};
+        engagement = {
+          ...engagement,
+          totalSubmissions: submission.total_submissions || 0,
+          lastSubmissionAt: submission.last_submission_at || null,
+        };
+      } else if (publicTarget?.kind === "feedback") {
+        const submissionRows = await query(
+          `SELECT COUNT(*)::int AS total_submissions, MAX(created_at) AS last_submission_at
+           FROM feedback_submissions
+           WHERE source_url = $1`,
+          [normalizedTracking.url],
+        );
+        const submission = submissionRows.rows[0] || {};
+        engagement = {
+          ...engagement,
+          totalSubmissions: submission.total_submissions || 0,
+          lastSubmissionAt: submission.last_submission_at || null,
+        };
+      }
+    }
+
+    let insight = "This QR job is generating successfully.";
+    if (job.failure_count > 0) {
+      insight = "This QR job had generation failures. Review the failed rows or settings before reusing it.";
+    } else if (engagement.isExpired) {
+      insight = "This QR is expired. New scans should now see the expiry warning instead of the original experience.";
+    } else if (engagement.totalScans > 0 && engagement.totalSubmissions > 0) {
+      insight = `This QR is active and converting: ${engagement.totalSubmissions} submission(s) from ${engagement.totalScans} scan(s).`;
+    } else if (engagement.totalScans > 0) {
+      insight = `This QR is being scanned (${engagement.totalScans} total scan${engagement.totalScans === 1 ? "" : "s"}), but engagement is still low.`;
+    }
+
     res.json({
       analysis: {
         job: {
@@ -794,6 +881,8 @@ bulkRouter.get("/jobs/:id/analysis", requireAuth, async (req, res, next) => {
               failedJobs: typePerformanceRow.failed_jobs,
             }
           : null,
+        engagement,
+        insight,
         rating,
         feedback,
       },

@@ -7,6 +7,7 @@ const { query } = require("../db/postgres");
 const { loadEnv } = require("../config/env");
 const { createHttpError } = require("../lib/http-error");
 const { requireAuth } = require("../middleware/auth");
+const { trackEvent } = require("../services/analytics");
 
 const publicRouter = express.Router();
 
@@ -91,6 +92,19 @@ function rewriteLegacyUrl(url, req) {
 function getRequestIp(req) {
   const forwarded = String(req.headers["x-forwarded-for"] || "").split(",")[0].trim();
   return forwarded || req.ip || "";
+}
+
+function normalizeTrackingUrl(url) {
+  const raw = String(url || "").trim();
+  if (!raw) return "";
+
+  try {
+    const parsed = new URL(raw);
+    parsed.searchParams.delete("exp");
+    return parsed.toString();
+  } catch {
+    return raw;
+  }
 }
 
 publicRouter.post(
@@ -210,7 +224,7 @@ publicRouter.post("/rate-submit", async (req, res, next) => {
         style,
         scale,
         rating,
-        sourceUrl || null,
+        normalizeTrackingUrl(sourceUrl) || null,
         String(req.headers["user-agent"] || "").slice(0, 1000),
         getRequestIp(req).slice(0, 255),
       ],
@@ -254,7 +268,7 @@ publicRouter.post("/feedback-submit", async (req, res, next) => {
         title || null,
         JSON.stringify(questions),
         JSON.stringify(answers),
-        sourceUrl || null,
+        normalizeTrackingUrl(sourceUrl) || null,
         String(req.headers["user-agent"] || "").slice(0, 1000),
         getRequestIp(req).slice(0, 255),
       ],
@@ -266,6 +280,35 @@ publicRouter.post("/feedback-submit", async (req, res, next) => {
         createdAt: result.rows[0].created_at,
       },
     });
+  } catch (error) {
+    next(error);
+  }
+});
+
+publicRouter.post("/track-view", async (req, res, next) => {
+  try {
+    const sourceUrl = normalizeTrackingUrl(req.body.sourceUrl);
+    const title = String(req.body.title || "").trim().slice(0, 255);
+    const targetKind = String(req.body.targetKind || "").trim().slice(0, 64);
+    const expired = Boolean(req.body.expired);
+
+    if (!sourceUrl) {
+      throw createHttpError(400, "VALIDATION_ERROR", "sourceUrl is required");
+    }
+
+    await trackEvent({
+      eventType: "qr.public.scan",
+      metadata: {
+        targetUrl: sourceUrl,
+        title: title || null,
+        targetKind: targetKind || null,
+        expired,
+        userAgent: String(req.headers["user-agent"] || "").slice(0, 255),
+        ipAddress: getRequestIp(req).slice(0, 255),
+      },
+    });
+
+    res.status(201).json({ ok: true });
   } catch (error) {
     next(error);
   }

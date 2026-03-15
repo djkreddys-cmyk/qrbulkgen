@@ -3,6 +3,19 @@
 import { useMemo, useState } from "react"
 import { useSearchParams } from "next/navigation"
 import { apiRequest } from "../../lib/api"
+import PublicScanTracker from "../../components/PublicScanTracker"
+
+function normalizeTrackingUrl(value) {
+  const raw = String(value || "").trim()
+  if (!raw) return ""
+  try {
+    const parsed = new URL(raw)
+    parsed.searchParams.delete("exp")
+    return parsed.toString()
+  } catch {
+    return raw
+  }
+}
 
 export default function RateClientPage() {
   const searchParams = useSearchParams()
@@ -32,7 +45,7 @@ export default function RateClientPage() {
           style,
           scale,
           rating,
-          sourceUrl: typeof window !== "undefined" ? window.location.href : "",
+          sourceUrl: typeof window !== "undefined" ? normalizeTrackingUrl(window.location.href) : "",
         }),
       })
       setSubmissionId(data?.submission?.id || "")
@@ -48,6 +61,7 @@ export default function RateClientPage() {
     <main className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
       <section className="w-full max-w-lg bg-white border rounded-lg p-8">
         <h1 className="text-2xl font-bold">{title}</h1>
+        <PublicScanTracker title={title} targetKind="rating" expired={isExpired} />
 
         {isExpired ? (
           <div className="mt-6 rounded border border-amber-200 bg-amber-50 p-4 text-amber-800">

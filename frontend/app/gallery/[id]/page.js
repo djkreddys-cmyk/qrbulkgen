@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { useParams, useSearchParams } from "next/navigation"
 import { apiRequest } from "../../../lib/api"
+import PublicScanTracker from "../../../components/PublicScanTracker"
 
 export default function GalleryPage() {
   const params = useParams()
@@ -51,6 +52,7 @@ export default function GalleryPage() {
   return (
     <main className="max-w-5xl mx-auto p-6">
       <h1 className="text-3xl font-bold mb-6">{title}</h1>
+      <PublicScanTracker title={title} targetKind="gallery" expired={isExpired} />
       {loading && <p>Loading gallery...</p>}
       {!!error && <p className="text-red-600">{error}</p>}
       {!loading && !error && isExpired && (
