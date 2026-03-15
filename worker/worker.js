@@ -335,13 +335,13 @@ async function processBulkJob(jobId, queuedRows = null) {
     [jobId, successCount, failureCount],
   );
 
-  await db.query(
-    `INSERT INTO analytics_events (user_id, job_id, event_type, event_value, metadata)
-     SELECT user_id, id, 'qr.bulk.completed', $2, jsonb_build_object('failureCount', $3)
-     FROM qr_jobs
-     WHERE id = $1`,
-    [jobId, successCount, failureCount],
-  );
+    await db.query(
+      `INSERT INTO analytics_events (user_id, job_id, event_type, event_value, metadata)
+       SELECT user_id, id, 'qr.bulk.completed', $2::int, jsonb_build_object('failureCount', $3::int)
+       FROM qr_jobs
+       WHERE id = $1`,
+      [jobId, successCount, failureCount],
+    );
 }
 
 const worker = new Worker(
