@@ -8,14 +8,26 @@ import {
   View,
 } from "react-native";
 import { Picker } from "@react-native-picker/picker";
+import * as DocumentPicker from "expo-document-picker";
 
 import { useAuth } from "../context/AuthContext";
 import { apiRequest, createAuthHeaders } from "../lib/api";
 import { shareDataUrlFile } from "../lib/files";
-import { applyExpiryToContent, getQrPlaceholder, QR_TYPES, supportsExpiry } from "../lib/qr";
+import {
+  addSocialLinkRow,
+  buildQrContent,
+  getAvailableSocialPlatforms,
+  getQrPlaceholder,
+  hasRequiredFields,
+  INITIAL_QR_FIELDS,
+  QR_TYPES,
+  SOCIAL_PLATFORM_OPTIONS,
+  supportsExpiry,
+} from "../lib/qr";
 
 const FORMATS = ["png", "svg"];
 const EC_LEVELS = ["L", "M", "Q", "H"];
+const APP_ORIGIN = "https://www.qrbulkgen.com";
 
 function FieldLabel({ children }) {
   return <Text style={{ fontSize: 12, fontWeight: "700", color: "#475569", letterSpacing: 0.4 }}>{children}</Text>;
@@ -38,36 +50,95 @@ function Card({ children }) {
   );
 }
 
-function SelectRow({ label, value, options, onChange }) {
+function InputField({ label, value, onChangeText, placeholder, multiline = false, keyboardType = "default", editable = true }) {
   return (
     <View style={{ gap: 6 }}>
       <FieldLabel>{label}</FieldLabel>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-        <View style={{ flexDirection: "row", gap: 8 }}>
-          {options.map((option) => {
-            const active = option === value;
-            return (
-              <TouchableOpacity
-                key={option}
-                onPress={() => onChange(option)}
-                style={{
-                  paddingHorizontal: 12,
-                  paddingVertical: 8,
-                  borderRadius: 999,
-                  borderWidth: 1,
-                  borderColor: active ? "#0f172a" : "#cbd5e1",
-                  backgroundColor: active ? "#0f172a" : "#ffffff",
-                }}
-              >
-                <Text style={{ color: active ? "#ffffff" : "#0f172a", fontWeight: "600" }}>
-                  {option.toUpperCase()}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-      </ScrollView>
+      <TextInput
+        value={value}
+        onChangeText={onChangeText}
+        placeholder={placeholder}
+        multiline={multiline}
+        editable={editable}
+        keyboardType={keyboardType}
+        style={{
+          minHeight: multiline ? 96 : undefined,
+          borderWidth: 1,
+          borderColor: "#cbd5e1",
+          borderRadius: 16,
+          paddingHorizontal: 14,
+          paddingVertical: 12,
+          textAlignVertical: multiline ? "top" : "center",
+          color: editable ? "#0f172a" : "#64748b",
+          backgroundColor: editable ? "#ffffff" : "#f8fafc",
+        }}
+      />
     </View>
+  );
+}
+
+function PickerField({ label, value, options, onChange }) {
+  return (
+    <View style={{ gap: 6 }}>
+      <FieldLabel>{label}</FieldLabel>
+      <View style={{ borderWidth: 1, borderColor: "#cbd5e1", borderRadius: 16, overflow: "hidden" }}>
+        <Picker selectedValue={value} onValueChange={onChange}>
+          {options.map((option) => (
+            <Picker.Item key={option.value || option} label={option.label || option} value={option.value || option} />
+          ))}
+        </Picker>
+      </View>
+    </View>
+  );
+}
+
+function ToggleTabs({ value, options, onChange }) {
+  return (
+    <View style={{ flexDirection: "row", gap: 8 }}>
+      {options.map((option) => {
+        const active = option.value === value;
+        return (
+          <TouchableOpacity
+            key={option.value}
+            onPress={() => onChange(option.value)}
+            style={{
+              flex: 1,
+              borderWidth: 1,
+              borderColor: active ? "#0f172a" : "#cbd5e1",
+              borderRadius: 14,
+              paddingVertical: 10,
+              backgroundColor: active ? "#0f172a" : "#ffffff",
+            }}
+          >
+            <Text style={{ textAlign: "center", fontWeight: "700", color: active ? "#ffffff" : "#0f172a" }}>
+              {option.label}
+            </Text>
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
+}
+
+function ActionButton({ title, onPress, disabled = false, tone = "dark" }) {
+  const styles =
+    tone === "light"
+      ? { backgroundColor: "#e2e8f0", color: "#0f172a" }
+      : { backgroundColor: "#0f172a", color: "#ffffff" };
+
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      disabled={disabled}
+      style={{
+        backgroundColor: styles.backgroundColor,
+        paddingVertical: 14,
+        borderRadius: 16,
+        opacity: disabled ? 0.6 : 1,
+      }}
+    >
+      <Text style={{ color: styles.color, textAlign: "center", fontWeight: "700" }}>{title}</Text>
+    </TouchableOpacity>
   );
 }
 
@@ -75,18 +146,48 @@ export function SingleGenerateScreen() {
   const { token, singleDraft, setSingleDraft } = useAuth();
   const skipQrTypeResetRef = useRef(false);
   const [qrType, setQrType] = useState("URL");
-  const [content, setContent] = useState("https://www.qrbulkgen.com");
+  const [fields, setFields] = useState(INITIAL_QR_FIELDS);
+  const [socialLinks, setSocialLinks] = useState([{ platform: "Instagram", customPlatform: "", url: "" }]);
   const [filenamePrefix, setFilenamePrefix] = useState("mobile-qr");
   const [foregroundColor, setForegroundColor] = useState("#000000");
   const [backgroundColor, setBackgroundColor] = useState("#ffffff");
   const [format, setFormat] = useState("png");
   const [errorCorrectionLevel, setErrorCorrectionLevel] = useState("M");
+  const [expiryDate, setExpiryDate] = useState("");
+  const [galleryMode, setGalleryMode] = useState("url");
+  const [pdfMode, setPdfMode] = useState("url");
+  const [galleryAssets, setGalleryAssets] = useState([]);
+  const [pdfAsset, setPdfAsset] = useState(null);
+  const [galleryLinkId, setGalleryLinkId] = useState("");
+  const [pdfLinkId, setPdfLinkId] = useState("");
+  const [uploadingGallery, setUploadingGallery] = useState(false);
+  const [uploadingPdf, setUploadingPdf] = useState(false);
   const [artifact, setArtifact] = useState(null);
   const [job, setJob] = useState(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [shareMessage, setShareMessage] = useState("");
-  const [expiryDate, setExpiryDate] = useState("");
+  const [uploadMessage, setUploadMessage] = useState("");
+
+  const generatedContent = useMemo(
+    () =>
+      hasRequiredFields(
+        qrType,
+        fields,
+        { galleryLinkId, pdfLinkId },
+        { galleryMode, pdfMode },
+        socialLinks,
+      )
+        ? buildQrContent(qrType, fields, {
+            appOrigin: APP_ORIGIN,
+            socialLinks,
+            ids: { galleryLinkId, pdfLinkId },
+            modes: { galleryMode, pdfMode },
+            expiryDate,
+          })
+        : "",
+    [qrType, fields, galleryLinkId, pdfLinkId, galleryMode, pdfMode, socialLinks, expiryDate],
+  );
 
   const previewSource = useMemo(() => {
     if (!artifact?.dataUrl) return null;
@@ -96,16 +197,21 @@ export function SingleGenerateScreen() {
     return null;
   }, [artifact]);
 
+  function setField(name, value) {
+    setFields((prev) => ({ ...prev, [name]: value }));
+  }
+
   useEffect(() => {
-    if (!singleDraft) {
-      return;
-    }
+    if (!singleDraft) return;
+
     skipQrTypeResetRef.current = true;
     if (singleDraft.qrType) {
       setQrType(singleDraft.qrType);
-    }
-    if (singleDraft.content) {
-      setContent(singleDraft.content);
+      if (singleDraft.qrType === "URL") {
+        setFields((prev) => ({ ...prev, url: singleDraft.content || "" }));
+      } else if (singleDraft.qrType === "Text") {
+        setFields((prev) => ({ ...prev, text: singleDraft.content || "" }));
+      }
     }
     setSingleDraft(null);
   }, [singleDraft, setSingleDraft]);
@@ -119,25 +225,129 @@ export function SingleGenerateScreen() {
       setShareMessage("");
       return;
     }
+
+    setFields(INITIAL_QR_FIELDS);
+    setSocialLinks([{ platform: "Instagram", customPlatform: "", url: "" }]);
+    setGalleryMode("url");
+    setPdfMode("url");
+    setGalleryAssets([]);
+    setPdfAsset(null);
+    setGalleryLinkId("");
+    setPdfLinkId("");
+    setUploadMessage("");
     setArtifact(null);
     setJob(null);
     setError("");
     setShareMessage("");
-    setContent("");
     setExpiryDate("");
   }, [qrType]);
 
+  async function handlePickPdf() {
+    const result = await DocumentPicker.getDocumentAsync({
+      type: ["application/pdf", ".pdf"],
+      copyToCacheDirectory: true,
+      multiple: false,
+    });
+    if (result.canceled) return;
+    const asset = result.assets?.[0];
+    if (!asset) return;
+    setPdfAsset(asset);
+    setPdfLinkId("");
+    setUploadMessage("");
+    setError("");
+  }
+
+  async function handlePickGallery() {
+    const result = await DocumentPicker.getDocumentAsync({
+      type: ["image/*"],
+      copyToCacheDirectory: true,
+      multiple: true,
+    });
+    if (result.canceled) return;
+    const assets = result.assets || [];
+    setGalleryAssets(assets.slice(0, 10));
+    setGalleryLinkId("");
+    setUploadMessage("");
+    setError("");
+  }
+
+  async function uploadPdf() {
+    if (!pdfAsset?.uri) {
+      setError("Please choose a PDF file first.");
+      return;
+    }
+    try {
+      setUploadingPdf(true);
+      setError("");
+      setUploadMessage("");
+      const formData = new FormData();
+      formData.append("pdf", {
+        uri: pdfAsset.uri,
+        name: pdfAsset.name || `document-${Date.now()}.pdf`,
+        type: pdfAsset.mimeType || "application/pdf",
+      });
+      formData.append("title", pdfAsset.name || "PDF Document");
+      const data = await apiRequest("/public/upload/pdf", {
+        method: "POST",
+        headers: createAuthHeaders(token),
+        body: formData,
+      });
+      setPdfLinkId(data?.link?.id || "");
+      setUploadMessage("PDF uploaded successfully.");
+    } catch (requestError) {
+      setError(requestError.message || "Failed to upload PDF");
+    } finally {
+      setUploadingPdf(false);
+    }
+  }
+
+  async function uploadGallery() {
+    if (!galleryAssets.length) {
+      setError("Please choose image files first.");
+      return;
+    }
+    try {
+      setUploadingGallery(true);
+      setError("");
+      setUploadMessage("");
+      const formData = new FormData();
+      galleryAssets.forEach((asset, index) => {
+        formData.append("images", {
+          uri: asset.uri,
+          name: asset.name || `image-${index + 1}.jpg`,
+          type: asset.mimeType || "image/jpeg",
+        });
+      });
+      formData.append("title", "Image Gallery");
+      const data = await apiRequest("/public/upload/gallery", {
+        method: "POST",
+        headers: createAuthHeaders(token),
+        body: formData,
+      });
+      setGalleryLinkId(data?.link?.id || "");
+      setUploadMessage("Gallery uploaded successfully.");
+    } catch (requestError) {
+      setError(requestError.message || "Failed to upload gallery");
+    } finally {
+      setUploadingGallery(false);
+    }
+  }
+
   async function handleGenerate() {
+    if (!generatedContent) {
+      setError("Please fill the required fields for this QR type.");
+      return;
+    }
+
     setBusy(true);
     setError("");
     setShareMessage("");
     try {
-      const nextContent = applyExpiryToContent(qrType, content, expiryDate);
       const data = await apiRequest("/qr/single", {
         method: "POST",
         headers: createAuthHeaders(token),
         body: JSON.stringify({
-          content: nextContent,
+          content: generatedContent,
           qrType,
           filenamePrefix,
           foregroundColor,
@@ -171,157 +381,337 @@ export function SingleGenerateScreen() {
     }
   }
 
+  function renderTypeFields() {
+    if (qrType === "URL") {
+      return <InputField label="URL" value={fields.url} onChangeText={(value) => setField("url", value)} placeholder="https://example.com" />;
+    }
+    if (qrType === "Text") {
+      return <InputField label="Text" value={fields.text} onChangeText={(value) => setField("text", value)} placeholder="Enter text" multiline />;
+    }
+    if (qrType === "Email") {
+      return (
+        <>
+          <InputField label="Email" value={fields.email} onChangeText={(value) => setField("email", value)} placeholder="hello@example.com" keyboardType="email-address" />
+          <InputField label="Subject (optional)" value={fields.subject} onChangeText={(value) => setField("subject", value)} placeholder="Subject" />
+          <InputField label="Body (optional)" value={fields.body} onChangeText={(value) => setField("body", value)} placeholder="Message body" multiline />
+        </>
+      );
+    }
+    if (qrType === "Phone") {
+      return <InputField label="Phone" value={fields.phone} onChangeText={(value) => setField("phone", value)} placeholder="+919999999999" keyboardType="phone-pad" />;
+    }
+    if (qrType === "SMS") {
+      return (
+        <>
+          <InputField label="SMS Phone" value={fields.smsPhone} onChangeText={(value) => setField("smsPhone", value)} placeholder="+919999999999" keyboardType="phone-pad" />
+          <InputField label="SMS Message" value={fields.smsMessage} onChangeText={(value) => setField("smsMessage", value)} placeholder="Type your message" multiline />
+        </>
+      );
+    }
+    if (qrType === "WhatsApp") {
+      return (
+        <>
+          <InputField label="WhatsApp Number" value={fields.whatsappPhone} onChangeText={(value) => setField("whatsappPhone", value)} placeholder="+919999999999" keyboardType="phone-pad" />
+          <InputField label="WhatsApp Message" value={fields.whatsappMessage} onChangeText={(value) => setField("whatsappMessage", value)} placeholder="Message (optional)" multiline />
+        </>
+      );
+    }
+    if (qrType === "vCard") {
+      return (
+        <>
+          <InputField label="First Name" value={fields.firstName} onChangeText={(value) => setField("firstName", value)} placeholder="John" />
+          <InputField label="Last Name" value={fields.lastName} onChangeText={(value) => setField("lastName", value)} placeholder="Doe" />
+          <InputField label="Organization" value={fields.organization} onChangeText={(value) => setField("organization", value)} placeholder="QRBulkGen" />
+          <InputField label="Job Title" value={fields.jobTitle} onChangeText={(value) => setField("jobTitle", value)} placeholder="Manager" />
+          <InputField label="Phone" value={fields.vcardPhone} onChangeText={(value) => setField("vcardPhone", value)} placeholder="+919999999999" keyboardType="phone-pad" />
+          <InputField label="Email" value={fields.vcardEmail} onChangeText={(value) => setField("vcardEmail", value)} placeholder="john@example.com" keyboardType="email-address" />
+          <InputField label="Website URL" value={fields.vcardUrl} onChangeText={(value) => setField("vcardUrl", value)} placeholder="https://example.com" />
+          <InputField label="Address" value={fields.address} onChangeText={(value) => setField("address", value)} placeholder="Address" multiline />
+        </>
+      );
+    }
+    if (qrType === "Location") {
+      return (
+        <>
+          <InputField label="Latitude" value={fields.latitude} onChangeText={(value) => setField("latitude", value)} placeholder="17.385" keyboardType="decimal-pad" />
+          <InputField label="Longitude" value={fields.longitude} onChangeText={(value) => setField("longitude", value)} placeholder="78.4867" keyboardType="decimal-pad" />
+        </>
+      );
+    }
+    if (qrType === "Youtube") {
+      return <InputField label="YouTube URL" value={fields.youtubeUrl} onChangeText={(value) => setField("youtubeUrl", value)} placeholder="https://youtube.com/..." />;
+    }
+    if (qrType === "WIFI") {
+      return (
+        <>
+          <InputField label="SSID" value={fields.wifiSsid} onChangeText={(value) => setField("wifiSsid", value)} placeholder="OfficeWiFi" />
+          <InputField label="Password" value={fields.wifiPassword} onChangeText={(value) => setField("wifiPassword", value)} placeholder="password123" />
+          <PickerField
+            label="Security Type"
+            value={fields.wifiType}
+            options={[
+              { label: "WPA/WPA2", value: "WPA" },
+              { label: "WEP", value: "WEP" },
+              { label: "Open", value: "nopass" },
+            ]}
+            onChange={(value) => setField("wifiType", value)}
+          />
+        </>
+      );
+    }
+    if (qrType === "Event") {
+      return (
+        <>
+          <InputField label="Event Title" value={fields.eventTitle} onChangeText={(value) => setField("eventTitle", value)} placeholder="Launch Event" />
+          <InputField label="Start" value={fields.eventStart} onChangeText={(value) => setField("eventStart", value)} placeholder="YYYY-MM-DDTHH:mm" />
+          <InputField label="End" value={fields.eventEnd} onChangeText={(value) => setField("eventEnd", value)} placeholder="YYYY-MM-DDTHH:mm" />
+          <InputField label="Location" value={fields.eventLocation} onChangeText={(value) => setField("eventLocation", value)} placeholder="Venue / city" />
+          <InputField label="Description" value={fields.eventDescription} onChangeText={(value) => setField("eventDescription", value)} placeholder="Event description" multiline />
+        </>
+      );
+    }
+    if (qrType === "Bitcoin") {
+      return (
+        <>
+          <InputField label="Wallet Address" value={fields.bitcoinAddress} onChangeText={(value) => setField("bitcoinAddress", value)} placeholder="1BoatSLR..." />
+          <InputField label="Amount (optional)" value={fields.bitcoinAmount} onChangeText={(value) => setField("bitcoinAmount", value)} placeholder="0.001" keyboardType="decimal-pad" />
+          <InputField label="Label (optional)" value={fields.bitcoinLabel} onChangeText={(value) => setField("bitcoinLabel", value)} placeholder="Invoice 1001" />
+          <InputField label="Message (optional)" value={fields.bitcoinMessage} onChangeText={(value) => setField("bitcoinMessage", value)} placeholder="Payment note" />
+        </>
+      );
+    }
+    if (qrType === "PDF") {
+      return (
+        <View style={{ gap: 10 }}>
+          <ToggleTabs value={pdfMode} onChange={setPdfMode} options={[{ label: "URL", value: "url" }, { label: "Upload PDF", value: "upload" }]} />
+          {pdfMode === "url" ? (
+            <InputField label="PDF URL" value={fields.pdfUrl} onChangeText={(value) => setField("pdfUrl", value)} placeholder="https://example.com/file.pdf" />
+          ) : (
+            <View style={{ gap: 8 }}>
+              <Text style={{ color: "#64748b" }}>{pdfAsset?.name || "No PDF selected"}</Text>
+              <ActionButton title="Choose PDF" onPress={handlePickPdf} tone="light" />
+              <ActionButton title={uploadingPdf ? "Uploading..." : "Upload PDF"} onPress={uploadPdf} disabled={uploadingPdf || !pdfAsset} />
+            </View>
+          )}
+        </View>
+      );
+    }
+    if (qrType === "Social Media") {
+      return (
+        <View style={{ gap: 10 }}>
+          {socialLinks.map((item, index) => (
+            <View key={`${item.platform}-${index}`} style={{ gap: 8, borderWidth: 1, borderColor: "#dbe3f0", borderRadius: 16, padding: 12 }}>
+              <PickerField
+                label="Platform"
+                value={item.platform}
+                options={getAvailableSocialPlatforms(socialLinks, index)}
+                onChange={(value) =>
+                  setSocialLinks((prev) =>
+                    prev.map((entry, entryIndex) => (entryIndex === index ? { ...entry, platform: value } : entry)),
+                  )
+                }
+              />
+              {item.platform === "Custom" && (
+                <InputField
+                  label="Custom Platform"
+                  value={item.customPlatform}
+                  onChangeText={(value) =>
+                    setSocialLinks((prev) =>
+                      prev.map((entry, entryIndex) => (entryIndex === index ? { ...entry, customPlatform: value } : entry)),
+                    )
+                  }
+                  placeholder="Platform name"
+                />
+              )}
+              <InputField
+                label="URL"
+                value={item.url}
+                onChangeText={(value) =>
+                  setSocialLinks((prev) =>
+                    prev.map((entry, entryIndex) => (entryIndex === index ? { ...entry, url: value } : entry)),
+                  )
+                }
+                placeholder="https://..."
+              />
+              <ActionButton
+                title="Remove Link"
+                onPress={() => setSocialLinks((prev) => prev.filter((_, entryIndex) => entryIndex !== index))}
+                disabled={socialLinks.length === 1}
+                tone="light"
+              />
+            </View>
+          ))}
+          <ActionButton title="Add Social Link" onPress={() => setSocialLinks((prev) => addSocialLinkRow(prev))} tone="light" />
+        </View>
+      );
+    }
+    if (qrType === "App Store") {
+      return <InputField label="App Store URL" value={fields.appStoreUrl} onChangeText={(value) => setField("appStoreUrl", value)} placeholder="https://apps.apple.com/app/id..." />;
+    }
+    if (qrType === "Image Gallery") {
+      return (
+        <View style={{ gap: 10 }}>
+          <ToggleTabs value={galleryMode} onChange={setGalleryMode} options={[{ label: "URL", value: "url" }, { label: "Upload Images", value: "upload" }]} />
+          {galleryMode === "url" ? (
+            <InputField label="Gallery URL" value={fields.galleryUrl} onChangeText={(value) => setField("galleryUrl", value)} placeholder="https://example.com/gallery" />
+          ) : (
+            <View style={{ gap: 8 }}>
+              <Text style={{ color: "#64748b" }}>
+                {galleryAssets.length ? `${galleryAssets.length} image(s) selected` : "No images selected"}
+              </Text>
+              <ActionButton title="Choose Images" onPress={handlePickGallery} tone="light" />
+              <ActionButton title={uploadingGallery ? "Uploading..." : "Upload Gallery"} onPress={uploadGallery} disabled={uploadingGallery || !galleryAssets.length} />
+            </View>
+          )}
+        </View>
+      );
+    }
+    if (qrType === "Rating") {
+      return (
+        <>
+          <InputField label="Rating Page Title" value={fields.ratingTitle} onChangeText={(value) => setField("ratingTitle", value)} placeholder="Rate your experience" />
+          <PickerField
+            label="Rating Style"
+            value={fields.ratingStyle}
+            options={[
+              { label: "5 Star Rating", value: "stars" },
+              { label: "Number Rating", value: "numbers" },
+            ]}
+            onChange={(value) => setField("ratingStyle", value)}
+          />
+          {fields.ratingStyle === "numbers" ? (
+            <PickerField
+              label="Number Rating Scale"
+              value={fields.ratingScale}
+              options={[
+                { label: "1-5", value: "5" },
+                { label: "1-10", value: "10" },
+              ]}
+              onChange={(value) => setField("ratingScale", value)}
+            />
+          ) : (
+            <InputField label="Number Rating Scale" value="1-5 (stars)" onChangeText={() => {}} editable={false} />
+          )}
+        </>
+      );
+    }
+    if (qrType === "Feedback") {
+      return (
+        <View style={{ gap: 10 }}>
+          <InputField label="Feedback Form Title" value={fields.feedbackTitle} onChangeText={(value) => setField("feedbackTitle", value)} placeholder="Share your feedback" />
+          {fields.feedbackQuestions.map((question, index) => (
+            <View key={`feedback-${index}`} style={{ gap: 8 }}>
+              <InputField
+                label={`Question ${index + 1}`}
+                value={question}
+                onChangeText={(value) =>
+                  setFields((prev) => {
+                    const nextQuestions = [...prev.feedbackQuestions];
+                    nextQuestions[index] = value;
+                    return { ...prev, feedbackQuestions: nextQuestions };
+                  })
+                }
+                placeholder={`Question ${index + 1}`}
+              />
+              {fields.feedbackQuestions.length > 1 && (
+                <ActionButton
+                  title="Remove Question"
+                  onPress={() =>
+                    setFields((prev) => ({
+                      ...prev,
+                      feedbackQuestions: prev.feedbackQuestions.filter((_, itemIndex) => itemIndex !== index),
+                    }))
+                  }
+                  tone="light"
+                />
+              )}
+            </View>
+          ))}
+          <ActionButton
+            title="Add Question"
+            onPress={() =>
+              setFields((prev) => ({
+                ...prev,
+                feedbackQuestions: [...prev.feedbackQuestions, ""],
+              }))
+            }
+            tone="light"
+          />
+        </View>
+      );
+    }
+
+    return (
+      <InputField
+        label="Content"
+        value={fields.text}
+        onChangeText={(value) => setField("text", value)}
+        placeholder={getQrPlaceholder(qrType)}
+        multiline
+      />
+    );
+  }
+
   return (
     <ScrollView contentContainerStyle={{ gap: 16, paddingBottom: 36 }}>
       <Card>
         <Text style={{ fontSize: 24, fontWeight: "700", color: "#0f172a" }}>Single QR Generator</Text>
         <Text style={{ color: "#64748b", lineHeight: 22 }}>
-          Generate one QR instantly from your phone, preview it, then share the file to a teammate,
-          customer, or another app.
+          Mobile now follows the web QR type flow more closely, with dedicated fields per QR type instead of one generic content box.
         </Text>
       </Card>
 
       <Card>
-        <View style={{ gap: 6 }}>
-          <FieldLabel>QR TYPE</FieldLabel>
-          <View
-            style={{
-              borderWidth: 1,
-              borderColor: "#cbd5e1",
-              borderRadius: 16,
-              overflow: "hidden",
-            }}
-          >
-            <Picker selectedValue={qrType} onValueChange={setQrType}>
-              {QR_TYPES.map((option) => (
-                <Picker.Item key={option} label={option} value={option} />
-              ))}
-            </Picker>
-          </View>
-        </View>
+        <PickerField label="QR TYPE" value={qrType} options={QR_TYPES} onChange={setQrType} />
 
-        <View style={{ gap: 6 }}>
-          <FieldLabel>CONTENT</FieldLabel>
-          <TextInput
-            value={content}
-            onChangeText={setContent}
-            placeholder={getQrPlaceholder(qrType)}
-            multiline
-            style={{
-              minHeight: 96,
-              borderWidth: 1,
-              borderColor: "#cbd5e1",
-              borderRadius: 16,
-              padding: 14,
-              textAlignVertical: "top",
-              color: "#0f172a",
-            }}
-          />
-          <Text style={{ color: "#64748b", fontSize: 12 }}>
-            Example format: {getQrPlaceholder(qrType)}
-          </Text>
-        </View>
+        {renderTypeFields()}
 
-        <View style={{ gap: 6 }}>
-          <FieldLabel>LAST SCAN DATE / EXPIRY</FieldLabel>
-          <TextInput
-            value={expiryDate}
-            onChangeText={setExpiryDate}
-            placeholder="MM/DD/YYYY or DD/MM/YYYY"
-            style={{
-              borderWidth: 1,
-              borderColor: "#cbd5e1",
-              borderRadius: 16,
-              paddingHorizontal: 14,
-              paddingVertical: 12,
-              color: "#0f172a",
-            }}
-          />
-          <Text style={{ color: "#64748b", fontSize: 12, lineHeight: 18 }}>
-            You can set a last scan date for every QR type here. Leave blank to default app-hosted validity to
-            6 months from creation. Expiry warnings are currently enforced on app-hosted QR pages like Rating,
-            Feedback, PDF, and Image Gallery.
-            {!supportsExpiry(qrType, content) ? " Direct QR content types may not honor expiry after scan yet." : ""}
-          </Text>
-        </View>
+        {!!uploadMessage && <Text style={{ color: "#047857" }}>{uploadMessage}</Text>}
+        {!!error && <Text style={{ color: "#b91c1c" }}>{error}</Text>}
 
-        <View style={{ gap: 6 }}>
-          <FieldLabel>FILE NAME</FieldLabel>
-          <TextInput
-            value={filenamePrefix}
-            onChangeText={setFilenamePrefix}
-            placeholder="mobile-qr"
-            style={{
-              borderWidth: 1,
-              borderColor: "#cbd5e1",
-              borderRadius: 16,
-              paddingHorizontal: 14,
-              paddingVertical: 12,
-              color: "#0f172a",
-            }}
-          />
-        </View>
+        <InputField
+          label="LAST SCAN DATE / EXPIRY"
+          value={expiryDate}
+          onChangeText={setExpiryDate}
+          placeholder="MM/DD/YYYY or DD/MM/YYYY"
+        />
+        <Text style={{ color: "#64748b", fontSize: 12, lineHeight: 18 }}>
+          Leave blank to default validity to 6 months from creation for app-hosted QR flows.{" "}
+          {!supportsExpiry(qrType, generatedContent)
+            ? "Direct QR content types may not honor expiry after scan yet."
+            : "This QR type supports app-hosted expiry handling."}
+        </Text>
 
-        <View style={{ flexDirection: "row", gap: 12 }}>
-          <View style={{ flex: 1, gap: 6 }}>
-            <FieldLabel>FOREGROUND</FieldLabel>
-            <TextInput
-              value={foregroundColor}
-              onChangeText={setForegroundColor}
-              autoCapitalize="characters"
-              style={{
-                borderWidth: 1,
-                borderColor: "#cbd5e1",
-                borderRadius: 16,
-                paddingHorizontal: 14,
-                paddingVertical: 12,
-                color: "#0f172a",
-              }}
-            />
-          </View>
-          <View style={{ flex: 1, gap: 6 }}>
-            <FieldLabel>BACKGROUND</FieldLabel>
-            <TextInput
-              value={backgroundColor}
-              onChangeText={setBackgroundColor}
-              autoCapitalize="characters"
-              style={{
-                borderWidth: 1,
-                borderColor: "#cbd5e1",
-                borderRadius: 16,
-                paddingHorizontal: 14,
-                paddingVertical: 12,
-                color: "#0f172a",
-              }}
-            />
-          </View>
-        </View>
-
-        <SelectRow label="FORMAT" value={format} options={FORMATS} onChange={setFormat} />
-        <SelectRow
-          label="ERROR CORRECTION"
-          value={errorCorrectionLevel}
-          options={EC_LEVELS}
-          onChange={setErrorCorrectionLevel}
+        <InputField
+          label="FILE NAME"
+          value={filenamePrefix}
+          onChangeText={setFilenamePrefix}
+          placeholder="mobile-qr"
         />
 
-        {!!error && <Text style={{ color: "#b91c1c" }}>{error}</Text>}
-        {!!shareMessage && <Text style={{ color: "#047857" }}>{shareMessage}</Text>}
+        <View style={{ flexDirection: "row", gap: 12 }}>
+          <View style={{ flex: 1 }}>
+            <InputField
+              label="FOREGROUND"
+              value={foregroundColor}
+              onChangeText={setForegroundColor}
+              placeholder="#000000"
+            />
+          </View>
+          <View style={{ flex: 1 }}>
+            <InputField
+              label="BACKGROUND"
+              value={backgroundColor}
+              onChangeText={setBackgroundColor}
+              placeholder="#ffffff"
+            />
+          </View>
+        </View>
 
-        <TouchableOpacity
-          onPress={handleGenerate}
-          disabled={busy}
-          style={{
-            backgroundColor: "#0f172a",
-            paddingVertical: 14,
-            borderRadius: 16,
-            opacity: busy ? 0.7 : 1,
-          }}
-        >
-          <Text style={{ color: "#ffffff", textAlign: "center", fontWeight: "700" }}>
-            {busy ? "Generating..." : "Generate QR"}
-          </Text>
-        </TouchableOpacity>
+        <PickerField label="FORMAT" value={format} options={FORMATS} onChange={setFormat} />
+        <PickerField label="ERROR CORRECTION" value={errorCorrectionLevel} options={EC_LEVELS} onChange={setErrorCorrectionLevel} />
+
+        <ActionButton title={busy ? "Generating..." : "Generate QR"} onPress={handleGenerate} disabled={busy} />
       </Card>
 
       <Card>
@@ -353,25 +743,14 @@ export function SingleGenerateScreen() {
             }}
           >
             <Text style={{ color: "#64748b" }}>
-              Preview will appear here after generation. PNG shows inline, while SVG can still be shared
-              after creation.
+              Preview will appear here after generation. PNG shows inline, while SVG can still be shared after creation.
             </Text>
           </View>
         )}
 
-        <TouchableOpacity
-          onPress={handleShare}
-          disabled={!artifact?.dataUrl}
-          style={{
-            backgroundColor: artifact?.dataUrl ? "#e2e8f0" : "#f1f5f9",
-            paddingVertical: 14,
-            borderRadius: 16,
-          }}
-        >
-          <Text style={{ color: "#0f172a", textAlign: "center", fontWeight: "700" }}>
-            Share / Download File
-          </Text>
-        </TouchableOpacity>
+        {!!shareMessage && <Text style={{ color: "#047857" }}>{shareMessage}</Text>}
+
+        <ActionButton title="Share / Download File" onPress={handleShare} disabled={!artifact?.dataUrl} tone="light" />
       </Card>
     </ScrollView>
   );

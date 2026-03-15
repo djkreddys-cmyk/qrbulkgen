@@ -19,25 +19,83 @@ export const QR_TYPES = [
   "Feedback",
 ];
 
+export const SOCIAL_PLATFORM_OPTIONS = [
+  "Instagram",
+  "Facebook",
+  "Twitter",
+  "LinkedIn",
+  "YouTube",
+  "WhatsApp",
+  "Telegram",
+  "Snapchat",
+  "Pinterest",
+  "Custom",
+];
+
 export const QR_PLACEHOLDERS = {
   URL: "https://example.com",
   Text: "Write the text you want to encode",
-  Email: "mailto:hello@example.com",
-  Phone: "tel:+919999999999",
-  SMS: "sms:+919999999999?body=Hello",
-  WhatsApp: "https://wa.me/919999999999",
-  vCard: "BEGIN:VCARD\nVERSION:3.0\nFN:John Doe\nEMAIL:john@example.com\nEND:VCARD",
-  Location: "geo:17.385,78.4867",
+  Email: "hello@example.com",
+  Phone: "+919999999999",
+  SMS: "+919999999999",
+  WhatsApp: "+919999999999",
+  vCard: "John Doe",
+  Location: "17.385,78.4867",
   Youtube: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
-  WIFI: "WIFI:T:WPA;S:OfficeWiFi;P:password123;;",
-  Event: "BEGIN:VEVENT\nSUMMARY:Launch Event\nDTSTART:20260320T120000Z\nDTEND:20260320T140000Z\nEND:VEVENT",
-  Bitcoin: "bitcoin:1BoatSLRHtKNngkdXEeobR76b53LETtpyT?amount=0.001",
+  WIFI: "OfficeWiFi",
+  Event: "Launch Event",
+  Bitcoin: "1BoatSLRHtKNngkdXEeobR76b53LETtpyT",
   PDF: "https://www.qrbulkgen.com/sample.pdf",
   "Social Media": "https://www.instagram.com/yourbrand",
   "App Store": "https://apps.apple.com/app/id123456789",
   "Image Gallery": "https://www.qrbulkgen.com/gallery/demo",
-  Rating: "https://www.qrbulkgen.com/rating/demo",
-  Feedback: "https://www.qrbulkgen.com/feedback/demo",
+  Rating: "Rate your experience",
+  Feedback: "Share your feedback",
+};
+
+export const INITIAL_QR_FIELDS = {
+  url: "",
+  text: "",
+  email: "",
+  subject: "",
+  body: "",
+  phone: "",
+  smsPhone: "",
+  smsMessage: "",
+  whatsappPhone: "",
+  whatsappMessage: "",
+  firstName: "",
+  lastName: "",
+  organization: "",
+  jobTitle: "",
+  vcardPhone: "",
+  vcardEmail: "",
+  vcardUrl: "",
+  address: "",
+  latitude: "",
+  longitude: "",
+  youtubeUrl: "",
+  wifiType: "WPA",
+  wifiSsid: "",
+  wifiPassword: "",
+  wifiHidden: false,
+  eventTitle: "",
+  eventStart: "",
+  eventEnd: "",
+  eventLocation: "",
+  eventDescription: "",
+  bitcoinAddress: "",
+  bitcoinAmount: "",
+  bitcoinLabel: "",
+  bitcoinMessage: "",
+  pdfUrl: "",
+  appStoreUrl: "",
+  galleryUrl: "",
+  ratingTitle: "Rate your experience",
+  ratingStyle: "stars",
+  ratingScale: "5",
+  feedbackTitle: "Share your feedback",
+  feedbackQuestions: ["How was your experience?"],
 };
 
 export function getQrPlaceholder(qrType) {
@@ -97,6 +155,59 @@ export function parseFlexibleExpiry(value) {
   return Number.isNaN(fallback.getTime()) ? null : fallback;
 }
 
+function toUtcDateTime(value) {
+  if (!value) return "";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "";
+  const yyyy = parsed.getUTCFullYear();
+  const mm = String(parsed.getUTCMonth() + 1).padStart(2, "0");
+  const dd = String(parsed.getUTCDate()).padStart(2, "0");
+  const hh = String(parsed.getUTCHours()).padStart(2, "0");
+  const mi = String(parsed.getUTCMinutes()).padStart(2, "0");
+  const ss = String(parsed.getUTCSeconds()).padStart(2, "0");
+  return `${yyyy}${mm}${dd}T${hh}${mi}${ss}Z`;
+}
+
+function fallbackEventStartUtc() {
+  return toUtcDateTime(new Date().toISOString());
+}
+
+function fallbackEventEndUtc() {
+  return toUtcDateTime(new Date(Date.now() + 60 * 60 * 1000).toISOString());
+}
+
+function utf8ToBase64(value) {
+  const input = String(value || "");
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+  let bytes = [];
+
+  if (typeof TextEncoder !== "undefined") {
+    bytes = Array.from(new TextEncoder().encode(input));
+  } else {
+    bytes = Array.from(unescape(encodeURIComponent(input))).map((char) => char.charCodeAt(0));
+  }
+
+  let output = "";
+  for (let i = 0; i < bytes.length; i += 3) {
+    const a = bytes[i];
+    const b = i + 1 < bytes.length ? bytes[i + 1] : NaN;
+    const c = i + 2 < bytes.length ? bytes[i + 2] : NaN;
+
+    const triple = (a << 16) | ((Number.isNaN(b) ? 0 : b) << 8) | (Number.isNaN(c) ? 0 : c);
+
+    output += chars[(triple >> 18) & 63];
+    output += chars[(triple >> 12) & 63];
+    output += Number.isNaN(b) ? "=" : chars[(triple >> 6) & 63];
+    output += Number.isNaN(c) ? "=" : chars[triple & 63];
+  }
+
+  return output;
+}
+
+function encodePayload(value) {
+  return utf8ToBase64(JSON.stringify(value));
+}
+
 export function supportsExpiry(qrType, content) {
   if (["PDF", "Image Gallery", "Rating", "Feedback"].includes(qrType)) {
     return true;
@@ -109,7 +220,12 @@ export function supportsExpiry(qrType, content) {
   try {
     const parsed = new URL(content);
     const pathname = parsed.pathname.toLowerCase();
-    return pathname === "/rate" || pathname === "/feedback" || pathname.startsWith("/gallery/") || pathname.startsWith("/pdf/");
+    return (
+      pathname === "/rate" ||
+      pathname === "/feedback" ||
+      pathname.startsWith("/gallery/") ||
+      pathname.startsWith("/pdf/")
+    );
   } catch (_error) {
     return false;
   }
@@ -129,5 +245,181 @@ export function applyExpiryToContent(qrType, content, expiryInput) {
     return parsed.toString();
   } catch (_error) {
     return raw;
+  }
+}
+
+export function getAvailableSocialPlatforms(socialLinks, index) {
+  const current = socialLinks[index]?.platform;
+  const used = new Set(
+    socialLinks
+      .filter((_, itemIndex) => itemIndex !== index)
+      .map((item) => item.platform)
+      .filter((platform) => platform && platform !== "Custom"),
+  );
+
+  return SOCIAL_PLATFORM_OPTIONS.filter((platform) => {
+    if (platform === "Custom") return true;
+    if (platform === current) return true;
+    return !used.has(platform);
+  });
+}
+
+export function addSocialLinkRow(socialLinks) {
+  const used = new Set(
+    socialLinks.map((item) => item.platform).filter((platform) => platform && platform !== "Custom"),
+  );
+  const firstAvailable = SOCIAL_PLATFORM_OPTIONS.find(
+    (platform) => platform === "Custom" || !used.has(platform),
+  );
+  return [...socialLinks, { platform: firstAvailable || "Custom", customPlatform: "", url: "" }];
+}
+
+export function hasRequiredFields(qrType, fields, ids = {}, modes = {}, socialLinks = []) {
+  if (qrType === "PDF") {
+    return modes.pdfMode === "upload" ? !!ids.pdfLinkId : !!String(fields.pdfUrl || "").trim();
+  }
+  if (qrType === "Image Gallery") {
+    return modes.galleryMode === "upload" ? !!ids.galleryLinkId : !!String(fields.galleryUrl || "").trim();
+  }
+  if (qrType === "WhatsApp") {
+    return !!String(fields.whatsappPhone || "").replace(/[^\d]/g, "");
+  }
+  if (qrType === "Social Media") {
+    return socialLinks.some((item) => {
+      const platform = item.platform === "Custom" ? item.customPlatform : item.platform;
+      return String(platform || "").trim() && String(item.url || "").trim();
+    });
+  }
+  if (qrType === "Rating") return true;
+  if (qrType === "Feedback") return (fields.feedbackQuestions || []).some((q) => String(q || "").trim());
+  if (qrType === "Location") {
+    return !!String(fields.latitude || "").trim() && !!String(fields.longitude || "").trim();
+  }
+
+  const map = {
+    URL: fields.url,
+    Text: fields.text,
+    Email: fields.email,
+    Phone: fields.phone,
+    SMS: fields.smsPhone,
+    Youtube: fields.youtubeUrl,
+    WIFI: fields.wifiSsid,
+    Event: fields.eventTitle,
+    Bitcoin: fields.bitcoinAddress,
+    "App Store": fields.appStoreUrl,
+    vCard: fields.firstName,
+  };
+
+  return !!String(map[qrType] || "").trim();
+}
+
+export function buildQrContent(qrType, fields, options = {}) {
+  const {
+    appOrigin = "https://www.qrbulkgen.com",
+    socialLinks = [],
+    ids = {},
+    modes = {},
+    expiryDate = "",
+  } = options;
+
+  const expiryValue = parseFlexibleExpiry(expiryDate)?.toISOString() || addMonths(new Date(), 6).toISOString();
+  const expirySuffix = expiryValue ? `exp=${encodeURIComponent(expiryValue)}` : "";
+
+  switch (qrType) {
+    case "URL":
+      return String(fields.url || "").trim();
+    case "Text":
+      return String(fields.text || "").trim();
+    case "Email":
+      return `mailto:${String(fields.email || "").trim()}?subject=${encodeURIComponent(fields.subject || "")}&body=${encodeURIComponent(fields.body || "")}`;
+    case "Phone":
+      return `tel:${String(fields.phone || "").trim()}`;
+    case "SMS":
+      return `SMSTO:${String(fields.smsPhone || "").trim()}:${fields.smsMessage || ""}`;
+    case "WhatsApp": {
+      const phone = String(fields.whatsappPhone || "").replace(/[^\d]/g, "");
+      const text = fields.whatsappMessage ? `?text=${encodeURIComponent(fields.whatsappMessage)}` : "";
+      return `https://wa.me/${phone}${text}`;
+    }
+    case "vCard":
+      return [
+        "BEGIN:VCARD",
+        "VERSION:3.0",
+        `N:${fields.lastName || ""};${fields.firstName || ""}`,
+        `FN:${`${fields.firstName || ""} ${fields.lastName || ""}`.trim()}`,
+        `ORG:${fields.organization || ""}`,
+        `TITLE:${fields.jobTitle || ""}`,
+        `TEL:${fields.vcardPhone || ""}`,
+        `EMAIL:${fields.vcardEmail || ""}`,
+        `URL:${fields.vcardUrl || ""}`,
+        `ADR:;;${fields.address || ""}`,
+        "END:VCARD",
+      ].join("\n");
+    case "Location":
+      return `geo:${String(fields.latitude || "").trim()},${String(fields.longitude || "").trim()}`;
+    case "Youtube":
+      return String(fields.youtubeUrl || "").trim();
+    case "WIFI":
+      return `WIFI:T:${fields.wifiType || "WPA"};S:${fields.wifiSsid || ""};P:${fields.wifiPassword || ""};H:${fields.wifiHidden ? "true" : "false"};;`;
+    case "Event":
+      return [
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        "BEGIN:VEVENT",
+        `SUMMARY:${fields.eventTitle || ""}`,
+        `DTSTART:${toUtcDateTime(fields.eventStart) || fallbackEventStartUtc()}`,
+        `DTEND:${toUtcDateTime(fields.eventEnd) || fallbackEventEndUtc()}`,
+        `LOCATION:${fields.eventLocation || ""}`,
+        `DESCRIPTION:${fields.eventDescription || ""}`,
+        "END:VEVENT",
+        "END:VCALENDAR",
+      ].join("\n");
+    case "Bitcoin": {
+      const amount = fields.bitcoinAmount ? `?amount=${fields.bitcoinAmount}` : "";
+      const label = fields.bitcoinLabel
+        ? `${amount ? "&" : "?"}label=${encodeURIComponent(fields.bitcoinLabel)}`
+        : "";
+      const message = fields.bitcoinMessage
+        ? `${amount || label ? "&" : "?"}message=${encodeURIComponent(fields.bitcoinMessage)}`
+        : "";
+      return `bitcoin:${String(fields.bitcoinAddress || "").trim()}${amount}${label}${message}`;
+    }
+    case "PDF":
+      return ids.pdfLinkId
+        ? `${appOrigin}/pdf/${ids.pdfLinkId}${expirySuffix ? `?${expirySuffix}` : ""}`
+        : String(fields.pdfUrl || "").trim();
+    case "Social Media":
+      return socialLinks
+        .map((item) => {
+          const platform = item.platform === "Custom" ? item.customPlatform : item.platform;
+          const label = String(platform || "").trim();
+          const url = String(item.url || "").trim();
+          if (!label || !url) return "";
+          return `${label}: ${url}`;
+        })
+        .filter(Boolean)
+        .join("\n");
+    case "App Store":
+      return String(fields.appStoreUrl || "").trim();
+    case "Image Gallery":
+      return ids.galleryLinkId
+        ? `${appOrigin}/gallery/${ids.galleryLinkId}${expirySuffix ? `?${expirySuffix}` : ""}`
+        : String(fields.galleryUrl || "").trim();
+    case "Rating": {
+      const title = encodeURIComponent(fields.ratingTitle || "Rate your experience");
+      const style = encodeURIComponent(fields.ratingStyle || "stars");
+      const scale = encodeURIComponent((fields.ratingStyle || "stars") === "stars" ? "5" : fields.ratingScale || "5");
+      return `${appOrigin}/rate?title=${title}&style=${style}&scale=${scale}${expirySuffix ? `&${expirySuffix}` : ""}`;
+    }
+    case "Feedback": {
+      const questions = (fields.feedbackQuestions || []).map((q) => String(q || "").trim()).filter(Boolean);
+      const payload = encodePayload({
+        title: fields.feedbackTitle || "Share your feedback",
+        questions,
+      });
+      return `${appOrigin}/feedback?f=${encodeURIComponent(payload)}${expirySuffix ? `&${expirySuffix}` : ""}`;
+    }
+    default:
+      return "";
   }
 }
