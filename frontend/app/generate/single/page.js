@@ -74,6 +74,21 @@ function alphaHex(opacity) {
   return clamp(Math.round(opacity * 255), 0, 255).toString(16).padStart(2, "0")
 }
 
+function drawRoundedRect(ctx, x, y, width, height, radius) {
+  const r = Math.min(radius, width / 2, height / 2)
+  ctx.beginPath()
+  ctx.moveTo(x + r, y)
+  ctx.lineTo(x + width - r, y)
+  ctx.quadraticCurveTo(x + width, y, x + width, y + r)
+  ctx.lineTo(x + width, y + height - r)
+  ctx.quadraticCurveTo(x + width, y + height, x + width - r, y + height)
+  ctx.lineTo(x + r, y + height)
+  ctx.quadraticCurveTo(x, y + height, x, y + height - r)
+  ctx.lineTo(x, y + r)
+  ctx.quadraticCurveTo(x, y, x + r, y)
+  ctx.closePath()
+}
+
 async function extractBrandPalette(dataUrl) {
   if (!dataUrl || typeof window === "undefined") {
     return null
@@ -386,7 +401,7 @@ export function SingleGenerateContent({ embedded = false, brandMode = false }) {
   const [cornerDotStyle, setCornerDotStyle] = useState("dot")
   const [logoDataUrl, setLogoDataUrl] = useState("")
   const [brandAccentColor, setBrandAccentColor] = useState("#1d4ed8")
-  const [brandStrength, setBrandStrength] = useState("balanced")
+  const [brandLayoutMode, setBrandLayoutMode] = useState("balanced")
   const [downloadResolution, setDownloadResolution] = useState(1024)
   const [appOrigin, setAppOrigin] = useState("")
   const [expiryDate, setExpiryDate] = useState("")
@@ -691,9 +706,12 @@ export function SingleGenerateContent({ embedded = false, brandMode = false }) {
     }
   }
 
-  const brandImageSize = brandStrength === "subtle" ? 0.22 : brandStrength === "bold" ? 0.3 : 0.26
-  const brandSilhouetteOpacity = brandStrength === "subtle" ? 0.08 : brandStrength === "bold" ? 0.16 : 0.12
-  const brandBackgroundOpacity = brandStrength === "subtle" ? 0.18 : brandStrength === "bold" ? 0.34 : 0.26
+  const brandImageSize = brandLayoutMode === "safe" ? 0.18 : brandLayoutMode === "full" ? 0.12 : 0.15
+  const brandSilhouetteOpacity = brandLayoutMode === "safe" ? 0.18 : brandLayoutMode === "full" ? 0.34 : 0.26
+  const brandBackgroundOpacity = brandLayoutMode === "safe" ? 0.34 : brandLayoutMode === "full" ? 0.6 : 0.48
+  const brandBackgroundCoverage = brandLayoutMode === "safe" ? 0.82 : brandLayoutMode === "full" ? 1.08 : 0.94
+  const centerMaskOpacity = brandLayoutMode === "safe" ? 0.82 : brandLayoutMode === "full" ? 0.54 : 0.68
+  const centerMaskSize = brandLayoutMode === "safe" ? 0.28 : brandLayoutMode === "full" ? 0.22 : 0.25
   const previewBackgroundColor = brandMode && logoDataUrl ? `#ffffff${alphaHex(0.06)}` : backgroundColor
   const selectableQrTypes = brandMode
     ? QR_TYPES.filter((type) => ["Feedback", "Rating", "PDF", "Image Gallery", "URL"].includes(type))
@@ -786,13 +804,22 @@ export function SingleGenerateContent({ embedded = false, brandMode = false }) {
             backgroundImage.onerror = reject
           })
 
-          const logoBox = downloadResolution * 0.68
-          const logoX = (downloadResolution - logoBox) / 2
-          const logoY = (downloadResolution - logoBox) / 2
-          ctx.save()
-          ctx.globalAlpha = brandBackgroundOpacity
-          ctx.drawImage(backgroundImage, logoX, logoY, logoBox, logoBox)
-          ctx.restore()
+            const logoBox = downloadResolution * brandBackgroundCoverage
+            const logoX = (downloadResolution - logoBox) / 2
+            const logoY = (downloadResolution - logoBox) / 2
+            ctx.save()
+            ctx.globalAlpha = brandBackgroundOpacity
+            ctx.drawImage(backgroundImage, logoX, logoY, logoBox, logoBox)
+            ctx.restore()
+
+            const maskSize = downloadResolution * centerMaskSize
+            const maskX = (downloadResolution - maskSize) / 2
+            const maskY = (downloadResolution - maskSize) / 2
+            ctx.save()
+            ctx.fillStyle = `rgba(255, 255, 255, ${centerMaskOpacity})`
+            drawRoundedRect(ctx, maskX, maskY, maskSize, maskSize, downloadResolution * 0.035)
+            ctx.fill()
+            ctx.restore()
 
           const qrBlob = await qrCodeRef.current.getRawData("png")
           if (qrBlob) {
@@ -1107,14 +1134,14 @@ export function SingleGenerateContent({ embedded = false, brandMode = false }) {
                   <input type="color" value={brandAccentColor} onChange={(e) => setBrandAccentColor(e.target.value)} className="w-full border p-1 h-10" />
                 </div>
                 <div>
-                  <label className="block mb-1 text-sm">Logo Style Strength</label>
-                  <select value={brandStrength} onChange={(e) => setBrandStrength(e.target.value)} className="w-full border p-2">
-                    <option value="subtle">Subtle</option>
-                    <option value="balanced">Balanced</option>
-                    <option value="bold">Bold</option>
-                  </select>
+                    <label className="block mb-1 text-sm">Layout Mode</label>
+                    <select value={brandLayoutMode} onChange={(e) => setBrandLayoutMode(e.target.value)} className="w-full border p-2">
+                      <option value="safe">Safe</option>
+                      <option value="balanced">Balanced</option>
+                      <option value="full">Full Cover</option>
+                    </select>
+                  </div>
                 </div>
-              </div>
             )}
 
             <div className="grid grid-cols-2 gap-4">
@@ -1180,22 +1207,36 @@ export function SingleGenerateContent({ embedded = false, brandMode = false }) {
             <div className="mt-4 flex justify-center">
               <div className="relative flex items-center justify-center">
                 {brandMode && logoDataUrl && (
-                  <img
-                    src={logoDataUrl}
-                    alt="Brand silhouette"
-                    className="pointer-events-none absolute h-[250px] w-[250px] object-contain blur-[1px]"
-                    style={{ opacity: brandSilhouetteOpacity }}
-                  />
-                )}
-                <div ref={previewRef} className="relative z-10 flex justify-center" />
+                    <img
+                      src={logoDataUrl}
+                      alt="Brand silhouette"
+                      className="pointer-events-none absolute object-contain blur-[0.5px]"
+                      style={{
+                        width: `${brandBackgroundCoverage * 100}%`,
+                        height: `${brandBackgroundCoverage * 100}%`,
+                        opacity: brandSilhouetteOpacity,
+                      }}
+                    />
+                  )}
+                  {brandMode && logoDataUrl && (
+                    <div
+                      className="pointer-events-none absolute rounded-[20%] bg-white"
+                      style={{
+                        width: `${centerMaskSize * 100}%`,
+                        height: `${centerMaskSize * 100}%`,
+                        opacity: centerMaskOpacity,
+                      }}
+                    />
+                  )}
+                  <div ref={previewRef} className="relative z-10 flex justify-center" />
+                </div>
               </div>
-            </div>
             {brandMode && (
               <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
                 <p className="font-semibold text-slate-900">Brand QR guidance</p>
-                <p className="mt-2">Upload your logo, keep contrast high, and use this mode for a full-logo background QR. It auto-picks colors from the logo, overlays the QR on top of the artwork, and keeps the scannable matrix strong.</p>
-              </div>
-            )}
+                  <p className="mt-2">Upload your logo, keep contrast high, and use this mode for a full-logo background QR. It auto-picks colors from the logo, expands the artwork coverage, and protects the scan-critical center with a soft mask.</p>
+                </div>
+              )}
             <div className="mt-4">
               <label className="block mb-1">Download Resolution</label>
               <select value={downloadResolution} onChange={(e) => setDownloadResolution(Number(e.target.value))} className="w-full border p-2">
