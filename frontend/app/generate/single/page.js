@@ -289,7 +289,7 @@ function AnalysisPanel({ analysis }) {
   )
 }
 
-export function SingleGenerateContent({ embedded = false }) {
+export function SingleGenerateContent({ embedded = false, brandMode = false }) {
   const previewRef = useRef(null)
   const qrCodeRef = useRef(null)
 
@@ -341,6 +341,31 @@ export function SingleGenerateContent({ embedded = false }) {
   useEffect(() => {
     setAppOrigin(normalizeSiteOrigin(process.env.NEXT_PUBLIC_SITE_URL, window.location.origin))
   }, [])
+
+  useEffect(() => {
+    if (!brandMode || isEditing) return
+    setQrType((prev) => (prev === "URL" ? "Feedback" : prev))
+    setErrorCorrectionLevel("H")
+    setDotStyle("classy-rounded")
+    setCornerSquareStyle("extra-rounded")
+    setCornerDotStyle("dot")
+    setFilenamePrefix((prev) => (prev === "qr" ? "brand-qr" : prev))
+    setForegroundColor("#0f172a")
+    setBackgroundColor("#ffffff")
+  }, [brandMode, isEditing])
+
+  function applyBrandPreset() {
+    if (!isEditing && qrType === "URL") {
+      setQrType("Feedback")
+    }
+    setErrorCorrectionLevel("H")
+    setDotStyle("classy-rounded")
+    setCornerSquareStyle("extra-rounded")
+    setCornerDotStyle("dot")
+    setForegroundColor("#0f172a")
+    setBackgroundColor("#ffffff")
+    setFilenamePrefix("brand-qr")
+  }
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
@@ -956,9 +981,34 @@ export function SingleGenerateContent({ embedded = false }) {
           </section>
 
           <section className="border rounded-lg p-6 bg-white">
-            <h2 className="text-xl font-semibold">Live Preview</h2>
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-xl font-semibold">Live Preview</h2>
+                {brandMode && (
+                  <p className="mt-2 max-w-md text-sm text-slate-600">
+                    Brand QR uses your uploaded logo as the visual anchor and applies a denser branded preset.
+                    Feedback and other tracked flows usually produce richer dot patterns.
+                  </p>
+                )}
+              </div>
+              {brandMode && (
+                <button
+                  type="button"
+                  onClick={applyBrandPreset}
+                  className="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-900"
+                >
+                  Apply Brand Preset
+                </button>
+              )}
+            </div>
             {!generatedContent && <p className="mt-4 text-gray-600">Fill required fields to generate QR instantly.</p>}
             <div ref={previewRef} className="mt-4 flex justify-center" />
+            {brandMode && (
+              <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+                <p className="font-semibold text-slate-900">Brand QR guidance</p>
+                <p className="mt-2">Upload your logo, keep contrast high, and use this mode for a logo-led branded QR. This preserves scan reliability better than trying to turn the logo pixels directly into the QR matrix.</p>
+              </div>
+            )}
             <div className="mt-4">
               <label className="block mb-1">Download Resolution</label>
               <select value={downloadResolution} onChange={(e) => setDownloadResolution(Number(e.target.value))} className="w-full border p-2">

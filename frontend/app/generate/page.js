@@ -20,7 +20,7 @@ export default function GeneratePage() {
 
     const params = new URLSearchParams(window.location.search)
     const queryMode = params.get("mode")
-    if (queryMode === "bulk" || queryMode === "single") {
+    if (queryMode === "bulk" || queryMode === "single" || queryMode === "brand") {
       setMode(queryMode)
     }
     setIsCheckingSession(false)
@@ -49,10 +49,17 @@ export default function GeneratePage() {
           >
             Bulk
           </button>
+          <button
+            type="button"
+            onClick={() => setMode("brand")}
+            className={`px-4 py-2 ${mode === "brand" ? "bg-black text-white" : "bg-white text-black"}`}
+          >
+            Brand QR
+          </button>
         </div>
       </main>
 
-      {mode === "single" ? <SingleGenerateContent embedded /> : <BulkGenerateContent embedded />}
+      {mode === "single" ? <SingleGenerateContent embedded /> : mode === "brand" ? <SingleGenerateContent embedded brandMode /> : <BulkGenerateContent embedded />}
     </div>
   )
 }
