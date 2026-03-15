@@ -47,10 +47,60 @@ export const pricingTiers = [
 ];
 
 export const homepageStats = [
-  { label: "QR types available", value: "18+" },
-  { label: "Formats supported", value: "PNG, SVG, ZIP" },
-  { label: "Public experiences", value: "Ratings, feedback, gallery, PDF" },
-  { label: "Deployment stack", value: "Vercel + Railway + Mobile" },
+  {
+    id: "types",
+    label: "QR types available",
+    value: "18+",
+    title: "Cover direct payloads, tracked experiences, and business workflows from one generator.",
+    body:
+      "The product supports direct QR payloads like URL, Text, Email, Phone, and WiFi, plus richer tracked flows like Rating, Feedback, PDF, and Image Gallery.",
+    bullets: ["18+ supported QR paths", "Structured forms by QR type", "One styling layer across every flow"],
+  },
+  {
+    id: "formats",
+    label: "Formats supported",
+    value: "PNG, SVG, ZIP",
+    title: "Move from preview to production file formats without leaving the product.",
+    body:
+      "Single generation supports instant image downloads while bulk workflows package finished rows into ZIP artifacts for vendors, packaging teams, and campaign operators.",
+    bullets: ["Single downloads in PNG and SVG", "Bulk artifact delivery as ZIP", "Mobile share support for finished outputs"],
+  },
+  {
+    id: "public",
+    label: "Public experiences",
+    value: "Ratings, feedback, gallery, PDF",
+    title: "Turn scans into response, learning, and content experiences.",
+    body:
+      "QRBulkGen is not limited to redirects. Teams can launch scan destinations that capture ratings, collect feedback, open PDFs, or show image galleries with expiry-aware handling.",
+    bullets: ["Scan-aware rating flows", "Feedback question summaries", "Hosted content pages with expiry support"],
+  },
+  {
+    id: "history",
+    label: "Shared history",
+    value: "Web + mobile sync",
+    title: "Use one account across devices without losing job visibility.",
+    body:
+      "The same backend job history powers the web dashboard and the mobile app, which means teams can create on desktop and monitor or share results from phone.",
+    bullets: ["Shared dashboard across devices", "Job analysis in web and mobile", "Single account session continuity"],
+  },
+  {
+    id: "bulk",
+    label: "Bulk workflow",
+    value: "CSV queue + ZIP delivery",
+    title: "Handle volume with a real queue-based pipeline, not manual repetition.",
+    body:
+      "Bulk QR generation validates uploads, queues jobs, processes rows in the worker, and returns finished ZIP artifacts with status, counts, and analysis available later.",
+    bullets: ["CSV validation before queueing", "Worker-backed processing pipeline", "Completed ZIP delivery with history"],
+  },
+  {
+    id: "analysis",
+    label: "Analysis reports",
+    value: "Per-job + QR type insights",
+    title: "See more than output counts with analysis built into the operating system.",
+    body:
+      "Dashboard reporting includes per-job generation metrics, QR-type performance, scan tracking, rating summaries, and feedback analysis so teams can improve what they ship.",
+    bullets: ["Per-job analysis expansions", "QR-type report breakdowns", "Engagement metrics for tracked experiences"],
+  },
 ];
 
 export const landingPages = [
