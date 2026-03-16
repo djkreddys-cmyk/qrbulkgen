@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import QRCodeStyling from "qr-code-styling"
 import Navbar from "../../../components/Navbar"
-import LocationPicker from "../../../components/LocationPicker"
 import { apiRequest } from "../../../lib/api"
 import { getAuthToken } from "../../../lib/auth"
 import {
@@ -239,6 +238,26 @@ function buildLocationUrl(fields) {
   const query = String(fields.locationAddress || fields.locationName || "").trim()
   if (query) {
     return `https://www.openstreetmap.org/search?query=${encodeURIComponent(query)}`
+  }
+
+  return ""
+}
+
+function buildGoogleMapsPreviewUrl(fields) {
+  const mapsUrl = String(fields.mapsUrl || "").trim()
+  if (mapsUrl) {
+    return `https://maps.google.com/maps?output=embed&q=${encodeURIComponent(mapsUrl)}`
+  }
+
+  const latitude = String(fields.latitude || "").trim()
+  const longitude = String(fields.longitude || "").trim()
+  if (latitude && longitude) {
+    return `https://maps.google.com/maps?output=embed&q=${encodeURIComponent(`${latitude},${longitude}`)}`
+  }
+
+  const query = String(fields.locationAddress || fields.locationName || "").trim()
+  if (query) {
+    return `https://maps.google.com/maps?output=embed&q=${encodeURIComponent(query)}`
   }
 
   return ""
@@ -686,6 +705,16 @@ export function SingleGenerateContent({ embedded = false, brandMode = false }) {
     )
   }
 
+  function openMapLink() {
+    const target = buildLocationUrl(fields)
+    if (!target) {
+      setUploadError("Add a place, address, map link, or current location first.")
+      return
+    }
+
+    window.open(target, "_blank", "noopener,noreferrer")
+  }
+
   function renderLockedContentSummary() {
     const entries = (QR_FIELD_DEFINITIONS[qrType] || [])
       .filter((field) => field.key !== "feedbackQuestions" && field.key !== "socialLinks")
@@ -987,8 +1016,15 @@ export function SingleGenerateContent({ embedded = false, brandMode = false }) {
     <main className="max-w-6xl mx-auto px-6 py-10">
         <h1 className="text-3xl font-bold">Single QR Generator</h1>
         {!!editMessage && <p className="mt-3 text-sm text-blue-700">{editMessage}</p>}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mt-8">
-          <section className="border rounded-lg p-6 bg-white space-y-4">
+        <div className="mt-8 grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.85fr)_minmax(0,1fr)]">
+          <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">QR Data</p>
+              <h2 className="mt-2 text-xl font-semibold text-slate-900">Type and content</h2>
+              <p className="mt-1 text-sm text-slate-500">
+                Enter the QR content here. Styling and expiry controls are now grouped separately for a cleaner workflow.
+              </p>
+            </div>
             <select value={qrType} onChange={(e) => handleQrTypeChange(e.target.value)} className="w-full border p-2" disabled={isEditing}>
               {selectableQrTypes.map((type) => <option key={type} value={type}>{type}</option>)}
             </select>
@@ -1048,7 +1084,14 @@ export function SingleGenerateContent({ embedded = false, brandMode = false }) {
                       <input className="w-full border p-2" placeholder="Longitude" value={fields.longitude} onChange={(e) => updateLocationField("longitude", e.target.value)} />
                     </div>
                   </details>
-                  <p className="text-xs text-slate-500">Search a place, paste a map link, or use your current location. The map preview now stays in the live preview panel.</p>
+                  <button
+                    type="button"
+                    onClick={openMapLink}
+                    className="inline-flex rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700"
+                  >
+                    Open Map
+                  </button>
+                  <p className="text-xs text-slate-500">Fill a place, address, map link, or current location, then open the map in a separate tab.</p>
                 </div>
               )}
             {!lockContent && ["Youtube", "App Store"].includes(qrType) && (
@@ -1240,7 +1283,16 @@ export function SingleGenerateContent({ embedded = false, brandMode = false }) {
                 {!!uploadMessage && <p className="text-sm text-green-700">{uploadMessage}</p>}
               </div>
             )}
+          </section>
 
+          <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Customization</p>
+              <h2 className="mt-2 text-xl font-semibold text-slate-900">Style and validity</h2>
+              <p className="mt-1 text-sm text-slate-500">
+                Adjust expiry, colors, corners, logo, and output styling without mixing them into the QR data form.
+              </p>
+            </div>
             <div>
               <label className="block mb-1 text-sm">Last Scan Date / Expiry</label>
               <input
@@ -1321,7 +1373,7 @@ export function SingleGenerateContent({ embedded = false, brandMode = false }) {
             </div>
           </section>
 
-          <section className="border rounded-lg p-6 bg-white">
+          <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <h2 className="text-xl font-semibold">{brandMode ? "Brand QR Preview" : "Live Preview"}</h2>
@@ -1342,8 +1394,8 @@ export function SingleGenerateContent({ embedded = false, brandMode = false }) {
                 </button>
               )}
             </div>
-            {!generatedContent && <p className="mt-4 text-gray-600">Fill required fields to generate QR instantly.</p>}
-            <div className="mt-4 flex justify-center">
+            {!generatedContent && <p className="text-gray-600">Fill required fields to generate QR instantly.</p>}
+            <div className="flex justify-center rounded-2xl border border-slate-200 bg-slate-50 p-4">
               <div className="relative flex items-center justify-center">
                 {brandMode && logoDataUrl && (
                     <img
@@ -1370,24 +1422,34 @@ export function SingleGenerateContent({ embedded = false, brandMode = false }) {
                   <div ref={previewRef} className="relative z-10 flex justify-center" />
                 </div>
               </div>
-              {qrType === "Location" && (
-                <div className="mt-4">
-                  <LocationPicker value={fields} onSelect={handleLocationSelect} />
-                </div>
-              )}
-              {brandMode && (
-                <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-                  <p className="font-semibold text-slate-900">Brand QR guidance</p>
-                  <p className="mt-2">Upload your logo, keep contrast high, and use this mode for a full-logo background QR. It auto-picks colors from the logo, expands the artwork coverage, and protects the scan-critical center with a soft mask.</p>
-                </div>
-              )}
-            <div className="mt-4">
+            {qrType === "Location" && generatedContent && (
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+                <p className="font-semibold text-slate-900">Location Preview</p>
+                {buildGoogleMapsPreviewUrl(fields) && (
+                  <iframe
+                    title="Google Maps Preview"
+                    src={buildGoogleMapsPreviewUrl(fields)}
+                    className="mt-3 h-64 w-full rounded-xl border border-slate-200"
+                    loading="lazy"
+                    referrerPolicy="no-referrer-when-downgrade"
+                  />
+                )}
+                <p className="mt-2 break-all">{generatedContent}</p>
+              </div>
+            )}
+            {brandMode && (
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+                <p className="font-semibold text-slate-900">Brand QR guidance</p>
+                <p className="mt-2">Upload your logo, keep contrast high, and use this mode for a full-logo background QR. It auto-picks colors from the logo, expands the artwork coverage, and protects the scan-critical center with a soft mask.</p>
+              </div>
+            )}
+            <div>
               <label className="block mb-1">Download Resolution</label>
               <select value={downloadResolution} onChange={(e) => setDownloadResolution(Number(e.target.value))} className="w-full border p-2">
                 {DOWNLOAD_RESOLUTIONS.map((res) => <option key={res} value={res}>{res} x {res}</option>)}
               </select>
             </div>
-            {generatedContent && <button type="button" onClick={handleDownload} className="inline-block mt-4 px-4 py-2 bg-black text-white rounded">{editingJobId ? "Update QR" : "Download QR"}</button>}
+            {generatedContent && <button type="button" onClick={handleDownload} className="inline-block px-4 py-2 bg-black text-white rounded">{editingJobId ? "Update QR" : "Download QR"}</button>}
           </section>
         </div>
         {analysisLoading && <p className="mt-6 text-sm text-slate-500">Loading analysis...</p>}

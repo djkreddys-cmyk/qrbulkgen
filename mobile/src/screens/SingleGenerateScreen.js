@@ -9,9 +9,9 @@ import {
 } from "react-native";
 import { Picker } from "@react-native-picker/picker";
 import * as DocumentPicker from "expo-document-picker";
+import { WebView } from "react-native-webview";
 
 import { useAuth } from "../context/AuthContext";
-import LocationPickerWebView from "../components/LocationPickerWebView";
 import { apiRequest, createAuthHeaders } from "../lib/api";
 import { shareDataUrlFile } from "../lib/files";
 import {
@@ -255,6 +255,40 @@ export function SingleGenerateScreen() {
       latitude: nextLocation.latitude || prev.latitude,
       longitude: nextLocation.longitude || prev.longitude,
     }));
+  }
+
+  async function openMapLink() {
+    const target = buildQrContent("Location", fields);
+    if (!target) {
+      setError("Add a place, address, map link, or current location first.");
+      return;
+    }
+
+    try {
+      await Linking.openURL(target);
+    } catch (_error) {
+      setError("Unable to open the map link on this device.");
+    }
+  }
+
+  function buildGoogleMapsPreviewUrl() {
+    const mapsUrl = String(fields.mapsUrl || "").trim();
+    if (mapsUrl) {
+      return `https://maps.google.com/maps?output=embed&q=${encodeURIComponent(mapsUrl)}`;
+    }
+
+    const latitude = String(fields.latitude || "").trim();
+    const longitude = String(fields.longitude || "").trim();
+    if (latitude && longitude) {
+      return `https://maps.google.com/maps?output=embed&q=${encodeURIComponent(`${latitude},${longitude}`)}`;
+    }
+
+    const query = String(fields.locationAddress || fields.locationName || "").trim();
+    if (query) {
+      return `https://maps.google.com/maps?output=embed&q=${encodeURIComponent(query)}`;
+    }
+
+    return "";
   }
 
   function renderLockedContentSummary() {
@@ -582,10 +616,10 @@ export function SingleGenerateScreen() {
           <InputField label="Place name" value={fields.locationName} onChangeText={(value) => updateLocationField("locationName", value)} placeholder="Office, store, event venue" />
           <InputField label="Address" value={fields.locationAddress} onChangeText={(value) => updateLocationField("locationAddress", value)} placeholder="Street, area, city" multiline />
           <InputField label="Map Link" value={fields.mapsUrl} onChangeText={(value) => updateLocationField("mapsUrl", value)} placeholder="Paste a map share link" />
+          <ActionButton title="Open Map" onPress={openMapLink} tone="light" />
           <Text style={{ fontSize: 12, color: "#64748b", lineHeight: 18 }}>
-            Paste a map share link or fill a place/address. Coordinates are kept as an advanced option.
+            Fill a place, address, map link, or current location, then open the map externally.
           </Text>
-          <LocationPickerWebView value={fields} onSelect={handleLocationSelect} />
           <InputField label="Latitude (advanced)" value={fields.latitude} onChangeText={(value) => updateLocationField("latitude", value)} placeholder="17.385" keyboardType="decimal-pad" />
           <InputField label="Longitude (advanced)" value={fields.longitude} onChangeText={(value) => updateLocationField("longitude", value)} placeholder="78.4867" keyboardType="decimal-pad" />
         </>
@@ -836,7 +870,7 @@ export function SingleGenerateScreen() {
           placeholder="mobile-qr"
         />
 
-        <View style={{ flexDirection: "row", gap: 12 }}>
+          <View style={{ flexDirection: "row", gap: 12 }}>
           <View style={{ flex: 1 }}>
             <InputField
               label="FOREGROUND"
@@ -845,6 +879,20 @@ export function SingleGenerateScreen() {
               placeholder="#000000"
             />
           </View>
+
+          {qrType === "Location" && generatedContent ? (
+            <View style={{ borderWidth: 1, borderColor: "#dbe3f0", borderRadius: 18, overflow: "hidden", marginTop: 8 }}>
+              <View style={{ paddingHorizontal: 14, paddingVertical: 12, backgroundColor: "#f8fafc", borderBottomWidth: 1, borderBottomColor: "#e2e8f0" }}>
+                <Text style={{ color: "#0f172a", fontWeight: "700" }}>Google Maps Preview</Text>
+              </View>
+              {buildGoogleMapsPreviewUrl() ? (
+                <WebView source={{ uri: buildGoogleMapsPreviewUrl() }} style={{ height: 220 }} />
+              ) : null}
+              <View style={{ padding: 14 }}>
+                <Text style={{ color: "#64748b", fontSize: 12, lineHeight: 18 }}>{generatedContent}</Text>
+              </View>
+            </View>
+          ) : null}
           <View style={{ flex: 1 }}>
             <InputField
               label="BACKGROUND"
