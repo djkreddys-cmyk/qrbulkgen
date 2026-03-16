@@ -1,5 +1,6 @@
 import {
   INITIAL_QR_FIELDS,
+  parseScannedQrDraft,
   QR_FIELD_DEFINITIONS,
   QR_PLACEHOLDERS,
   QR_TYPES,
@@ -7,7 +8,7 @@ import {
   validateQrFields,
 } from "../../../shared/qr-config";
 
-export { INITIAL_QR_FIELDS, QR_FIELD_DEFINITIONS, QR_TYPES, SOCIAL_PLATFORM_OPTIONS };
+export { INITIAL_QR_FIELDS, parseScannedQrDraft, QR_FIELD_DEFINITIONS, QR_TYPES, SOCIAL_PLATFORM_OPTIONS };
 
 export function getQrPlaceholder(qrType) {
   return QR_PLACEHOLDERS[qrType] || "Enter QR content";
@@ -94,12 +95,12 @@ function buildLocationUrl(fields) {
   const latitude = String(fields.latitude || "").trim();
   const longitude = String(fields.longitude || "").trim();
   if (latitude && longitude) {
-    return `https://www.google.com/maps?q=${encodeURIComponent(`${latitude},${longitude}`)}`;
+    return `https://www.openstreetmap.org/?mlat=${encodeURIComponent(latitude)}&mlon=${encodeURIComponent(longitude)}#map=16/${encodeURIComponent(latitude)}/${encodeURIComponent(longitude)}`;
   }
 
   const query = String(fields.locationAddress || fields.locationName || "").trim();
   if (query) {
-    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
+    return `https://www.openstreetmap.org/search?query=${encodeURIComponent(query)}`;
   }
 
   return "";
@@ -364,163 +365,4 @@ export function buildQrContent(qrType, fields, options = {}) {
     default:
       return "";
   }
-}
-
-function decodeBase64Utf8(value) {
-  try {
-    if (typeof atob === "function") {
-      return decodeURIComponent(
-        Array.from(atob(value))
-          .map((char) => `%${char.charCodeAt(0).toString(16).padStart(2, "0")}`)
-          .join(""),
-      );
-    }
-  } catch (_error) {
-    return "";
-  }
-  return "";
-}
-
-export function parseScannedQrDraft(rawValue) {
-  const value = String(rawValue || "").trim();
-  if (!value) {
-    return { qrType: "Text", fields: { ...INITIAL_QR_FIELDS } };
-  }
-
-  const fields = { ...INITIAL_QR_FIELDS };
-
-  if (/^mailto:/i.test(value)) {
-    const parsed = value.replace(/^mailto:/i, "");
-    const [emailPart, queryString = ""] = parsed.split("?");
-    const params = new URLSearchParams(queryString);
-    fields.email = decodeURIComponent(emailPart || "");
-    fields.subject = params.get("subject") || "";
-    fields.body = params.get("body") || "";
-    return { qrType: "Email", fields };
-  }
-
-  if (/^tel:/i.test(value)) {
-    fields.phone = value.replace(/^tel:/i, "");
-    return { qrType: "Phone", fields };
-  }
-
-  if (/^SMSTO:/i.test(value)) {
-    const payload = value.replace(/^SMSTO:/i, "");
-    const separatorIndex = payload.indexOf(":");
-    fields.smsPhone = separatorIndex >= 0 ? payload.slice(0, separatorIndex) : payload;
-    fields.smsMessage = separatorIndex >= 0 ? payload.slice(separatorIndex + 1) : "";
-    return { qrType: "SMS", fields };
-  }
-
-  if (/^WIFI:/i.test(value)) {
-    const getPart = (key) => {
-      const match = value.match(new RegExp(`${key}:([^;]*)`));
-      return match ? match[1] : "";
-    };
-    fields.wifiType = getPart("T") || "WPA";
-    fields.wifiSsid = getPart("S");
-    fields.wifiPassword = getPart("P");
-    fields.wifiHidden = getPart("H").toLowerCase() === "true";
-    return { qrType: "WIFI", fields };
-  }
-
-  if (/^geo:/i.test(value)) {
-    const payload = value.replace(/^geo:/i, "");
-    const [latitude = "", longitude = ""] = payload.split(",");
-    fields.latitude = latitude.trim();
-    fields.longitude = longitude.trim();
-    fields.mapsUrl = `https://www.google.com/maps?q=${encodeURIComponent(`${fields.latitude},${fields.longitude}`)}`;
-    return { qrType: "Location", fields };
-  }
-
-  if (/^BEGIN:VCARD/i.test(value)) {
-    const lines = value.split(/\r?\n/);
-    const read = (prefix) => {
-      const line = lines.find((entry) => entry.startsWith(prefix));
-      return line ? line.slice(prefix.length) : "";
-    };
-    fields.firstName = read("FN:").split(" ")[0] || "";
-    fields.lastName = read("FN:").split(" ").slice(1).join(" ");
-    fields.organization = read("ORG:");
-    fields.jobTitle = read("TITLE:");
-    fields.vcardPhone = read("TEL:");
-    fields.vcardEmail = read("EMAIL:");
-    fields.vcardUrl = read("URL:");
-    fields.address = read("ADR:;;");
-    return { qrType: "vCard", fields };
-  }
-
-  if (/^https:\/\/wa\.me\//i.test(value)) {
-    try {
-      const parsed = new URL(value);
-      fields.whatsappPhone = parsed.pathname.replace(/\//g, "");
-      fields.whatsappMessage = parsed.searchParams.get("text") || "";
-      return { qrType: "WhatsApp", fields };
-    } catch (_error) {
-      return { qrType: "URL", fields: { ...fields, url: value } };
-    }
-  }
-
-  if (looksLikeUrl(value)) {
-    try {
-      const parsed = new URL(value);
-      const host = parsed.hostname.toLowerCase();
-      const pathname = parsed.pathname.toLowerCase();
-
-      if (host.includes("youtube.com") || host.includes("youtu.be")) {
-        fields.youtubeUrl = value;
-        return { qrType: "Youtube", fields };
-      }
-
-      if (host.includes("apps.apple.com")) {
-        fields.appStoreUrl = value;
-        return { qrType: "App Store", fields };
-      }
-
-      if (pathname === "/rate") {
-        fields.ratingTitle = parsed.searchParams.get("title") || fields.ratingTitle;
-        fields.ratingStyle = parsed.searchParams.get("style") || fields.ratingStyle;
-        fields.ratingScale = parsed.searchParams.get("scale") || fields.ratingScale;
-        return { qrType: "Rating", fields };
-      }
-
-      if (pathname === "/feedback") {
-        const payload = parsed.searchParams.get("f");
-        if (payload) {
-          const decoded = decodeBase64Utf8(payload);
-          if (decoded) {
-            try {
-              const parsedPayload = JSON.parse(decoded);
-              fields.feedbackTitle = parsedPayload.title || fields.feedbackTitle;
-              fields.feedbackQuestions = Array.isArray(parsedPayload.questions) && parsedPayload.questions.length
-                ? parsedPayload.questions
-                : fields.feedbackQuestions;
-            } catch (_error) {
-              // ignore malformed payload and keep defaults
-            }
-          }
-        }
-        return { qrType: "Feedback", fields };
-      }
-
-      if (pathname.startsWith("/pdf/")) {
-        fields.pdfUrl = value;
-        return { qrType: "PDF", fields };
-      }
-
-      if (pathname.startsWith("/gallery/")) {
-        fields.galleryUrl = value;
-        return { qrType: "Image Gallery", fields };
-      }
-
-      fields.url = value;
-      return { qrType: "URL", fields };
-    } catch (_error) {
-      fields.url = value;
-      return { qrType: "URL", fields };
-    }
-  }
-
-  fields.text = value;
-  return { qrType: "Text", fields };
 }

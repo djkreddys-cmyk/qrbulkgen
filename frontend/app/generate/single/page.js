@@ -8,6 +8,8 @@ import { apiRequest } from "../../../lib/api"
 import { getAuthToken } from "../../../lib/auth"
 import {
   DOWNLOAD_RESOLUTIONS,
+  INITIAL_QR_FIELDS,
+  parseScannedQrDraft,
   QR_FIELD_DEFINITIONS,
   QR_TYPES,
   SOCIAL_PLATFORM_OPTIONS,
@@ -231,12 +233,12 @@ function buildLocationUrl(fields) {
   const latitude = String(fields.latitude || "").trim()
   const longitude = String(fields.longitude || "").trim()
   if (latitude && longitude) {
-    return `https://www.google.com/maps?q=${encodeURIComponent(`${latitude},${longitude}`)}`
+    return `https://www.openstreetmap.org/?mlat=${encodeURIComponent(latitude)}&mlon=${encodeURIComponent(longitude)}#map=16/${encodeURIComponent(latitude)}/${encodeURIComponent(longitude)}`
   }
 
   const query = String(fields.locationAddress || fields.locationName || "").trim()
   if (query) {
-    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`
+    return `https://www.openstreetmap.org/search?query=${encodeURIComponent(query)}`
   }
 
   return ""
@@ -586,6 +588,27 @@ export function SingleGenerateContent({ embedded = false, brandMode = false }) {
     loadEditPayload()
   }, [])
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get("editJob")) return
+
+    const rawScannedValue =
+      params.get("scan") ||
+      params.get("content") ||
+      params.get("value") ||
+      params.get("raw")
+
+    if (!rawScannedValue) return
+
+    const draft = parseScannedQrDraft(rawScannedValue)
+    setQrType(draft.qrType || "Text")
+    setFields({
+      ...INITIAL_QR_FIELDS,
+      ...(draft.fields || {}),
+    })
+    setEditMessage("Loaded scanned QR content into the matching field layout.")
+  }, [])
+
   const canGenerate = useMemo(
     () =>
       hasRequiredFields(
@@ -620,7 +643,7 @@ export function SingleGenerateContent({ embedded = false, brandMode = false }) {
         }
       }
       if ((name === "latitude" || name === "longitude") && next.latitude && next.longitude && !next.mapsUrl) {
-        next.mapsUrl = `https://www.google.com/maps?q=${encodeURIComponent(`${next.latitude},${next.longitude}`)}`
+        next.mapsUrl = `https://www.openstreetmap.org/?mlat=${encodeURIComponent(next.latitude)}&mlon=${encodeURIComponent(next.longitude)}#map=16/${encodeURIComponent(next.latitude)}/${encodeURIComponent(next.longitude)}`
       }
       return next
     })
@@ -651,7 +674,7 @@ export function SingleGenerateContent({ embedded = false, brandMode = false }) {
           ...prev,
           latitude,
           longitude,
-          mapsUrl: `https://www.google.com/maps?q=${encodeURIComponent(`${latitude},${longitude}`)}`,
+          mapsUrl: `https://www.openstreetmap.org/?mlat=${encodeURIComponent(latitude)}&mlon=${encodeURIComponent(longitude)}#map=16/${encodeURIComponent(latitude)}/${encodeURIComponent(longitude)}`,
           locationName: prev.locationName || "Pinned location",
         }))
         setUploadError("")
@@ -1014,7 +1037,7 @@ export function SingleGenerateContent({ embedded = false, brandMode = false }) {
                 <div className="space-y-3 rounded-lg border p-3">
                   <input className="w-full border p-2" placeholder="Place name" value={fields.locationName} onChange={(e) => updateLocationField("locationName", e.target.value)} />
                   <textarea className="w-full border p-2" rows={2} placeholder="Address or landmark" value={fields.locationAddress} onChange={(e) => updateLocationField("locationAddress", e.target.value)} />
-                  <input className="w-full border p-2" placeholder="Paste Google Maps link (optional)" value={fields.mapsUrl} onChange={(e) => updateLocationField("mapsUrl", e.target.value)} />
+                  <input className="w-full border p-2" placeholder="Paste map link (optional)" value={fields.mapsUrl} onChange={(e) => updateLocationField("mapsUrl", e.target.value)} />
                   <div className="flex flex-wrap gap-2">
                     <button type="button" className="rounded border px-3 py-2 text-sm" onClick={useCurrentLocation}>Use Current Location</button>
                   </div>
@@ -1025,7 +1048,7 @@ export function SingleGenerateContent({ embedded = false, brandMode = false }) {
                       <input className="w-full border p-2" placeholder="Longitude" value={fields.longitude} onChange={(e) => updateLocationField("longitude", e.target.value)} />
                     </div>
                   </details>
-                  <p className="text-xs text-slate-500">Search a place, paste a Google Maps link, or use your current location. The map preview now stays in the live preview panel.</p>
+                  <p className="text-xs text-slate-500">Search a place, paste a map link, or use your current location. The map preview now stays in the live preview panel.</p>
                 </div>
               )}
             {!lockContent && ["Youtube", "App Store"].includes(qrType) && (

@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Image,
-  Linking,
   ScrollView,
   Text,
   TextInput,
@@ -241,23 +240,10 @@ export function SingleGenerateScreen() {
         }
       }
       if ((name === "latitude" || name === "longitude") && next.latitude && next.longitude && !next.mapsUrl) {
-        next.mapsUrl = `https://www.google.com/maps?q=${encodeURIComponent(`${next.latitude},${next.longitude}`)}`;
+        next.mapsUrl = `https://www.openstreetmap.org/?mlat=${encodeURIComponent(next.latitude)}&mlon=${encodeURIComponent(next.longitude)}#map=16/${encodeURIComponent(next.latitude)}/${encodeURIComponent(next.longitude)}`;
       }
       return next;
     });
-  }
-
-  async function openGoogleMaps() {
-    const query = String(fields.mapsUrl || fields.locationAddress || fields.locationName || "").trim();
-    const target = query
-      ? String(fields.mapsUrl || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`)
-      : "https://www.google.com/maps";
-
-    try {
-      await Linking.openURL(target);
-    } catch (_error) {
-      setError("Unable to open Google Maps on this device.");
-    }
   }
 
   function handleLocationSelect(nextLocation) {
@@ -595,10 +581,9 @@ export function SingleGenerateScreen() {
         <>
           <InputField label="Place name" value={fields.locationName} onChangeText={(value) => updateLocationField("locationName", value)} placeholder="Office, store, event venue" />
           <InputField label="Address" value={fields.locationAddress} onChangeText={(value) => updateLocationField("locationAddress", value)} placeholder="Street, area, city" multiline />
-          <InputField label="Google Maps URL" value={fields.mapsUrl} onChangeText={(value) => updateLocationField("mapsUrl", value)} placeholder="Paste a Google Maps share link" />
-          <ActionButton title="Open Google Maps" onPress={openGoogleMaps} tone="light" />
+          <InputField label="Map Link" value={fields.mapsUrl} onChangeText={(value) => updateLocationField("mapsUrl", value)} placeholder="Paste a map share link" />
           <Text style={{ fontSize: 12, color: "#64748b", lineHeight: 18 }}>
-            Paste a Google Maps share link or fill a place/address. Coordinates are kept as an advanced option.
+            Paste a map share link or fill a place/address. Coordinates are kept as an advanced option.
           </Text>
           <LocationPickerWebView value={fields} onSelect={handleLocationSelect} />
           <InputField label="Latitude (advanced)" value={fields.latitude} onChangeText={(value) => updateLocationField("latitude", value)} placeholder="17.385" keyboardType="decimal-pad" />

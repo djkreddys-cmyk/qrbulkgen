@@ -3,49 +3,99 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 
 const DEFAULT_CENTER = { lat: 17.385, lng: 78.4867 }
-const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ""
+const LEAFLET_CSS_ID = "leaflet-osm-css"
+const LEAFLET_JS_ID = "leaflet-osm-js"
 
-let scriptPromise = null
+let leafletPromise = null
 
-function loadGoogleMapsScript() {
+function buildOsmUrl(latitude, longitude) {
+  return `https://www.openstreetmap.org/?mlat=${latitude}&mlon=${longitude}#map=16/${latitude}/${longitude}`
+}
+
+function loadLeaflet() {
   if (typeof window === "undefined") {
-    return Promise.reject(new Error("Google Maps is only available in the browser."))
+    return Promise.reject(new Error("Leaflet can only load in the browser."))
   }
 
-  if (window.google?.maps?.places) {
-    return Promise.resolve(window.google)
+  if (window.L) {
+    return Promise.resolve(window.L)
   }
 
-  if (!GOOGLE_MAPS_API_KEY) {
-    return Promise.reject(new Error("Add NEXT_PUBLIC_GOOGLE_MAPS_API_KEY to enable the location picker."))
-  }
+  if (!leafletPromise) {
+    leafletPromise = new Promise((resolve, reject) => {
+      if (!document.getElementById(LEAFLET_CSS_ID)) {
+        const css = document.createElement("link")
+        css.id = LEAFLET_CSS_ID
+        css.rel = "stylesheet"
+        css.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        document.head.appendChild(css)
+      }
 
-  if (!scriptPromise) {
-    scriptPromise = new Promise((resolve, reject) => {
+      const existingScript = document.getElementById(LEAFLET_JS_ID)
+      if (existingScript) {
+        existingScript.addEventListener("load", () => resolve(window.L))
+        existingScript.addEventListener("error", () => reject(new Error("Failed to load OpenStreetMap map tools.")))
+        return
+      }
+
       const script = document.createElement("script")
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&libraries=places`
+      script.id = LEAFLET_JS_ID
+      script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
       script.async = true
-      script.defer = true
-      script.onload = () => resolve(window.google)
-      script.onerror = () => reject(new Error("Failed to load Google Maps."))
-      document.head.appendChild(script)
+      script.onload = () => resolve(window.L)
+      script.onerror = () => reject(new Error("Failed to load OpenStreetMap map tools."))
+      document.body.appendChild(script)
     })
   }
 
-  return scriptPromise
+  return leafletPromise
 }
 
-export default function LocationPicker({
-  value,
-  onSelect,
-}) {
+async function searchPlaces(query) {
+  const trimmed = String(query || "").trim()
+  if (!trimmed) return []
+
+  const response = await fetch(
+    `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=5&q=${encodeURIComponent(trimmed)}`,
+    {
+      headers: {
+        Accept: "application/json",
+      },
+    },
+  )
+
+  if (!response.ok) {
+    throw new Error("Unable to search OpenStreetMap right now.")
+  }
+
+  return response.json()
+}
+
+async function reverseLookup(latitude, longitude) {
+  const response = await fetch(
+    `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(latitude)}&lon=${encodeURIComponent(longitude)}`,
+    {
+      headers: {
+        Accept: "application/json",
+      },
+    },
+  )
+
+  if (!response.ok) {
+    throw new Error("Unable to read that map location.")
+  }
+
+  return response.json()
+}
+
+export default function LocationPicker({ value, onSelect }) {
   const mapRef = useRef(null)
-  const inputRef = useRef(null)
   const markerRef = useRef(null)
   const mapInstanceRef = useRef(null)
-  const autocompleteRef = useRef(null)
-  const geocoderRef = useRef(null)
   const [pickerError, setPickerError] = useState("")
+  const [searchQuery, setSearchQuery] = useState("")
+  const [suggestions, setSuggestions] = useState([])
+  const [isSearching, setIsSearching] = useState(false)
 
   const initialCenter = useMemo(() => {
     const latitude = Number(value?.latitude)
@@ -57,79 +107,71 @@ export default function LocationPicker({
   }, [value?.latitude, value?.longitude])
 
   useEffect(() => {
+    setSearchQuery(value?.locationName || value?.locationAddress || "")
+  }, [value?.locationName, value?.locationAddress])
+
+  useEffect(() => {
     let active = true
 
     async function setupMap() {
       try {
-        const google = await loadGoogleMapsScript()
-        if (!active || !mapRef.current || !inputRef.current) return
+        const L = await loadLeaflet()
+        if (!active || !mapRef.current) return
 
-        geocoderRef.current = new google.maps.Geocoder()
-        mapInstanceRef.current = new google.maps.Map(mapRef.current, {
-          center: initialCenter,
+        if (mapInstanceRef.current) {
+          mapInstanceRef.current.remove()
+        }
+
+        const map = L.map(mapRef.current, {
+          center: [initialCenter.lat, initialCenter.lng],
           zoom: value?.latitude && value?.longitude ? 15 : 11,
-          mapTypeControl: false,
-          streetViewControl: false,
-          fullscreenControl: false,
+          zoomControl: true,
         })
 
-        markerRef.current = new google.maps.Marker({
-          map: mapInstanceRef.current,
-          position: initialCenter,
-          visible: Boolean(value?.latitude && value?.longitude),
-        })
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+        }).addTo(map)
 
-        autocompleteRef.current = new google.maps.places.Autocomplete(inputRef.current, {
-          fields: ["formatted_address", "geometry", "name"],
-        })
+        const marker = L.marker([initialCenter.lat, initialCenter.lng], {
+          opacity: value?.latitude && value?.longitude ? 1 : 0,
+        }).addTo(map)
 
-        autocompleteRef.current.addListener("place_changed", () => {
-          const place = autocompleteRef.current.getPlace()
-          const location = place?.geometry?.location
-          if (!location) return
+        map.on("click", async (event) => {
+          const latitude = Number(event.latlng.lat).toFixed(6)
+          const longitude = Number(event.latlng.lng).toFixed(6)
+          marker.setLatLng([latitude, longitude]).setOpacity(1)
+          map.panTo([latitude, longitude])
 
-          const next = {
-            locationName: place.name || "",
-            locationAddress: place.formatted_address || "",
-            mapsUrl: `https://www.google.com/maps?q=${location.lat()},${location.lng()}`,
-            latitude: String(location.lat().toFixed(6)),
-            longitude: String(location.lng().toFixed(6)),
-          }
+          try {
+            const result = await reverseLookup(latitude, longitude)
+            const locationAddress = result?.display_name || ""
+            const locationName =
+              result?.name ||
+              result?.address?.amenity ||
+              result?.address?.building ||
+              result?.address?.road ||
+              "Pinned location"
 
-          markerRef.current?.setVisible(true)
-          markerRef.current?.setPosition(location)
-          mapInstanceRef.current?.panTo(location)
-          mapInstanceRef.current?.setZoom(16)
-          onSelect(next)
-        })
-
-        mapInstanceRef.current.addListener("click", (event) => {
-          const latitude = event.latLng.lat()
-          const longitude = event.latLng.lng()
-          markerRef.current?.setVisible(true)
-          markerRef.current?.setPosition(event.latLng)
-
-          const next = {
-            locationName: value?.locationName || "Pinned location",
-            locationAddress: value?.locationAddress || "",
-            mapsUrl: `https://www.google.com/maps?q=${latitude},${longitude}`,
-            latitude: String(latitude.toFixed(6)),
-            longitude: String(longitude.toFixed(6)),
-          }
-
-          if (geocoderRef.current) {
-            geocoderRef.current.geocode({ location: { lat: latitude, lng: longitude } }, (results) => {
-              const first = results?.[0]
-              onSelect({
-                ...next,
-                locationAddress: first?.formatted_address || next.locationAddress,
-                locationName: first?.address_components?.[0]?.long_name || next.locationName,
-              })
+            onSelect?.({
+              locationName,
+              locationAddress,
+              mapsUrl: buildOsmUrl(latitude, longitude),
+              latitude: String(latitude),
+              longitude: String(longitude),
             })
-          } else {
-            onSelect(next)
+          } catch (_error) {
+            onSelect?.({
+              locationName: value?.locationName || "Pinned location",
+              locationAddress: value?.locationAddress || "",
+              mapsUrl: buildOsmUrl(latitude, longitude),
+              latitude: String(latitude),
+              longitude: String(longitude),
+            })
           }
         })
+
+        mapInstanceRef.current = map
+        markerRef.current = marker
       } catch (error) {
         if (active) {
           setPickerError(error.message || "Location picker is unavailable right now.")
@@ -142,7 +184,7 @@ export default function LocationPicker({
     return () => {
       active = false
     }
-  }, [initialCenter.lat, initialCenter.lng])
+  }, [initialCenter.lat, initialCenter.lng, value?.latitude, value?.longitude])
 
   useEffect(() => {
     const map = mapInstanceRef.current
@@ -153,11 +195,63 @@ export default function LocationPicker({
       return
     }
 
-    const position = { lat: latitude, lng: longitude }
-    marker.setVisible(true)
-    marker.setPosition(position)
-    map.panTo(position)
+    marker.setLatLng([latitude, longitude]).setOpacity(1)
+    map.panTo([latitude, longitude])
   }, [value?.latitude, value?.longitude])
+
+  useEffect(() => {
+    const trimmed = String(searchQuery || "").trim()
+    if (trimmed.length < 3) {
+      setSuggestions([])
+      return
+    }
+
+    let active = true
+    const timeout = window.setTimeout(async () => {
+      try {
+        setIsSearching(true)
+        const results = await searchPlaces(trimmed)
+        if (active) {
+          setSuggestions(Array.isArray(results) ? results : [])
+          setPickerError("")
+        }
+      } catch (error) {
+        if (active) {
+          setSuggestions([])
+          setPickerError(error.message || "Unable to search OpenStreetMap right now.")
+        }
+      } finally {
+        if (active) {
+          setIsSearching(false)
+        }
+      }
+    }, 350)
+
+    return () => {
+      active = false
+      window.clearTimeout(timeout)
+    }
+  }, [searchQuery])
+
+  async function handleSuggestionSelect(place) {
+    const latitude = Number(place.lat).toFixed(6)
+    const longitude = Number(place.lon).toFixed(6)
+    setSearchQuery(place.display_name || "")
+    setSuggestions([])
+
+    if (mapInstanceRef.current && markerRef.current) {
+      markerRef.current.setLatLng([latitude, longitude]).setOpacity(1)
+      mapInstanceRef.current.setView([latitude, longitude], 16)
+    }
+
+    onSelect?.({
+      locationName: place.name || place.display_name?.split(",")[0] || "Selected place",
+      locationAddress: place.display_name || "",
+      mapsUrl: buildOsmUrl(latitude, longitude),
+      latitude: String(latitude),
+      longitude: String(longitude),
+    })
+  }
 
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-200">
@@ -166,12 +260,29 @@ export default function LocationPicker({
         <p className="mt-1 text-xs text-slate-500">Search a place or click anywhere on the map to auto-fill the location QR fields.</p>
       </div>
       <div className="space-y-3 p-4">
-        <input
-          ref={inputRef}
-          defaultValue={value?.locationName || value?.locationAddress || ""}
-          placeholder="Search places"
-          className="w-full rounded-lg border border-slate-300 px-3 py-2"
-        />
+        <div className="relative">
+          <input
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            placeholder="Search places"
+            className="w-full rounded-lg border border-slate-300 px-3 py-2"
+          />
+          {!!suggestions.length && (
+            <div className="absolute z-20 mt-2 max-h-56 w-full overflow-auto rounded-xl border border-slate-200 bg-white shadow-lg">
+              {suggestions.map((place) => (
+                <button
+                  key={`${place.place_id}-${place.lat}-${place.lon}`}
+                  type="button"
+                  onClick={() => handleSuggestionSelect(place)}
+                  className="block w-full border-b border-slate-100 px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
+                >
+                  {place.display_name}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+        {isSearching && <p className="text-xs text-slate-500">Searching OpenStreetMap…</p>}
         {pickerError ? (
           <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-3 text-sm text-rose-700">
             {pickerError}
