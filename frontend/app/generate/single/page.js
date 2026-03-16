@@ -227,17 +227,23 @@ function parseLocationCoordinates(value) {
 
 function buildLocationUrl(fields) {
   const mapsUrl = String(fields.mapsUrl || "").trim()
-  if (mapsUrl) return mapsUrl
+  if (mapsUrl) {
+    if (/google\.[^/]+\/maps|maps\.app\.goo\.gl/i.test(mapsUrl)) return mapsUrl
+    const parsed = parseLocationCoordinates(mapsUrl)
+    if (parsed?.latitude && parsed?.longitude) {
+      return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${parsed.latitude},${parsed.longitude}`)}`
+    }
+  }
 
   const latitude = String(fields.latitude || "").trim()
   const longitude = String(fields.longitude || "").trim()
   if (latitude && longitude) {
-    return `https://www.openstreetmap.org/?mlat=${encodeURIComponent(latitude)}&mlon=${encodeURIComponent(longitude)}#map=16/${encodeURIComponent(latitude)}/${encodeURIComponent(longitude)}`
+    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${latitude},${longitude}`)}`
   }
 
   const query = String(fields.locationAddress || fields.locationName || "").trim()
   if (query) {
-    return `https://www.openstreetmap.org/search?query=${encodeURIComponent(query)}`
+    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`
   }
 
   return ""
@@ -495,6 +501,9 @@ export function SingleGenerateContent({ embedded = false, brandMode = false }) {
   const [analysis, setAnalysis] = useState(null)
   const [analysisLoading, setAnalysisLoading] = useState(false)
   const [locationPreviewOpen, setLocationPreviewOpen] = useState(false)
+  const [locationPreviewSize, setLocationPreviewSize] = useState("balanced")
+  const [locationPreviewOffset, setLocationPreviewOffset] = useState({ x: 0, y: 0 })
+  const locationDragRef = useRef(null)
   const isEditing = Boolean(editingJobId)
   const lockContent = isEditing && qrType !== "Feedback"
 
@@ -525,6 +534,28 @@ export function SingleGenerateContent({ embedded = false, brandMode = false }) {
     setForegroundColor("#0f172a")
     setBackgroundColor("#ffffff")
   }, [brandMode, isEditing])
+
+  useEffect(() => {
+    function handlePointerMove(event) {
+      if (!locationDragRef.current) return
+      const { startX, startY, initialX, initialY } = locationDragRef.current
+      setLocationPreviewOffset({
+        x: initialX + (event.clientX - startX),
+        y: initialY + (event.clientY - startY),
+      })
+    }
+
+    function handlePointerUp() {
+      locationDragRef.current = null
+    }
+
+    window.addEventListener("mousemove", handlePointerMove)
+    window.addEventListener("mouseup", handlePointerUp)
+    return () => {
+      window.removeEventListener("mousemove", handlePointerMove)
+      window.removeEventListener("mouseup", handlePointerUp)
+    }
+  }, [])
 
   function applyBrandPreset() {
     if (!isEditing && !["Feedback", "Rating", "PDF", "Image Gallery", "URL"].includes(qrType)) {
@@ -1446,19 +1477,78 @@ export function SingleGenerateContent({ embedded = false, brandMode = false }) {
         </div>
         {locationPreviewOpen && qrType === "Location" && buildGoogleMapsPreviewUrl(fields) && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 px-4 py-8">
-            <div className="flex max-h-[90vh] w-full max-w-5xl flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl">
-              <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
+            <div
+              className={`flex max-h-[90vh] w-full flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl ${
+                locationPreviewSize === "small"
+                  ? "max-w-3xl"
+                  : locationPreviewSize === "large"
+                    ? "max-w-6xl"
+                    : "max-w-5xl"
+              }`}
+              style={{ transform: `translate(${locationPreviewOffset.x}px, ${locationPreviewOffset.y}px)` }}
+            >
+              <div
+                className="flex cursor-move items-center justify-between border-b border-slate-200 px-6 py-4"
+                onMouseDown={(event) => {
+                  locationDragRef.current = {
+                    startX: event.clientX,
+                    startY: event.clientY,
+                    initialX: locationPreviewOffset.x,
+                    initialY: locationPreviewOffset.y,
+                  }
+                }}
+              >
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Location Preview</p>
                   <h3 className="mt-1 text-xl font-semibold text-slate-900">{fields.locationName || fields.locationAddress || "Selected location"}</h3>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setLocationPreviewOpen(false)}
-                  className="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700"
-                >
-                  Close
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setLocationPreviewSize("small")}
+                    className={`rounded-full border px-3 py-2 text-xs font-semibold ${locationPreviewSize === "small" ? "border-slate-900 bg-slate-900 text-white" : "border-slate-200 text-slate-700"}`}
+                  >
+                    Small
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setLocationPreviewSize("balanced")}
+                    className={`rounded-full border px-3 py-2 text-xs font-semibold ${locationPreviewSize === "balanced" ? "border-slate-900 bg-slate-900 text-white" : "border-slate-200 text-slate-700"}`}
+                  >
+                    Medium
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setLocationPreviewSize("large")}
+                    className={`rounded-full border px-3 py-2 text-xs font-semibold ${locationPreviewSize === "large" ? "border-slate-900 bg-slate-900 text-white" : "border-slate-200 text-slate-700"}`}
+                  >
+                    Large
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setLocationPreviewOffset({ x: 0, y: 0 })}
+                    className="rounded-full border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700"
+                  >
+                    Reset
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFields((prev) => ({ ...prev, mapsUrl: buildLocationUrl(prev) }))
+                      setLocationPreviewOpen(false)
+                    }}
+                    className="rounded-full border border-slate-900 bg-slate-900 px-4 py-2 text-sm font-semibold text-white"
+                  >
+                    Confirm Location
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setLocationPreviewOpen(false)}
+                    className="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700"
+                  >
+                    Close
+                  </button>
+                </div>
               </div>
               <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_320px]">
                 <iframe

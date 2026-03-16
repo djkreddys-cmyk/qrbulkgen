@@ -90,17 +90,23 @@ function parseLocationCoordinates(value) {
 
 function buildLocationUrl(fields) {
   const mapsUrl = String(fields.mapsUrl || "").trim();
-  if (mapsUrl) return mapsUrl;
+  if (mapsUrl) {
+    if (/google\.[^/]+\/maps|maps\.app\.goo\.gl/i.test(mapsUrl)) return mapsUrl;
+    const parsed = parseLocationCoordinates(mapsUrl);
+    if (parsed?.latitude && parsed?.longitude) {
+      return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${parsed.latitude},${parsed.longitude}`)}`;
+    }
+  }
 
   const latitude = String(fields.latitude || "").trim();
   const longitude = String(fields.longitude || "").trim();
   if (latitude && longitude) {
-    return `https://www.openstreetmap.org/?mlat=${encodeURIComponent(latitude)}&mlon=${encodeURIComponent(longitude)}#map=16/${encodeURIComponent(latitude)}/${encodeURIComponent(longitude)}`;
+    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${latitude},${longitude}`)}`;
   }
 
   const query = String(fields.locationAddress || fields.locationName || "").trim();
   if (query) {
-    return `https://www.openstreetmap.org/search?query=${encodeURIComponent(query)}`;
+    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
   }
 
   return "";
