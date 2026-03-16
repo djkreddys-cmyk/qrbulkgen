@@ -349,13 +349,7 @@ export function SingleGenerateScreen() {
 
       if (singleDraft.qrType) {
         setQrType(singleDraft.qrType);
-        if (singleDraft.fields) {
-          setFields((prev) => ({ ...prev, ...singleDraft.fields }));
-        } else if (singleDraft.qrType === "URL") {
-          setFields((prev) => ({ ...prev, url: singleDraft.content || "" }));
-        } else if (singleDraft.qrType === "Text") {
-          setFields((prev) => ({ ...prev, text: singleDraft.content || "" }));
-        }
+        setFields((prev) => ({ ...prev, ...(singleDraft.fields || {}) }));
       }
       setSingleDraft(null);
     }

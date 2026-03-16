@@ -391,13 +391,21 @@ export function BulkGenerateContent({ embedded = false }) {
                 )}
                 <div className="mt-4 rounded-xl border border-dashed border-slate-300 bg-white p-3">
                   <p className="text-xs font-semibold text-slate-800">Example row preview</p>
-                  <div className="mt-2 grid gap-2">
-                    {Object.entries(BULK_SAMPLE_ROWS_BY_TYPE[qrType] || BULK_SAMPLE_ROWS_BY_TYPE.URL).map(([key, value]) => (
-                      <div key={key} className="grid grid-cols-[120px,1fr] gap-3 text-xs">
-                        <span className="font-semibold text-slate-600">{key}</span>
-                        <span className="break-all text-slate-700">{String(value)}</span>
-                      </div>
-                    ))}
+                  <div className="mt-3 overflow-hidden rounded-lg border border-slate-200">
+                    <div className="grid grid-cols-2 bg-slate-100 px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                      <span>Column</span>
+                      <span>Example value</span>
+                    </div>
+                    <div className="divide-y divide-slate-200">
+                      {Object.entries(BULK_SAMPLE_ROWS_BY_TYPE[qrType] || BULK_SAMPLE_ROWS_BY_TYPE.URL).map(([key, value]) => (
+                        <div key={key} className="grid grid-cols-2 gap-3 px-3 py-2 text-xs">
+                          <span className="font-semibold text-slate-700">{key}</span>
+                          <code className="break-all rounded bg-slate-50 px-2 py-1 text-slate-700">
+                            {String(value || (key === "expiresAt" ? "31-12-2026" : ""))}
+                          </code>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </div>
               </div>

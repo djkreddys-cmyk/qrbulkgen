@@ -269,13 +269,13 @@ export const BULK_SAMPLE_ROWS_BY_TYPE = {
     style: "stars",
     scale: "5",
     filename: "qr-rating-1",
-    expiresAt: "2026-04-30T23:59:59Z",
+    expiresAt: "30-04-2026",
   },
   Feedback: {
     title: "Share your feedback",
     questions: "How was your experience?|Any suggestions?",
     filename: "qr-feedback-1",
-    expiresAt: "2026-04-30T23:59:59Z",
+    expiresAt: "30-04-2026",
   },
 };
 

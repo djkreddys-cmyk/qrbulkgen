@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Linking, Text, TouchableOpacity, View } from "react-native";
-import { CameraView, useCameraPermissions } from "expo-camera";
+import * as DocumentPicker from "expo-document-picker";
+import { Camera, CameraView, useCameraPermissions } from "expo-camera";
 
 import { useAuth } from "../context/AuthContext";
 import { looksLikeUrl, parseScannedQrDraft } from "../lib/qr";
@@ -27,6 +28,7 @@ export function ScannerScreen() {
   const [permission, requestPermission] = useCameraPermissions();
   const [scannedValue, setScannedValue] = useState("");
   const [lastScanAt, setLastScanAt] = useState(0);
+  const [fileScanMessage, setFileScanMessage] = useState("");
 
   async function handleOpen() {
     if (!looksLikeUrl(scannedValue)) return;
@@ -38,6 +40,42 @@ export function ScannerScreen() {
     const draft = parseScannedQrDraft(scannedValue);
     setSingleDraft(draft);
     navigate("single-generate");
+  }
+
+  async function handlePickSavedQr() {
+    try {
+      setFileScanMessage("");
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ["image/*"],
+        copyToCacheDirectory: true,
+        multiple: false,
+      });
+      if (result.canceled) return;
+
+      const asset = result.assets?.[0];
+      const uri = asset?.uri;
+      if (!uri) {
+        setFileScanMessage("Could not read the selected image.");
+        return;
+      }
+
+      const scans = await Camera.scanFromURLAsync(uri, ["qr"]);
+      const first = scans?.[0]?.data ? String(scans[0].data) : "";
+      if (!first) {
+        setFileScanMessage("No QR code was found in that image.");
+        return;
+      }
+
+      setScannedValue(first);
+      setLastScanAt(Date.now());
+      setFileScanMessage("Saved QR opened successfully.");
+
+      if (looksLikeUrl(first)) {
+        Linking.openURL(first).catch(() => {});
+      }
+    } catch (_error) {
+      setFileScanMessage("Unable to scan that image right now.");
+    }
   }
 
   if (!permission) {
@@ -76,6 +114,15 @@ export function ScannerScreen() {
           Scan any QR code and web links will open immediately. You can also move the scanned content
           into the single generator to restyle or regenerate it.
         </Text>
+        <TouchableOpacity
+          onPress={handlePickSavedQr}
+          style={{ backgroundColor: "#e2e8f0", paddingVertical: 14, borderRadius: 16 }}
+        >
+          <Text style={{ color: "#0f172a", textAlign: "center", fontWeight: "700" }}>
+            Open Saved QR
+          </Text>
+        </TouchableOpacity>
+        {!!fileScanMessage && <Text style={{ color: "#475569", lineHeight: 20 }}>{fileScanMessage}</Text>}
       </Card>
 
       <Card>

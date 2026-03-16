@@ -1048,8 +1048,8 @@ export function SingleGenerateContent({ embedded = false, brandMode = false }) {
     <main className="mx-auto max-w-[88rem] px-5 py-10">
         <h1 className="text-3xl font-bold">Single QR Generator</h1>
         {!!editMessage && <p className="mt-3 text-sm text-blue-700">{editMessage}</p>}
-        <div className="mt-8 grid grid-cols-1 gap-6 xl:grid-cols-[minmax(320px,1.15fr)_minmax(300px,0.92fr)_minmax(360px,1.02fr)]">
-          <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm xl:min-h-[40rem] xl:max-h-[78vh] xl:overflow-y-auto xl:pr-3">
+        <div className="mt-8 grid grid-cols-1 gap-6 xl:grid-cols-[minmax(330px,1.08fr)_minmax(320px,0.98fr)_minmax(360px,1fr)]">
+          <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm xl:min-h-[42rem] xl:max-h-[78vh] xl:overflow-y-auto xl:pr-3">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">QR Data</p>
               <h2 className="mt-2 text-xl font-semibold text-slate-900">Type and content</h2>
@@ -1310,7 +1310,7 @@ export function SingleGenerateContent({ embedded = false, brandMode = false }) {
             )}
           </section>
 
-          <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm xl:min-h-[40rem]">
+          <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm xl:min-h-[42rem]">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Customization</p>
               <h2 className="mt-2 text-xl font-semibold text-slate-900">Style and validity</h2>
@@ -1398,7 +1398,7 @@ export function SingleGenerateContent({ embedded = false, brandMode = false }) {
             </div>
           </section>
 
-          <section className="flex flex-col space-y-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm xl:min-h-[40rem]">
+          <section className="flex flex-col space-y-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm xl:min-h-[42rem]">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <h2 className="text-xl font-semibold">{brandMode ? "Brand QR Preview" : "Live Preview"}</h2>
@@ -1420,7 +1420,7 @@ export function SingleGenerateContent({ embedded = false, brandMode = false }) {
               )}
             </div>
             {!generatedContent && <p className="text-gray-600">Fill required fields to generate QR instantly.</p>}
-            <div className="flex justify-center rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <div className="flex min-h-[21rem] justify-center rounded-2xl border border-slate-200 bg-slate-50 p-4">
               <div className="relative flex items-center justify-center">
                 {brandMode && logoDataUrl && (
                     <img
@@ -1447,6 +1447,11 @@ export function SingleGenerateContent({ embedded = false, brandMode = false }) {
                   <div ref={previewRef} className="relative z-10 flex justify-center" />
                 </div>
               </div>
+            {!generatedContent && qrType !== "Location" && (
+              <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-4 text-sm text-slate-500">
+                The live QR preview will appear here as soon as the selected QR type has enough data to generate.
+              </div>
+            )}
             {qrType === "Location" && buildGoogleMapsPreviewUrl(fields) && (
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
                 <p className="font-semibold text-slate-900">Location Preview</p>
