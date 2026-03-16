@@ -494,6 +494,7 @@ export function SingleGenerateContent({ embedded = false, brandMode = false }) {
   const [editingJobId, setEditingJobId] = useState("")
   const [analysis, setAnalysis] = useState(null)
   const [analysisLoading, setAnalysisLoading] = useState(false)
+  const [locationPreviewOpen, setLocationPreviewOpen] = useState(false)
   const isEditing = Boolean(editingJobId)
   const lockContent = isEditing && qrType !== "Feedback"
 
@@ -1013,10 +1014,10 @@ export function SingleGenerateContent({ embedded = false, brandMode = false }) {
   }
 
   const content = (
-    <main className="max-w-6xl mx-auto px-6 py-10">
+    <main className="mx-auto max-w-[88rem] px-5 py-10">
         <h1 className="text-3xl font-bold">Single QR Generator</h1>
         {!!editMessage && <p className="mt-3 text-sm text-blue-700">{editMessage}</p>}
-        <div className="mt-8 grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.85fr)_minmax(0,1fr)]">
+        <div className="mt-8 grid grid-cols-1 gap-6 xl:grid-cols-[minmax(320px,1.15fr)_minmax(300px,0.92fr)_minmax(360px,1.02fr)]">
           <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm xl:max-h-[78vh] xl:overflow-y-auto xl:pr-3">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">QR Data</p>
@@ -1418,14 +1419,14 @@ export function SingleGenerateContent({ embedded = false, brandMode = false }) {
             {qrType === "Location" && buildGoogleMapsPreviewUrl(fields) && (
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
                 <p className="font-semibold text-slate-900">Location Preview</p>
-                <iframe
-                  title="Google Maps Preview"
-                  src={buildGoogleMapsPreviewUrl(fields)}
-                  className="mt-3 h-64 w-full rounded-xl border border-slate-200"
-                  loading="lazy"
-                  referrerPolicy="no-referrer-when-downgrade"
-                />
                 <p className="mt-2 break-all">{generatedContent || buildLocationUrl(fields)}</p>
+                <button
+                  type="button"
+                  onClick={() => setLocationPreviewOpen(true)}
+                  className="mt-3 inline-flex rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700"
+                >
+                  Open Map Preview
+                </button>
               </div>
             )}
             {brandMode && (
@@ -1443,6 +1444,49 @@ export function SingleGenerateContent({ embedded = false, brandMode = false }) {
             {generatedContent && <button type="button" onClick={handleDownload} className="inline-block px-4 py-2 bg-black text-white rounded">{editingJobId ? "Update QR" : "Download QR"}</button>}
           </section>
         </div>
+        {locationPreviewOpen && qrType === "Location" && buildGoogleMapsPreviewUrl(fields) && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 px-4 py-8">
+            <div className="flex max-h-[90vh] w-full max-w-5xl flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl">
+              <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Location Preview</p>
+                  <h3 className="mt-1 text-xl font-semibold text-slate-900">{fields.locationName || fields.locationAddress || "Selected location"}</h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setLocationPreviewOpen(false)}
+                  className="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700"
+                >
+                  Close
+                </button>
+              </div>
+              <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_320px]">
+                <iframe
+                  title="Google Maps Preview"
+                  src={buildGoogleMapsPreviewUrl(fields)}
+                  className="h-[65vh] w-full border-0"
+                  loading="lazy"
+                  referrerPolicy="no-referrer-when-downgrade"
+                />
+                <div className="border-t border-slate-200 bg-slate-50 p-6 lg:border-l lg:border-t-0">
+                  <p className="text-sm font-semibold text-slate-900">Live location details</p>
+                  <p className="mt-3 text-sm text-slate-600">{fields.locationAddress || "No address entered yet."}</p>
+                  <p className="mt-3 break-all text-xs text-slate-500">{generatedContent || buildLocationUrl(fields)}</p>
+                  <div className="mt-4 grid grid-cols-2 gap-3">
+                    <div className="rounded-2xl border border-slate-200 bg-white p-3">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Latitude</p>
+                      <p className="mt-2 text-sm font-medium text-slate-900">{fields.latitude || "-"}</p>
+                    </div>
+                    <div className="rounded-2xl border border-slate-200 bg-white p-3">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Longitude</p>
+                      <p className="mt-2 text-sm font-medium text-slate-900">{fields.longitude || "-"}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
         {analysisLoading && <p className="mt-6 text-sm text-slate-500">Loading analysis...</p>}
         {!analysisLoading && analysis && <AnalysisPanel analysis={analysis} />}
       </main>
