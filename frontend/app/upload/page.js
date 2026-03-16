@@ -386,7 +386,6 @@ export function BulkGenerateContent({ embedded = false }) {
                     </div>
                     <p className="text-xs text-gray-700 mt-2">
                       Use <code>DD-MM-YYYY</code>. If you leave it blank, the QR defaults to 6 months from creation and stays valid until the end of the selected day.
-                      If left blank, validity defaults to 6 months from creation.
                     </p>
                   </>
                 )}

@@ -1049,7 +1049,7 @@ export function SingleGenerateContent({ embedded = false, brandMode = false }) {
         <h1 className="text-3xl font-bold">Single QR Generator</h1>
         {!!editMessage && <p className="mt-3 text-sm text-blue-700">{editMessage}</p>}
         <div className="mt-8 grid grid-cols-1 gap-6 xl:grid-cols-[minmax(320px,1.15fr)_minmax(300px,0.92fr)_minmax(360px,1.02fr)]">
-          <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm xl:max-h-[78vh] xl:overflow-y-auto xl:pr-3">
+          <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm xl:min-h-[40rem] xl:max-h-[78vh] xl:overflow-y-auto xl:pr-3">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">QR Data</p>
               <h2 className="mt-2 text-xl font-semibold text-slate-900">Type and content</h2>
@@ -1310,7 +1310,7 @@ export function SingleGenerateContent({ embedded = false, brandMode = false }) {
             )}
           </section>
 
-          <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm xl:min-h-[40rem]">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Customization</p>
               <h2 className="mt-2 text-xl font-semibold text-slate-900">Style and validity</h2>
@@ -1398,7 +1398,7 @@ export function SingleGenerateContent({ embedded = false, brandMode = false }) {
             </div>
           </section>
 
-          <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <section className="flex flex-col space-y-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm xl:min-h-[40rem]">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <h2 className="text-xl font-semibold">{brandMode ? "Brand QR Preview" : "Live Preview"}</h2>
@@ -1466,7 +1466,7 @@ export function SingleGenerateContent({ embedded = false, brandMode = false }) {
                 <p className="mt-2">Upload your logo, keep contrast high, and use this mode for a full-logo background QR. It auto-picks colors from the logo, expands the artwork coverage, and protects the scan-critical center with a soft mask.</p>
               </div>
             )}
-            <div>
+            <div className="mt-auto">
               <label className="block mb-1">Download Resolution</label>
               <select value={downloadResolution} onChange={(e) => setDownloadResolution(Number(e.target.value))} className="w-full border p-2">
                 {DOWNLOAD_RESOLUTIONS.map((res) => <option key={res} value={res}>{res} x {res}</option>)}
