@@ -1017,7 +1017,7 @@ export function SingleGenerateContent({ embedded = false, brandMode = false }) {
         <h1 className="text-3xl font-bold">Single QR Generator</h1>
         {!!editMessage && <p className="mt-3 text-sm text-blue-700">{editMessage}</p>}
         <div className="mt-8 grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.85fr)_minmax(0,1fr)]">
-          <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm xl:max-h-[78vh] xl:overflow-y-auto xl:pr-3">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">QR Data</p>
               <h2 className="mt-2 text-xl font-semibold text-slate-900">Type and content</h2>
@@ -1084,14 +1084,7 @@ export function SingleGenerateContent({ embedded = false, brandMode = false }) {
                       <input className="w-full border p-2" placeholder="Longitude" value={fields.longitude} onChange={(e) => updateLocationField("longitude", e.target.value)} />
                     </div>
                   </details>
-                  <button
-                    type="button"
-                    onClick={openMapLink}
-                    className="inline-flex rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700"
-                  >
-                    Open Map
-                  </button>
-                  <p className="text-xs text-slate-500">Fill a place, address, map link, or current location, then open the map in a separate tab.</p>
+                  <p className="text-xs text-slate-500">Fill a place, address, map link, or current location. The live map preview on the right updates as you type.</p>
                 </div>
               )}
             {!lockContent && ["Youtube", "App Store"].includes(qrType) && (
@@ -1422,19 +1415,17 @@ export function SingleGenerateContent({ embedded = false, brandMode = false }) {
                   <div ref={previewRef} className="relative z-10 flex justify-center" />
                 </div>
               </div>
-            {qrType === "Location" && generatedContent && (
+            {qrType === "Location" && buildGoogleMapsPreviewUrl(fields) && (
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
                 <p className="font-semibold text-slate-900">Location Preview</p>
-                {buildGoogleMapsPreviewUrl(fields) && (
-                  <iframe
-                    title="Google Maps Preview"
-                    src={buildGoogleMapsPreviewUrl(fields)}
-                    className="mt-3 h-64 w-full rounded-xl border border-slate-200"
-                    loading="lazy"
-                    referrerPolicy="no-referrer-when-downgrade"
-                  />
-                )}
-                <p className="mt-2 break-all">{generatedContent}</p>
+                <iframe
+                  title="Google Maps Preview"
+                  src={buildGoogleMapsPreviewUrl(fields)}
+                  className="mt-3 h-64 w-full rounded-xl border border-slate-200"
+                  loading="lazy"
+                  referrerPolicy="no-referrer-when-downgrade"
+                />
+                <p className="mt-2 break-all">{generatedContent || buildLocationUrl(fields)}</p>
               </div>
             )}
             {brandMode && (

@@ -319,9 +319,15 @@ export function BulkGenerateContent({ embedded = false }) {
     <main className="max-w-6xl mx-auto px-6 py-10">
         <h1 className="text-3xl font-bold">Bulk QR Generator</h1>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mt-8">
-          <form onSubmit={handleSubmit} className="border rounded-lg p-6 bg-white space-y-4">
-            <h2 className="text-xl font-semibold">{editingJobId ? "Update Bulk Job" : "Create Bulk Job"}</h2>
+        <div className="mt-8 grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.85fr)_minmax(0,1fr)]">
+          <form onSubmit={handleSubmit} className="space-y-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm xl:max-h-[78vh] xl:overflow-y-auto xl:pr-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Bulk Data</p>
+              <h2 className="mt-2 text-xl font-semibold text-slate-900">{editingJobId ? "Update Bulk Job" : "Create Bulk Job"}</h2>
+              <p className="mt-1 text-sm text-slate-500">
+                Choose the bulk QR type, lock in the preview sample, and attach the CSV that drives the generated batch.
+              </p>
+            </div>
 
             <div>
               <label className="block mb-1 text-sm">QR Type</label>
@@ -397,7 +403,16 @@ export function BulkGenerateContent({ embedded = false }) {
                 </div>
               </div>
             </div>
+          </form>
 
+          <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Customization</p>
+              <h2 className="mt-2 text-xl font-semibold text-slate-900">Style and validity</h2>
+              <p className="mt-1 text-sm text-slate-500">
+                Adjust expiry, error correction, colors, corners, logo, and archive-ready ZIP naming before you queue the run.
+              </p>
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
                 <label className="block mb-1 text-sm">Last Scan Date / Expiry Override</label>
@@ -471,13 +486,15 @@ export function BulkGenerateContent({ embedded = false }) {
             <button type="submit" disabled={isSubmitting} className="px-4 py-2 bg-black text-white rounded disabled:opacity-60">
               {isSubmitting ? (editingJobId ? "Updating..." : "Queuing...") : (editingJobId ? "Update Bulk Job" : "Queue Bulk Job")}
             </button>
-          </form>
+          </section>
 
-          <section className="border rounded-lg p-6 bg-white">
+          <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
             <h2 className="text-xl font-semibold">Live Preview</h2>
             {!previewContent.trim() && <p className="mt-4 text-gray-600">Add preview content to generate QR instantly.</p>}
-            <div ref={previewRef} className="mt-4 flex justify-center" />
-            <div className="mt-4">
+            <div className="flex justify-center rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <div ref={previewRef} className="flex justify-center" />
+            </div>
+            <div>
               <label className="block mb-1">Format</label>
               <select value={format} onChange={(e) => setFormat(e.target.value)} className="w-full border p-2 mb-3">
                 <option value="png">PNG</option>

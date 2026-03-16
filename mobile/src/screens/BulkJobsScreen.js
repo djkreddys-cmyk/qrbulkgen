@@ -321,11 +321,11 @@ export function BulkJobsScreen() {
       )}
 
       <Card>
-        <Text style={{ fontSize: 20, fontWeight: "700", color: "#0f172a" }}>{editingJobId ? "Update Bulk Job" : "Create Bulk Job"}</Text>
+        <Text style={{ fontSize: 20, fontWeight: "700", color: "#0f172a" }}>Bulk Data</Text>
         <Text style={{ color: "#64748b" }}>
           {editingJobId
-            ? "This bulk update keeps the same QR type and CSV. You can adjust expiry and styling, then save a fresh run for the same job."
-            : "Use the same QR type list as web. Your CSV should follow the matching sample columns from the web bulk page."}
+            ? "This bulk update keeps the same QR type and CSV. Review the locked bulk data here, then adjust styling in the next card."
+            : "Choose the QR type and attach the CSV that drives this batch from mobile."}
         </Text>
         <View
           style={{
@@ -392,6 +392,13 @@ export function BulkJobsScreen() {
             </Text>
           </TouchableOpacity>
         </View>
+      </Card>
+
+      <Card>
+        <Text style={{ fontSize: 20, fontWeight: "700", color: "#0f172a" }}>Customization</Text>
+        <Text style={{ color: "#64748b" }}>
+          Adjust expiry, error correction, colors, and ZIP naming before you queue or update the run.
+        </Text>
         <View style={{ gap: 6 }}>
           <Text style={{ color: "#64748b", fontSize: 12, fontWeight: "700" }}>LAST SCAN DATE / EXPIRY OVERRIDE</Text>
           <TextInput

@@ -257,20 +257,6 @@ export function SingleGenerateScreen() {
     }));
   }
 
-  async function openMapLink() {
-    const target = buildQrContent("Location", fields);
-    if (!target) {
-      setError("Add a place, address, map link, or current location first.");
-      return;
-    }
-
-    try {
-      await Linking.openURL(target);
-    } catch (_error) {
-      setError("Unable to open the map link on this device.");
-    }
-  }
-
   function buildGoogleMapsPreviewUrl() {
     const mapsUrl = String(fields.mapsUrl || "").trim();
     if (mapsUrl) {
@@ -616,15 +602,14 @@ export function SingleGenerateScreen() {
           <InputField label="Place name" value={fields.locationName} onChangeText={(value) => updateLocationField("locationName", value)} placeholder="Office, store, event venue" />
           <InputField label="Address" value={fields.locationAddress} onChangeText={(value) => updateLocationField("locationAddress", value)} placeholder="Street, area, city" multiline />
           <InputField label="Map Link" value={fields.mapsUrl} onChangeText={(value) => updateLocationField("mapsUrl", value)} placeholder="Paste a map share link" />
-          <ActionButton title="Open Map" onPress={openMapLink} tone="light" />
           <Text style={{ fontSize: 12, color: "#64748b", lineHeight: 18 }}>
-            Fill a place, address, map link, or current location, then open the map externally.
+            Fill a place, address, map link, or current location. The live map preview below updates as you type.
           </Text>
           <InputField label="Latitude (advanced)" value={fields.latitude} onChangeText={(value) => updateLocationField("latitude", value)} placeholder="17.385" keyboardType="decimal-pad" />
           <InputField label="Longitude (advanced)" value={fields.longitude} onChangeText={(value) => updateLocationField("longitude", value)} placeholder="78.4867" keyboardType="decimal-pad" />
         </>
       );
-      }
+    }
     if (qrType === "Youtube") {
       return <InputField label="YouTube URL" value={fields.youtubeUrl} onChangeText={(value) => setField("youtubeUrl", value)} placeholder="https://youtube.com/..." />;
     }
@@ -839,6 +824,10 @@ export function SingleGenerateScreen() {
       </Card>
 
       <Card>
+        <Text style={{ fontSize: 20, fontWeight: "700", color: "#0f172a" }}>QR Data</Text>
+        <Text style={{ color: "#64748b", lineHeight: 22 }}>
+          Enter the QR type and content details here. Styling and expiry are grouped in the next card.
+        </Text>
         {isEditing ? (
           <InputField label="QR TYPE" value={qrType} onChangeText={() => {}} editable={false} />
         ) : (
@@ -849,7 +838,13 @@ export function SingleGenerateScreen() {
 
         {!!uploadMessage && <Text style={{ color: "#047857" }}>{uploadMessage}</Text>}
         {!!error && <Text style={{ color: "#b91c1c" }}>{error}</Text>}
+      </Card>
 
+      <Card>
+        <Text style={{ fontSize: 20, fontWeight: "700", color: "#0f172a" }}>Customization</Text>
+        <Text style={{ color: "#64748b", lineHeight: 22 }}>
+          Adjust validity, colors, format, and QR styling without mixing them into the content form.
+        </Text>
         <InputField
           label="LAST SCAN DATE / EXPIRY"
           value={expiryDate}
@@ -942,6 +937,18 @@ export function SingleGenerateScreen() {
             </Text>
           </View>
         )}
+
+        {qrType === "Location" && buildGoogleMapsPreviewUrl() ? (
+          <View style={{ borderWidth: 1, borderColor: "#dbe3f0", borderRadius: 18, overflow: "hidden" }}>
+            <View style={{ paddingHorizontal: 14, paddingVertical: 12, backgroundColor: "#f8fafc", borderBottomWidth: 1, borderBottomColor: "#e2e8f0" }}>
+              <Text style={{ color: "#0f172a", fontWeight: "700" }}>Google Maps Preview</Text>
+            </View>
+            <WebView source={{ uri: buildGoogleMapsPreviewUrl() }} style={{ height: 220 }} />
+            <View style={{ padding: 14 }}>
+              <Text style={{ color: "#64748b", fontSize: 12, lineHeight: 18 }}>{generatedContent || buildQrContent("Location", fields, { appOrigin: APP_ORIGIN, socialLinks, ids: { galleryLinkId, pdfLinkId }, modes: { galleryMode, pdfMode }, expiryDate })}</Text>
+            </View>
+          </View>
+        ) : null}
 
         {!!shareMessage && <Text style={{ color: "#047857" }}>{shareMessage}</Text>}
 
