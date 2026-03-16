@@ -12,6 +12,7 @@ import { Picker } from "@react-native-picker/picker";
 import * as DocumentPicker from "expo-document-picker";
 
 import { useAuth } from "../context/AuthContext";
+import LocationPickerWebView from "../components/LocationPickerWebView";
 import { apiRequest, createAuthHeaders } from "../lib/api";
 import { shareDataUrlFile } from "../lib/files";
 import {
@@ -257,6 +258,17 @@ export function SingleGenerateScreen() {
     } catch (_error) {
       setError("Unable to open Google Maps on this device.");
     }
+  }
+
+  function handleLocationSelect(nextLocation) {
+    setFields((prev) => ({
+      ...prev,
+      locationName: nextLocation.locationName || prev.locationName,
+      locationAddress: nextLocation.locationAddress || prev.locationAddress,
+      mapsUrl: nextLocation.mapsUrl || prev.mapsUrl,
+      latitude: nextLocation.latitude || prev.latitude,
+      longitude: nextLocation.longitude || prev.longitude,
+    }));
   }
 
   function renderLockedContentSummary() {
@@ -576,20 +588,21 @@ export function SingleGenerateScreen() {
         </>
       );
     }
-      if (qrType === "Location") {
-        return (
-          <>
-            <InputField label="Place name" value={fields.locationName} onChangeText={(value) => updateLocationField("locationName", value)} placeholder="Office, store, event venue" />
-            <InputField label="Address" value={fields.locationAddress} onChangeText={(value) => updateLocationField("locationAddress", value)} placeholder="Street, area, city" multiline />
-            <InputField label="Google Maps URL" value={fields.mapsUrl} onChangeText={(value) => updateLocationField("mapsUrl", value)} placeholder="Paste a Google Maps share link" />
-            <ActionButton title="Open Google Maps" onPress={openGoogleMaps} tone="light" />
-            <Text style={{ fontSize: 12, color: "#64748b", lineHeight: 18 }}>
-              Paste a Google Maps share link or fill a place/address. Coordinates are kept as an advanced option.
-            </Text>
-            <InputField label="Latitude (advanced)" value={fields.latitude} onChangeText={(value) => updateLocationField("latitude", value)} placeholder="17.385" keyboardType="decimal-pad" />
-            <InputField label="Longitude (advanced)" value={fields.longitude} onChangeText={(value) => updateLocationField("longitude", value)} placeholder="78.4867" keyboardType="decimal-pad" />
-          </>
-        );
+    if (qrType === "Location") {
+      return (
+        <>
+          <InputField label="Place name" value={fields.locationName} onChangeText={(value) => updateLocationField("locationName", value)} placeholder="Office, store, event venue" />
+          <InputField label="Address" value={fields.locationAddress} onChangeText={(value) => updateLocationField("locationAddress", value)} placeholder="Street, area, city" multiline />
+          <InputField label="Google Maps URL" value={fields.mapsUrl} onChangeText={(value) => updateLocationField("mapsUrl", value)} placeholder="Paste a Google Maps share link" />
+          <ActionButton title="Open Google Maps" onPress={openGoogleMaps} tone="light" />
+          <Text style={{ fontSize: 12, color: "#64748b", lineHeight: 18 }}>
+            Paste a Google Maps share link or fill a place/address. Coordinates are kept as an advanced option.
+          </Text>
+          <LocationPickerWebView value={fields} onSelect={handleLocationSelect} />
+          <InputField label="Latitude (advanced)" value={fields.latitude} onChangeText={(value) => updateLocationField("latitude", value)} placeholder="17.385" keyboardType="decimal-pad" />
+          <InputField label="Longitude (advanced)" value={fields.longitude} onChangeText={(value) => updateLocationField("longitude", value)} placeholder="78.4867" keyboardType="decimal-pad" />
+        </>
+      );
       }
     if (qrType === "Youtube") {
       return <InputField label="YouTube URL" value={fields.youtubeUrl} onChangeText={(value) => setField("youtubeUrl", value)} placeholder="https://youtube.com/..." />;

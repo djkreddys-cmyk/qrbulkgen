@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import QRCodeStyling from "qr-code-styling"
 import Navbar from "../../../components/Navbar"
+import LocationPicker from "../../../components/LocationPicker"
 import { apiRequest } from "../../../lib/api"
 import { getAuthToken } from "../../../lib/auth"
 import {
@@ -236,21 +237,6 @@ function buildLocationUrl(fields) {
   const query = String(fields.locationAddress || fields.locationName || "").trim()
   if (query) {
     return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`
-  }
-
-  return ""
-}
-
-function buildLocationEmbedUrl(fields) {
-  const latitude = String(fields.latitude || "").trim()
-  const longitude = String(fields.longitude || "").trim()
-  if (latitude && longitude) {
-    return `https://www.google.com/maps?q=${encodeURIComponent(`${latitude},${longitude}`)}&z=15&output=embed`
-  }
-
-  const query = String(fields.locationAddress || fields.locationName || "").trim()
-  if (query) {
-    return `https://www.google.com/maps?q=${encodeURIComponent(query)}&z=15&output=embed`
   }
 
   return ""
@@ -640,6 +626,17 @@ export function SingleGenerateContent({ embedded = false, brandMode = false }) {
     })
   }
 
+  function handleLocationSelect(nextLocation) {
+    setFields((prev) => ({
+      ...prev,
+      locationName: nextLocation.locationName || prev.locationName,
+      locationAddress: nextLocation.locationAddress || prev.locationAddress,
+      mapsUrl: nextLocation.mapsUrl || prev.mapsUrl,
+      latitude: nextLocation.latitude || prev.latitude,
+      longitude: nextLocation.longitude || prev.longitude,
+    }))
+  }
+
   function useCurrentLocation() {
     if (typeof navigator === "undefined" || !navigator.geolocation) {
       setUploadError("Current location is not available in this browser.")
@@ -820,7 +817,6 @@ export function SingleGenerateContent({ embedded = false, brandMode = false }) {
   const centerMaskOpacity = brandLayoutMode === "safe" ? 0.82 : brandLayoutMode === "full" ? 0.54 : 0.68
   const centerMaskSize = brandLayoutMode === "safe" ? 0.28 : brandLayoutMode === "full" ? 0.22 : 0.25
   const previewBackgroundColor = brandMode && logoDataUrl ? `#ffffff${alphaHex(0.06)}` : backgroundColor
-  const locationPreviewUrl = qrType === "Location" ? buildLocationEmbedUrl(fields) : ""
   const selectableQrTypes = brandMode
     ? QR_TYPES.filter((type) => ["Feedback", "Rating", "PDF", "Image Gallery", "URL"].includes(type))
     : QR_TYPES
@@ -1352,23 +1348,8 @@ export function SingleGenerateContent({ embedded = false, brandMode = false }) {
                 </div>
               </div>
               {qrType === "Location" && (
-                <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200">
-                  <div className="border-b border-slate-200 bg-slate-50 px-4 py-3">
-                    <p className="text-sm font-semibold text-slate-900">Location Live Preview</p>
-                    <p className="mt-1 text-xs text-slate-500">The selected place stays inside the page so users can confirm the map before generating the QR.</p>
-                  </div>
-                  {locationPreviewUrl ? (
-                    <iframe
-                      title="Location live preview"
-                      src={locationPreviewUrl}
-                      className="h-64 w-full"
-                      loading="lazy"
-                    />
-                  ) : (
-                    <div className="flex h-64 items-center justify-center bg-slate-50 px-6 text-center text-sm text-slate-500">
-                      Enter a place name, address, paste a Google Maps link, or use your current location to load the map preview here.
-                    </div>
-                  )}
+                <div className="mt-4">
+                  <LocationPicker value={fields} onSelect={handleLocationSelect} />
                 </div>
               )}
               {brandMode && (
