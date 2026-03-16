@@ -3,7 +3,7 @@ import { Linking, Text, TouchableOpacity, View } from "react-native";
 import { CameraView, useCameraPermissions } from "expo-camera";
 
 import { useAuth } from "../context/AuthContext";
-import { looksLikeUrl } from "../lib/qr";
+import { looksLikeUrl, parseScannedQrDraft } from "../lib/qr";
 
 function Card({ children }) {
   return (
@@ -35,10 +35,8 @@ export function ScannerScreen() {
 
   function handleUseInGenerator() {
     if (!scannedValue) return;
-    setSingleDraft({
-      qrType: looksLikeUrl(scannedValue) ? "URL" : "Text",
-      content: scannedValue,
-    });
+    const draft = parseScannedQrDraft(scannedValue);
+    setSingleDraft(draft);
     navigate("single-generate");
   }
 
