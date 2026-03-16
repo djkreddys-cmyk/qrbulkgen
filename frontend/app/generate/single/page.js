@@ -820,6 +820,7 @@ export function SingleGenerateContent({ embedded = false, brandMode = false }) {
   const centerMaskOpacity = brandLayoutMode === "safe" ? 0.82 : brandLayoutMode === "full" ? 0.54 : 0.68
   const centerMaskSize = brandLayoutMode === "safe" ? 0.28 : brandLayoutMode === "full" ? 0.22 : 0.25
   const previewBackgroundColor = brandMode && logoDataUrl ? `#ffffff${alphaHex(0.06)}` : backgroundColor
+  const locationPreviewUrl = qrType === "Location" ? buildLocationEmbedUrl(fields) : ""
   const selectableQrTypes = brandMode
     ? QR_TYPES.filter((type) => ["Feedback", "Rating", "PDF", "Image Gallery", "URL"].includes(type))
     : QR_TYPES
@@ -1020,14 +1021,6 @@ export function SingleGenerateContent({ embedded = false, brandMode = false }) {
                   <input className="w-full border p-2" placeholder="Paste Google Maps link (optional)" value={fields.mapsUrl} onChange={(e) => updateLocationField("mapsUrl", e.target.value)} />
                   <div className="flex flex-wrap gap-2">
                     <button type="button" className="rounded border px-3 py-2 text-sm" onClick={useCurrentLocation}>Use Current Location</button>
-                    <a
-                      href={buildLocationUrl(fields) || "https://www.google.com/maps"}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="rounded border px-3 py-2 text-sm"
-                    >
-                      Open Google Maps
-                    </a>
                   </div>
                   <details className="rounded border bg-slate-50 p-3 text-sm text-slate-600">
                     <summary className="cursor-pointer font-medium text-slate-900">Advanced coordinates</summary>
@@ -1036,16 +1029,7 @@ export function SingleGenerateContent({ embedded = false, brandMode = false }) {
                       <input className="w-full border p-2" placeholder="Longitude" value={fields.longitude} onChange={(e) => updateLocationField("longitude", e.target.value)} />
                     </div>
                   </details>
-                  {buildLocationEmbedUrl(fields) ? (
-                    <iframe
-                      title="Location preview"
-                      src={buildLocationEmbedUrl(fields)}
-                      className="h-56 w-full rounded-lg border"
-                      loading="lazy"
-                    />
-                  ) : (
-                    <p className="text-xs text-slate-500">Search a place, paste a Google Maps link, or use your current location to preview it here.</p>
-                  )}
+                  <p className="text-xs text-slate-500">Search a place, paste a Google Maps link, or use your current location. The map preview now stays in the live preview panel.</p>
                 </div>
               )}
             {!lockContent && ["Youtube", "App Store"].includes(qrType) && (
@@ -1367,9 +1351,23 @@ export function SingleGenerateContent({ embedded = false, brandMode = false }) {
                   <div ref={previewRef} className="relative z-10 flex justify-center" />
                 </div>
               </div>
-            {brandMode && (
-              <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-                <p className="font-semibold text-slate-900">Brand QR guidance</p>
+              {locationPreviewUrl && (
+                <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200">
+                  <div className="border-b border-slate-200 bg-slate-50 px-4 py-3">
+                    <p className="text-sm font-semibold text-slate-900">Location Live Preview</p>
+                    <p className="mt-1 text-xs text-slate-500">The selected place stays inside the page so users can confirm the map before generating the QR.</p>
+                  </div>
+                  <iframe
+                    title="Location live preview"
+                    src={locationPreviewUrl}
+                    className="h-64 w-full"
+                    loading="lazy"
+                  />
+                </div>
+              )}
+              {brandMode && (
+                <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+                  <p className="font-semibold text-slate-900">Brand QR guidance</p>
                   <p className="mt-2">Upload your logo, keep contrast high, and use this mode for a full-logo background QR. It auto-picks colors from the logo, expands the artwork coverage, and protects the scan-critical center with a soft mask.</p>
                 </div>
               )}
