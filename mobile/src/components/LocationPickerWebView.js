@@ -110,11 +110,23 @@ function buildHtml(initialValue) {
             opacity: initialValue.latitude && initialValue.longitude ? 1 : 0,
           }).addTo(map);
 
+          setTimeout(() => {
+            map.invalidateSize();
+          }, 150);
+
           map.on("click", async (event) => {
             const latitude = Number(event.latlng.lat).toFixed(6);
             const longitude = Number(event.latlng.lng).toFixed(6);
             marker.setLatLng([latitude, longitude]).setOpacity(1);
             map.setView([latitude, longitude], 16);
+
+            sendSelection({
+              locationName: initialValue.locationName || "Pinned location",
+              locationAddress: initialValue.locationAddress || "",
+              mapsUrl: buildOsmUrl(latitude, longitude),
+              latitude: String(latitude),
+              longitude: String(longitude),
+            });
 
             try {
               const result = await reverseLookup(latitude, longitude);

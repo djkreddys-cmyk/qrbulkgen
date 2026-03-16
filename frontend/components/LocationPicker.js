@@ -136,11 +136,23 @@ export default function LocationPicker({ value, onSelect }) {
           opacity: value?.latitude && value?.longitude ? 1 : 0,
         }).addTo(map)
 
+        window.setTimeout(() => {
+          map.invalidateSize()
+        }, 150)
+
         map.on("click", async (event) => {
           const latitude = Number(event.latlng.lat).toFixed(6)
           const longitude = Number(event.latlng.lng).toFixed(6)
           marker.setLatLng([latitude, longitude]).setOpacity(1)
           map.panTo([latitude, longitude])
+
+          onSelect?.({
+            locationName: value?.locationName || "Pinned location",
+            locationAddress: value?.locationAddress || "",
+            mapsUrl: buildOsmUrl(latitude, longitude),
+            latitude: String(latitude),
+            longitude: String(longitude),
+          })
 
           try {
             const result = await reverseLookup(latitude, longitude)
@@ -197,6 +209,9 @@ export default function LocationPicker({ value, onSelect }) {
 
     marker.setLatLng([latitude, longitude]).setOpacity(1)
     map.panTo([latitude, longitude])
+    window.setTimeout(() => {
+      map.invalidateSize()
+    }, 80)
   }, [value?.latitude, value?.longitude])
 
   useEffect(() => {
@@ -282,13 +297,13 @@ export default function LocationPicker({ value, onSelect }) {
             </div>
           )}
         </div>
-        {isSearching && <p className="text-xs text-slate-500">Searching OpenStreetMap…</p>}
+        {isSearching && <p className="text-xs text-slate-500">Searching OpenStreetMap...</p>}
         {pickerError ? (
           <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-3 text-sm text-rose-700">
             {pickerError}
           </div>
         ) : (
-          <div ref={mapRef} className="h-72 w-full rounded-xl border border-slate-200" />
+          <div ref={mapRef} className="h-72 w-full rounded-xl border border-slate-200 [touch-action:none]" />
         )}
       </div>
     </div>
