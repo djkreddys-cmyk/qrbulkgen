@@ -43,7 +43,7 @@ export const QR_PLACEHOLDERS = {
   SMS: "+919999999999",
   WhatsApp: "+919999999999",
   vCard: "John Doe",
-  Location: "17.385,78.4867",
+  Location: "Search place or paste Google Maps link",
   Youtube: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
   WIFI: "OfficeWiFi",
   Event: "Launch Event",
@@ -74,6 +74,9 @@ export const INITIAL_QR_FIELDS = {
   vcardEmail: "",
   vcardUrl: "",
   address: "",
+  locationName: "",
+  locationAddress: "",
+  mapsUrl: "",
   latitude: "",
   longitude: "",
   youtubeUrl: "",
@@ -124,8 +127,11 @@ export const QR_FIELD_DEFINITIONS = {
     { key: "address", label: "Address", required: false, multiline: true },
   ],
   Location: [
-    { key: "latitude", label: "Latitude", required: true },
-    { key: "longitude", label: "Longitude", required: true },
+    { key: "locationName", label: "Place Name", required: false },
+    { key: "locationAddress", label: "Address", required: false, multiline: true },
+    { key: "mapsUrl", label: "Google Maps URL", required: false },
+    { key: "latitude", label: "Latitude", required: false },
+    { key: "longitude", label: "Longitude", required: false },
   ],
   Youtube: [{ key: "youtubeUrl", label: "YouTube URL", required: true }],
   WIFI: [
@@ -163,7 +169,7 @@ export const QR_VALIDATION_RULES = {
   SMS: ["smsPhone", "smsMessage"],
   WhatsApp: ["whatsappPhone"],
   vCard: ["firstName"],
-  Location: ["latitude", "longitude"],
+  Location: ["@location"],
   Youtube: ["youtubeUrl"],
   WIFI: ["wifiSsid"],
   Event: ["eventTitle"],
@@ -332,6 +338,16 @@ function hasFilledValue(value, key) {
 
 export function hasValueForValidationRule(rule, fields, context = {}) {
   const source = { ...(fields || {}), ...(context || {}) };
+  if (rule === "@location") {
+    const hasCoordinates =
+      hasFilledValue(source.latitude, "latitude") && hasFilledValue(source.longitude, "longitude");
+    return (
+      hasCoordinates ||
+      hasFilledValue(source.locationName, "locationName") ||
+      hasFilledValue(source.locationAddress, "locationAddress") ||
+      hasFilledValue(source.mapsUrl, "mapsUrl")
+    );
+  }
   return String(rule || "")
     .split("|")
     .some((key) => hasFilledValue(source[key], key));

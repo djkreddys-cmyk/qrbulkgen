@@ -59,6 +59,52 @@ export function formatExpiryDateForInput(value) {
   return `${day}-${month}-${year}`;
 }
 
+function parseLocationCoordinates(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return null;
+
+  const directMatch = raw.match(/(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)/);
+  if (directMatch) {
+    return { latitude: directMatch[1], longitude: directMatch[2] };
+  }
+
+  try {
+    const parsed = new URL(raw);
+    const query = parsed.searchParams.get("q") || parsed.searchParams.get("query");
+    const queryMatch = query && query.match(/(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)/);
+    if (queryMatch) {
+      return { latitude: queryMatch[1], longitude: queryMatch[2] };
+    }
+
+    const atMatch = parsed.href.match(/@(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/);
+    if (atMatch) {
+      return { latitude: atMatch[1], longitude: atMatch[2] };
+    }
+  } catch (_error) {
+    return null;
+  }
+
+  return null;
+}
+
+function buildLocationUrl(fields) {
+  const mapsUrl = String(fields.mapsUrl || "").trim();
+  if (mapsUrl) return mapsUrl;
+
+  const latitude = String(fields.latitude || "").trim();
+  const longitude = String(fields.longitude || "").trim();
+  if (latitude && longitude) {
+    return `https://www.google.com/maps?q=${encodeURIComponent(`${latitude},${longitude}`)}`;
+  }
+
+  const query = String(fields.locationAddress || fields.locationName || "").trim();
+  if (query) {
+    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
+  }
+
+  return "";
+}
+
 function toUtcDateTime(value) {
   if (!value) return "";
   const parsed = new Date(value);
@@ -196,7 +242,10 @@ export function getManagedTitleForQrType(qrType, fields) {
     SMS: fields.smsMessage || fields.smsPhone,
     WhatsApp: fields.whatsappMessage || fields.whatsappPhone,
     vCard: `${fields.firstName || ""} ${fields.lastName || ""}`.trim(),
-    Location: `${fields.latitude || ""}, ${fields.longitude || ""}`.trim(),
+    Location:
+      String(fields.locationName || fields.locationAddress || "").trim() ||
+      `${fields.latitude || ""}, ${fields.longitude || ""}`.trim() ||
+      String(fields.mapsUrl || "").trim(),
     Youtube: fields.youtubeUrl,
     WIFI: fields.wifiSsid,
     Event: fields.eventTitle,
@@ -249,8 +298,17 @@ export function buildQrContent(qrType, fields, options = {}) {
         `ADR:;;${fields.address || ""}`,
         "END:VCARD",
       ].join("\n");
-    case "Location":
-      return `geo:${String(fields.latitude || "").trim()},${String(fields.longitude || "").trim()}`;
+    case "Location": {
+      const parsedCoordinates = parseLocationCoordinates(fields.mapsUrl);
+      if (parsedCoordinates && (!fields.latitude || !fields.longitude)) {
+        fields = {
+          ...fields,
+          latitude: parsedCoordinates.latitude,
+          longitude: parsedCoordinates.longitude,
+        };
+      }
+      return buildLocationUrl(fields);
+    }
     case "Youtube":
       return String(fields.youtubeUrl || "").trim();
     case "WIFI":

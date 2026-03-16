@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Image,
+  Linking,
   ScrollView,
   Text,
   TextInput,
@@ -226,6 +227,36 @@ export function SingleGenerateScreen() {
 
   function setField(name, value) {
     setFields((prev) => ({ ...prev, [name]: value }));
+  }
+
+  function updateLocationField(name, value) {
+    setFields((prev) => {
+      const next = { ...prev, [name]: value };
+      if (name === "mapsUrl") {
+        const match = String(value || "").match(/(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)/);
+        if (match) {
+          next.latitude = match[1];
+          next.longitude = match[2];
+        }
+      }
+      if ((name === "latitude" || name === "longitude") && next.latitude && next.longitude && !next.mapsUrl) {
+        next.mapsUrl = `https://www.google.com/maps?q=${encodeURIComponent(`${next.latitude},${next.longitude}`)}`;
+      }
+      return next;
+    });
+  }
+
+  async function openGoogleMaps() {
+    const query = String(fields.mapsUrl || fields.locationAddress || fields.locationName || "").trim();
+    const target = query
+      ? String(fields.mapsUrl || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`)
+      : "https://www.google.com/maps";
+
+    try {
+      await Linking.openURL(target);
+    } catch (_error) {
+      setError("Unable to open Google Maps on this device.");
+    }
   }
 
   function renderLockedContentSummary() {
@@ -545,14 +576,21 @@ export function SingleGenerateScreen() {
         </>
       );
     }
-    if (qrType === "Location") {
-      return (
-        <>
-          <InputField label="Latitude" value={fields.latitude} onChangeText={(value) => setField("latitude", value)} placeholder="17.385" keyboardType="decimal-pad" />
-          <InputField label="Longitude" value={fields.longitude} onChangeText={(value) => setField("longitude", value)} placeholder="78.4867" keyboardType="decimal-pad" />
-        </>
-      );
-    }
+      if (qrType === "Location") {
+        return (
+          <>
+            <InputField label="Place name" value={fields.locationName} onChangeText={(value) => updateLocationField("locationName", value)} placeholder="Office, store, event venue" />
+            <InputField label="Address" value={fields.locationAddress} onChangeText={(value) => updateLocationField("locationAddress", value)} placeholder="Street, area, city" multiline />
+            <InputField label="Google Maps URL" value={fields.mapsUrl} onChangeText={(value) => updateLocationField("mapsUrl", value)} placeholder="Paste a Google Maps share link" />
+            <ActionButton title="Open Google Maps" onPress={openGoogleMaps} tone="light" />
+            <Text style={{ fontSize: 12, color: "#64748b", lineHeight: 18 }}>
+              Paste a Google Maps share link or fill a place/address. Coordinates are kept as an advanced option.
+            </Text>
+            <InputField label="Latitude (advanced)" value={fields.latitude} onChangeText={(value) => updateLocationField("latitude", value)} placeholder="17.385" keyboardType="decimal-pad" />
+            <InputField label="Longitude (advanced)" value={fields.longitude} onChangeText={(value) => updateLocationField("longitude", value)} placeholder="78.4867" keyboardType="decimal-pad" />
+          </>
+        );
+      }
     if (qrType === "Youtube") {
       return <InputField label="YouTube URL" value={fields.youtubeUrl} onChangeText={(value) => setField("youtubeUrl", value)} placeholder="https://youtube.com/..." />;
     }

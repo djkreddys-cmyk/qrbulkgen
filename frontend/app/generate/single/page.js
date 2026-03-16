@@ -195,6 +195,67 @@ function toExpiryQueryValue(value) {
   return parsed ? parsed.toISOString() : ""
 }
 
+function parseLocationCoordinates(value) {
+  const raw = String(value || "").trim()
+  if (!raw) return null
+
+  const directMatch = raw.match(/(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)/)
+  if (directMatch) {
+    return { latitude: directMatch[1], longitude: directMatch[2] }
+  }
+
+  try {
+    const parsed = new URL(raw)
+    const q = parsed.searchParams.get("q") || parsed.searchParams.get("query")
+    const qMatch = q && q.match(/(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)/)
+    if (qMatch) {
+      return { latitude: qMatch[1], longitude: qMatch[2] }
+    }
+
+    const atMatch = parsed.href.match(/@(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/)
+    if (atMatch) {
+      return { latitude: atMatch[1], longitude: atMatch[2] }
+    }
+  } catch {
+    return null
+  }
+
+  return null
+}
+
+function buildLocationUrl(fields) {
+  const mapsUrl = String(fields.mapsUrl || "").trim()
+  if (mapsUrl) return mapsUrl
+
+  const latitude = String(fields.latitude || "").trim()
+  const longitude = String(fields.longitude || "").trim()
+  if (latitude && longitude) {
+    return `https://www.google.com/maps?q=${encodeURIComponent(`${latitude},${longitude}`)}`
+  }
+
+  const query = String(fields.locationAddress || fields.locationName || "").trim()
+  if (query) {
+    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`
+  }
+
+  return ""
+}
+
+function buildLocationEmbedUrl(fields) {
+  const latitude = String(fields.latitude || "").trim()
+  const longitude = String(fields.longitude || "").trim()
+  if (latitude && longitude) {
+    return `https://www.google.com/maps?q=${encodeURIComponent(`${latitude},${longitude}`)}&z=15&output=embed`
+  }
+
+  const query = String(fields.locationAddress || fields.locationName || "").trim()
+  if (query) {
+    return `https://www.google.com/maps?q=${encodeURIComponent(query)}&z=15&output=embed`
+  }
+
+  return ""
+}
+
 function getManagedTitleForQrType(type, fields) {
   const map = {
     URL: fields.url,
@@ -204,7 +265,10 @@ function getManagedTitleForQrType(type, fields) {
     SMS: fields.smsMessage || fields.smsPhone,
     WhatsApp: fields.whatsappMessage || fields.whatsappPhone,
     vCard: `${fields.firstName || ""} ${fields.lastName || ""}`.trim(),
-    Location: `${fields.latitude || ""}, ${fields.longitude || ""}`.trim(),
+    Location:
+      String(fields.locationName || fields.locationAddress || "").trim() ||
+      `${fields.latitude || ""}, ${fields.longitude || ""}`.trim() ||
+      String(fields.mapsUrl || "").trim(),
     Youtube: fields.youtubeUrl,
     WIFI: fields.wifiSsid,
     Event: fields.eventTitle,
@@ -251,7 +315,7 @@ function buildQrContent(type, fields, appOrigin, ids, socialLinks, expiryDate) {
         "END:VCARD",
       ].join("\n")
     case "Location":
-      return `geo:${fields.latitude.trim()},${fields.longitude.trim()}`
+      return buildLocationUrl(fields)
     case "Youtube":
       return fields.youtubeUrl.trim()
     case "WIFI":
@@ -429,7 +493,7 @@ export function SingleGenerateContent({ embedded = false, brandMode = false }) {
   const [fields, setFields] = useState({
     url: "", text: "", email: "", subject: "", body: "", phone: "", smsPhone: "", smsMessage: "",
     whatsappPhone: "", whatsappMessage: "", firstName: "", lastName: "", organization: "", jobTitle: "",
-    vcardPhone: "", vcardEmail: "", vcardUrl: "", address: "", latitude: "", longitude: "",
+    vcardPhone: "", vcardEmail: "", vcardUrl: "", address: "", locationName: "", locationAddress: "", mapsUrl: "", latitude: "", longitude: "",
     youtubeUrl: "", wifiType: "WPA", wifiSsid: "", wifiPassword: "", wifiHidden: false,
     eventTitle: "", eventStart: "", eventEnd: "", eventLocation: "", eventDescription: "", bitcoinAddress: "",
     bitcoinAmount: "", bitcoinLabel: "", bitcoinMessage: "",
@@ -557,6 +621,49 @@ export function SingleGenerateContent({ embedded = false, brandMode = false }) {
 
   function setField(name, value) {
     setFields((prev) => ({ ...prev, [name]: value }))
+  }
+
+  function updateLocationField(name, value) {
+    setFields((prev) => {
+      const next = { ...prev, [name]: value }
+      if (name === "mapsUrl") {
+        const coordinates = parseLocationCoordinates(value)
+        if (coordinates) {
+          next.latitude = coordinates.latitude
+          next.longitude = coordinates.longitude
+        }
+      }
+      if ((name === "latitude" || name === "longitude") && next.latitude && next.longitude && !next.mapsUrl) {
+        next.mapsUrl = `https://www.google.com/maps?q=${encodeURIComponent(`${next.latitude},${next.longitude}`)}`
+      }
+      return next
+    })
+  }
+
+  function useCurrentLocation() {
+    if (typeof navigator === "undefined" || !navigator.geolocation) {
+      setUploadError("Current location is not available in this browser.")
+      return
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const latitude = position.coords.latitude.toFixed(6)
+        const longitude = position.coords.longitude.toFixed(6)
+        setFields((prev) => ({
+          ...prev,
+          latitude,
+          longitude,
+          mapsUrl: `https://www.google.com/maps?q=${encodeURIComponent(`${latitude},${longitude}`)}`,
+          locationName: prev.locationName || "Pinned location",
+        }))
+        setUploadError("")
+      },
+      () => {
+        setUploadError("Unable to access your current location.")
+      },
+      { enableHighAccuracy: true, timeout: 12000 }
+    )
   }
 
   function renderLockedContentSummary() {
@@ -906,12 +1013,41 @@ export function SingleGenerateContent({ embedded = false, brandMode = false }) {
                 <input className="w-full border p-2" placeholder="Address" value={fields.address} onChange={(e) => setField("address", e.target.value)} />
               </div>
             )}
-            {!lockContent && qrType === "Location" && (
-              <div className="grid grid-cols-2 gap-2">
-                <input className="w-full border p-2" placeholder="Latitude" value={fields.latitude} onChange={(e) => setField("latitude", e.target.value)} />
-                <input className="w-full border p-2" placeholder="Longitude" value={fields.longitude} onChange={(e) => setField("longitude", e.target.value)} />
-              </div>
-            )}
+              {!lockContent && qrType === "Location" && (
+                <div className="space-y-3 rounded-lg border p-3">
+                  <input className="w-full border p-2" placeholder="Place name" value={fields.locationName} onChange={(e) => updateLocationField("locationName", e.target.value)} />
+                  <textarea className="w-full border p-2" rows={2} placeholder="Address or landmark" value={fields.locationAddress} onChange={(e) => updateLocationField("locationAddress", e.target.value)} />
+                  <input className="w-full border p-2" placeholder="Paste Google Maps link (optional)" value={fields.mapsUrl} onChange={(e) => updateLocationField("mapsUrl", e.target.value)} />
+                  <div className="flex flex-wrap gap-2">
+                    <button type="button" className="rounded border px-3 py-2 text-sm" onClick={useCurrentLocation}>Use Current Location</button>
+                    <a
+                      href={buildLocationUrl(fields) || "https://www.google.com/maps"}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="rounded border px-3 py-2 text-sm"
+                    >
+                      Open Google Maps
+                    </a>
+                  </div>
+                  <details className="rounded border bg-slate-50 p-3 text-sm text-slate-600">
+                    <summary className="cursor-pointer font-medium text-slate-900">Advanced coordinates</summary>
+                    <div className="mt-3 grid grid-cols-2 gap-2">
+                      <input className="w-full border p-2" placeholder="Latitude" value={fields.latitude} onChange={(e) => updateLocationField("latitude", e.target.value)} />
+                      <input className="w-full border p-2" placeholder="Longitude" value={fields.longitude} onChange={(e) => updateLocationField("longitude", e.target.value)} />
+                    </div>
+                  </details>
+                  {buildLocationEmbedUrl(fields) ? (
+                    <iframe
+                      title="Location preview"
+                      src={buildLocationEmbedUrl(fields)}
+                      className="h-56 w-full rounded-lg border"
+                      loading="lazy"
+                    />
+                  ) : (
+                    <p className="text-xs text-slate-500">Search a place, paste a Google Maps link, or use your current location to preview it here.</p>
+                  )}
+                </div>
+              )}
             {!lockContent && ["Youtube", "App Store"].includes(qrType) && (
               <input
                 className="w-full border p-2"
