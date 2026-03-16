@@ -1351,18 +1351,24 @@ export function SingleGenerateContent({ embedded = false, brandMode = false }) {
                   <div ref={previewRef} className="relative z-10 flex justify-center" />
                 </div>
               </div>
-              {locationPreviewUrl && (
+              {qrType === "Location" && (
                 <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200">
                   <div className="border-b border-slate-200 bg-slate-50 px-4 py-3">
                     <p className="text-sm font-semibold text-slate-900">Location Live Preview</p>
                     <p className="mt-1 text-xs text-slate-500">The selected place stays inside the page so users can confirm the map before generating the QR.</p>
                   </div>
-                  <iframe
-                    title="Location live preview"
-                    src={locationPreviewUrl}
-                    className="h-64 w-full"
-                    loading="lazy"
-                  />
+                  {locationPreviewUrl ? (
+                    <iframe
+                      title="Location live preview"
+                      src={locationPreviewUrl}
+                      className="h-64 w-full"
+                      loading="lazy"
+                    />
+                  ) : (
+                    <div className="flex h-64 items-center justify-center bg-slate-50 px-6 text-center text-sm text-slate-500">
+                      Enter a place name, address, paste a Google Maps link, or use your current location to load the map preview here.
+                    </div>
+                  )}
                 </div>
               )}
               {brandMode && (
