@@ -328,7 +328,7 @@ async function processBulkJob(jobId, queuedRows = null) {
     try {
       const managedLink = await createManagedBulkLink(job, content, rows[i]);
       if ((job.output_format || "png") === "svg") {
-        const svg = await QRCode.toString(managedLink.url, {
+        const svg = await QRCode.toString(content, {
           type: "svg",
           width: job.qr_size || 512,
           margin: job.qr_margin || 2,
@@ -340,7 +340,7 @@ async function processBulkJob(jobId, queuedRows = null) {
         });
         await fsp.writeFile(filePath, svg, "utf8");
       } else {
-        await QRCode.toFile(filePath, managedLink.url, {
+        await QRCode.toFile(filePath, content, {
           width: job.qr_size || 512,
           margin: job.qr_margin || 2,
           errorCorrectionLevel: job.error_correction_level || "M",

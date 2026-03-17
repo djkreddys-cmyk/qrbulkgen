@@ -13,7 +13,7 @@ function getManagedLinkId(value) {
   try {
     const parsed = new URL(raw);
     const host = parsed.hostname.toLowerCase();
-    const pathMatch = parsed.pathname.match(/^\/q\/([0-9a-f-]+)$/i);
+    const pathMatch = parsed.pathname.match(/^\/q\/([0-9a-f-]+)/i);
     if (!pathMatch) return "";
     if (!host.includes("qrbulkgen")) return "";
     return pathMatch[1] || "";

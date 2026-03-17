@@ -46,7 +46,13 @@ function buildLocationHref(content) {
 
 export default function ManagedQrPage() {
   const params = useParams()
-  const linkId = Array.isArray(params?.id) ? params.id[0] : params?.id
+  const routeParamId = Array.isArray(params?.id) ? params.id[0] : params?.id
+  const linkId = useMemo(() => {
+    if (routeParamId) return routeParamId
+    if (typeof window === "undefined") return ""
+    const match = window.location.pathname.match(/\/q\/([0-9a-f-]+)/i)
+    return match?.[1] || ""
+  }, [routeParamId])
   const [link, setLink] = useState(null)
   const [error, setError] = useState("")
   const [opened, setOpened] = useState(false)

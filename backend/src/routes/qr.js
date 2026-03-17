@@ -89,7 +89,7 @@ async function upsertSingleJob({
     });
     const dataUrl = await createSingleQrDataUrl({
       ...payload,
-      content: managedLink.url,
+      content: payload.content,
     });
     const fileName = `${payload.filenamePrefix}-${Date.now()}.${payload.format}`;
     const payloadSizeBytes = Buffer.byteLength(dataUrl, "utf8");
@@ -255,7 +255,7 @@ async function upsertSingleJob({
 
   const dataUrl = await createSingleQrDataUrl({
     ...payload,
-    content: managedLink.url,
+    content: nextContent || payload.content,
   });
   const fileName = `${payload.filenamePrefix}-${Date.now()}.${payload.format}`;
   const payloadSizeBytes = Buffer.byteLength(dataUrl, "utf8");
