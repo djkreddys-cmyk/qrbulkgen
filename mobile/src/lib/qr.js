@@ -267,6 +267,13 @@ export function getManagedTitleForQrType(qrType, fields) {
   return String(map[qrType] || qrType || "QR Code").trim() || String(qrType || "QR Code");
 }
 
+function getUsableHostedId(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  if (raw.toLowerCase() === "undefined" || raw.toLowerCase() === "null") return "";
+  return raw;
+}
+
 export function buildQrContent(qrType, fields, options = {}) {
   const {
     appOrigin = "https://www.qrbulkgen.com",
@@ -334,8 +341,8 @@ export function buildQrContent(qrType, fields, options = {}) {
         "END:VCALENDAR",
       ].join("\n");
     case "PDF":
-      return ids.pdfLinkId
-        ? `${appOrigin}/pdf/${ids.pdfLinkId}`
+      return getUsableHostedId(ids.pdfLinkId)
+        ? `${appOrigin}/pdf/${getUsableHostedId(ids.pdfLinkId)}`
         : String(fields.pdfUrl || "").trim();
     case "Social Media":
       return socialLinks
@@ -351,8 +358,8 @@ export function buildQrContent(qrType, fields, options = {}) {
     case "App Store":
       return String(fields.appStoreUrl || "").trim();
     case "Image Gallery":
-      return ids.galleryLinkId
-        ? `${appOrigin}/gallery/${ids.galleryLinkId}`
+      return getUsableHostedId(ids.galleryLinkId)
+        ? `${appOrigin}/gallery/${getUsableHostedId(ids.galleryLinkId)}`
         : String(fields.galleryUrl || "").trim();
     case "Rating": {
       const title = encodeURIComponent(fields.ratingTitle || "Rate your experience");

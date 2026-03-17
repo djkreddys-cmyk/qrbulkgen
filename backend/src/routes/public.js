@@ -114,6 +114,12 @@ function buildVisitorKey(req, linkId = "") {
   return crypto.createHash("sha256").update(`${linkId}|${ip}|${userAgent}`).digest("hex");
 }
 
+function isUuid(value) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    String(value || "").trim(),
+  );
+}
+
 publicRouter.post(
   "/upload/gallery",
   requireAuth,
@@ -339,6 +345,9 @@ publicRouter.get("/qr-links/:id", async (req, res, next) => {
     if (!id) {
       throw createHttpError(400, "VALIDATION_ERROR", "link id is required");
     }
+    if (!isUuid(id)) {
+      throw createHttpError(400, "VALIDATION_ERROR", "link id must be a valid UUID");
+    }
 
     const result = await query(
       `SELECT id, qr_type, title, content, target_payload, expires_at, last_scanned_at, created_at
@@ -379,6 +388,9 @@ publicRouter.get("/links/:id", async (req, res, next) => {
     const id = String(req.params.id || "").trim();
     if (!id) {
       throw createHttpError(400, "VALIDATION_ERROR", "link id is required");
+    }
+    if (!isUuid(id)) {
+      throw createHttpError(400, "VALIDATION_ERROR", "link id must be a valid UUID");
     }
 
     const result = await query(

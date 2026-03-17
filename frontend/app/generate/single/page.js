@@ -296,6 +296,13 @@ function getManagedTitleForQrType(type, fields) {
   return String(map[type] || type || "QR Code").trim() || String(type || "QR Code")
 }
 
+function getUsableHostedId(value) {
+  const raw = String(value || "").trim()
+  if (!raw) return ""
+  if (raw.toLowerCase() === "undefined" || raw.toLowerCase() === "null") return ""
+  return raw
+}
+
 function buildQrContent(type, fields, appOrigin, ids, socialLinks, expiryDate) {
   switch (type) {
     case "URL":
@@ -347,7 +354,7 @@ function buildQrContent(type, fields, appOrigin, ids, socialLinks, expiryDate) {
         "END:VCALENDAR",
       ].join("\n")
     case "PDF":
-      return ids.pdfLinkId ? `${appOrigin}/pdf/${ids.pdfLinkId}` : fields.pdfUrl.trim()
+      return getUsableHostedId(ids.pdfLinkId) ? `${appOrigin}/pdf/${getUsableHostedId(ids.pdfLinkId)}` : fields.pdfUrl.trim()
     case "Social Media":
       return socialLinks
         .map((item) => {
@@ -362,7 +369,7 @@ function buildQrContent(type, fields, appOrigin, ids, socialLinks, expiryDate) {
     case "App Store":
       return fields.appStoreUrl.trim()
     case "Image Gallery":
-      return ids.galleryLinkId ? `${appOrigin}/gallery/${ids.galleryLinkId}` : fields.galleryUrl.trim()
+      return getUsableHostedId(ids.galleryLinkId) ? `${appOrigin}/gallery/${getUsableHostedId(ids.galleryLinkId)}` : fields.galleryUrl.trim()
     case "Rating": {
       const title = encodeURIComponent(fields.ratingTitle || "Rate your experience")
       const style = encodeURIComponent(fields.ratingStyle || "stars")

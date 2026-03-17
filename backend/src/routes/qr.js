@@ -41,6 +41,13 @@ function toExpiryIso(value) {
   return parsed ? parsed.toISOString() : "";
 }
 
+function normalizeHostedUploadId(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  if (raw.toLowerCase() === "undefined" || raw.toLowerCase() === "null") return "";
+  return raw;
+}
+
 function buildSingleTargetPayload(body, qrType) {
   return {
     qrType,
@@ -49,8 +56,8 @@ function buildSingleTargetPayload(body, qrType) {
     galleryMode: body.galleryMode || "url",
     pdfMode: body.pdfMode || "url",
     uploadIds: {
-      galleryLinkId: body.galleryLinkId || "",
-      pdfLinkId: body.pdfLinkId || "",
+      galleryLinkId: normalizeHostedUploadId(body.galleryLinkId),
+      pdfLinkId: normalizeHostedUploadId(body.pdfLinkId),
     },
     expiresAt: toExpiryIso(body.expiresAt) || "",
   };

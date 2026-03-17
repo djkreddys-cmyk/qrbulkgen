@@ -15,6 +15,7 @@ import { useAuth } from "../context/AuthContext";
 import { apiRequest, createAuthHeaders } from "../lib/api";
 import { shareDataUrlFile } from "../lib/files";
 import {
+  addMonths,
   addSocialLinkRow,
   buildQrContent,
   formatExpiryDateForInput,
