@@ -63,7 +63,26 @@ export default function PdfPage() {
       )}
       {!loading && !error && !isExpired && !pdfUrl && <p>PDF URL missing</p>}
       {!loading && !error && !isExpired && !!pdfUrl && (
-        <iframe title={title} src={pdfUrl} className="w-full min-h-[80vh] border rounded" />
+        <div className="space-y-4">
+          <div className="flex flex-wrap gap-3">
+            <a
+              href={pdfUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="rounded border border-slate-300 px-4 py-2 font-medium text-slate-900"
+            >
+              Open PDF
+            </a>
+            <a
+              href={pdfUrl}
+              download
+              className="rounded bg-slate-950 px-4 py-2 font-medium text-white"
+            >
+              Save PDF
+            </a>
+          </div>
+          <iframe title={title} src={pdfUrl} className="w-full min-h-[80vh] border rounded" />
+        </div>
       )}
     </main>
   )

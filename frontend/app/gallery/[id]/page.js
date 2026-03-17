@@ -64,9 +64,21 @@ export default function GalleryPage() {
       {!loading && !error && !isExpired && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {images.map((image, index) => (
-            <a key={`${image.url}-${index}`} href={image.url} target="_blank" rel="noreferrer" className="border rounded overflow-hidden">
-              <img src={image.url} alt={image.fileName || `Image ${index + 1}`} className="w-full h-56 object-cover" />
-            </a>
+            <div key={`${image.url}-${index}`} className="border rounded overflow-hidden bg-white">
+              <a href={image.url} target="_blank" rel="noreferrer">
+                <img src={image.url} alt={image.fileName || `Image ${index + 1}`} className="w-full h-56 object-cover" />
+              </a>
+              <div className="flex items-center justify-between gap-3 p-3">
+                <p className="min-w-0 truncate text-sm text-slate-600">{image.fileName || `Image ${index + 1}`}</p>
+                <a
+                  href={image.url}
+                  download
+                  className="shrink-0 rounded bg-slate-950 px-3 py-2 text-sm font-medium text-white"
+                >
+                  Save
+                </a>
+              </div>
+            </div>
           ))}
         </div>
       )}

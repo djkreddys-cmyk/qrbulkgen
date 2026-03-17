@@ -5,7 +5,7 @@ import { Camera, CameraView, useCameraPermissions } from "expo-camera";
 
 import { useAuth } from "../context/AuthContext";
 import { apiRequest } from "../lib/api";
-import { looksLikeUrl, parseScannedQrDraft } from "../lib/qr";
+import { buildQrContent, looksLikeUrl, parseScannedQrDraft } from "../lib/qr";
 
 function getManagedLinkId(value) {
   const raw = String(value || "").trim();
@@ -19,6 +19,30 @@ function getManagedLinkId(value) {
     return pathMatch[1] || "";
   } catch (_error) {
     return "";
+  }
+}
+
+function getHostedPublicLink(value) {
+  const raw = String(value || "").trim();
+  if (!/^https?:\/\//i.test(raw)) return null;
+  try {
+    const parsed = new URL(raw);
+    const host = parsed.hostname.toLowerCase();
+    if (!host.includes("qrbulkgen")) return null;
+
+    const pdfMatch = parsed.pathname.match(/^\/pdf\/([0-9a-f-]+)/i);
+    if (pdfMatch) {
+      return { type: "pdf", id: pdfMatch[1] || "" };
+    }
+
+    const galleryMatch = parsed.pathname.match(/^\/gallery\/([0-9a-f-]+)/i);
+    if (galleryMatch) {
+      return { type: "gallery", id: galleryMatch[1] || "" };
+    }
+
+    return null;
+  } catch (_error) {
+    return null;
   }
 }
 
@@ -39,6 +63,22 @@ function Card({ children }) {
   );
 }
 
+function normalizeOpenTarget(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  if (/^https?:\/\//i.test(raw)) return raw;
+  if (/^mailto:/i.test(raw)) return raw;
+  if (/^tel:/i.test(raw)) return raw;
+  if (/^sms:/i.test(raw)) return raw;
+  if (/^SMSTO:/i.test(raw)) {
+    const parts = raw.replace(/^SMSTO:/i, "").split(":");
+    const phone = parts.shift() || "";
+    const body = parts.join(":");
+    return `sms:${phone}${body ? `?body=${encodeURIComponent(body)}` : ""}`;
+  }
+  return "";
+}
+
 export function ScannerScreen() {
   const { navigate, setSingleDraft } = useAuth();
   const [permission, requestPermission] = useCameraPermissions();
@@ -48,21 +88,52 @@ export function ScannerScreen() {
 
   async function resolveScannedValue(rawValue) {
     const managedLinkId = getManagedLinkId(rawValue);
-    if (!managedLinkId) {
-      return String(rawValue || "");
+    if (managedLinkId) {
+      try {
+        const data = await apiRequest(`/public/qr-links/${managedLinkId}`);
+        return String(data?.link?.content || rawValue || "");
+      } catch (_error) {
+        return String(rawValue || "");
+      }
     }
 
-    try {
-      const data = await apiRequest(`/public/qr-links/${managedLinkId}`);
-      return String(data?.link?.content || rawValue || "");
-    } catch (_error) {
-      return String(rawValue || "");
+    const hostedPublicLink = getHostedPublicLink(rawValue);
+    if (hostedPublicLink?.id) {
+      try {
+        const data = await apiRequest(`/public/links/${hostedPublicLink.id}`);
+        if (hostedPublicLink.type === "pdf") {
+          return String(data?.link?.payload?.url || rawValue || "");
+        }
+        if (hostedPublicLink.type === "gallery") {
+          return String(data?.link?.payload?.images?.[0]?.url || rawValue || "");
+        }
+      } catch (_error) {
+        return String(rawValue || "");
+      }
     }
+
+    return String(rawValue || "");
+  }
+
+  function resolveOpenTarget(value) {
+    const direct = normalizeOpenTarget(value);
+    if (direct) return direct;
+
+    const draft = parseScannedQrDraft(value);
+    const rebuilt = buildQrContent(draft.qrType, draft.fields || {}, {
+      appOrigin: "https://www.qrbulkgen.com",
+      socialLinks: draft.socialLinks || [],
+      ids: draft.ids || {},
+      modes: draft.modes || {},
+      expiryDate: draft.expiryDate || "",
+    });
+    return normalizeOpenTarget(rebuilt);
   }
 
   async function handleOpen() {
-    if (!looksLikeUrl(scannedValue)) return;
-    await Linking.openURL(scannedValue);
+    const target = resolveOpenTarget(scannedValue);
+    if (!target) return;
+    await Linking.openURL(target);
   }
 
   function handleUseInGenerator() {
@@ -101,8 +172,9 @@ export function ScannerScreen() {
       setLastScanAt(Date.now());
       setFileScanMessage("Saved QR opened successfully.");
 
-      if (looksLikeUrl(resolved)) {
-        Linking.openURL(resolved).catch(() => {});
+      const target = resolveOpenTarget(resolved);
+      if (target) {
+        Linking.openURL(target).catch(() => {});
       }
     } catch (_error) {
       setFileScanMessage("Unable to scan that image right now.");
@@ -170,8 +242,9 @@ export function ScannerScreen() {
               setLastScanAt(now);
               const resolved = await resolveScannedValue(data || "");
               setScannedValue(resolved);
-              if (looksLikeUrl(resolved)) {
-                Linking.openURL(resolved).catch(() => {});
+              const target = resolveOpenTarget(resolved);
+              if (target) {
+                Linking.openURL(target).catch(() => {});
               }
             }}
           />
@@ -211,10 +284,10 @@ export function ScannerScreen() {
           </TouchableOpacity>
           <TouchableOpacity
             onPress={handleOpen}
-            disabled={!looksLikeUrl(scannedValue)}
+            disabled={!resolveOpenTarget(scannedValue)}
             style={{
               flex: 1,
-              backgroundColor: looksLikeUrl(scannedValue) ? "#e2e8f0" : "#f1f5f9",
+              backgroundColor: resolveOpenTarget(scannedValue) ? "#e2e8f0" : "#f1f5f9",
               paddingVertical: 14,
               borderRadius: 16,
             }}

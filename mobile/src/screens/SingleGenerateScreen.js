@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Image,
+  Modal,
   ScrollView,
   Text,
   TextInput,
@@ -197,6 +198,7 @@ export function SingleGenerateScreen() {
   const [error, setError] = useState("");
   const [shareMessage, setShareMessage] = useState("");
   const [uploadMessage, setUploadMessage] = useState("");
+  const [showLocationPreviewModal, setShowLocationPreviewModal] = useState(false);
 
   const generatedContent = useMemo(
     () =>
@@ -598,10 +600,13 @@ export function SingleGenerateScreen() {
           <InputField label="Address" value={fields.locationAddress} onChangeText={(value) => updateLocationField("locationAddress", value)} placeholder="Street, area, city" multiline />
           <InputField label="Map Link" value={fields.mapsUrl} onChangeText={(value) => updateLocationField("mapsUrl", value)} placeholder="Paste a map share link" />
           <Text style={{ fontSize: 12, color: "#64748b", lineHeight: 18 }}>
-            Fill a place, address, map link, or current location. The live map preview below updates as you type.
+            Fill a place, address, or map link. Use the map preview popup to confirm the final location on mobile.
           </Text>
           <InputField label="Latitude (advanced)" value={fields.latitude} onChangeText={(value) => updateLocationField("latitude", value)} placeholder="17.385" keyboardType="decimal-pad" />
           <InputField label="Longitude (advanced)" value={fields.longitude} onChangeText={(value) => updateLocationField("longitude", value)} placeholder="78.4867" keyboardType="decimal-pad" />
+          {buildGoogleMapsPreviewUrl() ? (
+            <ActionButton title="Open Google Maps Preview" onPress={() => setShowLocationPreviewModal(true)} tone="light" />
+          ) : null}
         </>
       );
     }
@@ -870,19 +875,6 @@ export function SingleGenerateScreen() {
             />
           </View>
 
-          {qrType === "Location" && generatedContent ? (
-            <View style={{ borderWidth: 1, borderColor: "#dbe3f0", borderRadius: 18, overflow: "hidden", marginTop: 8 }}>
-              <View style={{ paddingHorizontal: 14, paddingVertical: 12, backgroundColor: "#f8fafc", borderBottomWidth: 1, borderBottomColor: "#e2e8f0" }}>
-                <Text style={{ color: "#0f172a", fontWeight: "700" }}>Google Maps Preview</Text>
-              </View>
-              {buildGoogleMapsPreviewUrl() ? (
-                <WebView source={{ uri: buildGoogleMapsPreviewUrl() }} style={{ height: 220 }} />
-              ) : null}
-              <View style={{ padding: 14 }}>
-                <Text style={{ color: "#64748b", fontSize: 12, lineHeight: 18 }}>{generatedContent}</Text>
-              </View>
-            </View>
-          ) : null}
           <View style={{ flex: 1 }}>
             <InputField
               label="BACKGROUND"
@@ -933,15 +925,15 @@ export function SingleGenerateScreen() {
           </View>
         )}
 
-        {qrType === "Location" && buildGoogleMapsPreviewUrl() ? (
-          <View style={{ borderWidth: 1, borderColor: "#dbe3f0", borderRadius: 18, overflow: "hidden" }}>
-            <View style={{ paddingHorizontal: 14, paddingVertical: 12, backgroundColor: "#f8fafc", borderBottomWidth: 1, borderBottomColor: "#e2e8f0" }}>
-              <Text style={{ color: "#0f172a", fontWeight: "700" }}>Google Maps Preview</Text>
-            </View>
-            <WebView source={{ uri: buildGoogleMapsPreviewUrl() }} style={{ height: 220 }} />
-            <View style={{ padding: 14 }}>
-              <Text style={{ color: "#64748b", fontSize: 12, lineHeight: 18 }}>{generatedContent || buildQrContent("Location", fields, { appOrigin: APP_ORIGIN, socialLinks, ids: { galleryLinkId, pdfLinkId }, modes: { galleryMode, pdfMode }, expiryDate })}</Text>
-            </View>
+        {qrType === "Location" ? (
+          <View style={{ borderWidth: 1, borderColor: "#dbe3f0", borderRadius: 18, padding: 14, gap: 8, backgroundColor: "#f8fafc" }}>
+            <Text style={{ color: "#0f172a", fontWeight: "700" }}>Location Preview</Text>
+            <Text style={{ color: "#64748b", fontSize: 12, lineHeight: 18 }}>
+              {generatedContent || "Add a place, address, or map link to preview the location."}
+            </Text>
+            {buildGoogleMapsPreviewUrl() ? (
+              <ActionButton title="Open Google Maps Preview" onPress={() => setShowLocationPreviewModal(true)} tone="light" />
+            ) : null}
           </View>
         ) : null}
 
@@ -969,6 +961,62 @@ export function SingleGenerateScreen() {
           </View>
         </Card>
       ) : null}
+
+      <Modal
+        visible={showLocationPreviewModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowLocationPreviewModal(false)}
+      >
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: "rgba(15, 23, 42, 0.45)",
+            justifyContent: "center",
+            padding: 16,
+          }}
+        >
+          <View
+            style={{
+              backgroundColor: "#ffffff",
+              borderRadius: 22,
+              overflow: "hidden",
+              maxHeight: "82%",
+              borderWidth: 1,
+              borderColor: "#dbe3f0",
+            }}
+          >
+            <View
+              style={{
+                paddingHorizontal: 16,
+                paddingVertical: 14,
+                backgroundColor: "#f8fafc",
+                borderBottomWidth: 1,
+                borderBottomColor: "#e2e8f0",
+                flexDirection: "row",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
+              <Text style={{ color: "#0f172a", fontWeight: "700", fontSize: 16 }}>Google Maps Preview</Text>
+              <TouchableOpacity onPress={() => setShowLocationPreviewModal(false)}>
+                <Text style={{ color: "#2563eb", fontWeight: "700" }}>Close</Text>
+              </TouchableOpacity>
+            </View>
+            {buildGoogleMapsPreviewUrl() ? (
+              <WebView source={{ uri: buildGoogleMapsPreviewUrl() }} style={{ height: 360 }} />
+            ) : null}
+            <View style={{ padding: 16, gap: 6 }}>
+              <Text style={{ color: "#0f172a", fontWeight: "700" }}>
+                {fields.locationName || "Selected location"}
+              </Text>
+              <Text style={{ color: "#64748b", lineHeight: 20 }}>
+                {fields.locationAddress || generatedContent || "No location details yet."}
+              </Text>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 }
