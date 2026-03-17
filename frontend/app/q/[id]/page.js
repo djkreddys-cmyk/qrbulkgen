@@ -83,6 +83,21 @@ function downloadTextFile(content, fileName, mimeType) {
   URL.revokeObjectURL(url)
 }
 
+function openStructuredContent(content, fileName, mimeType) {
+  const blob = new Blob([content], { type: mimeType })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement("a")
+  link.href = url
+  link.target = "_self"
+  if (fileName) {
+    link.download = fileName
+  }
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  window.setTimeout(() => URL.revokeObjectURL(url), 1500)
+}
+
 function normalizeKind(qrType, content) {
   if (["URL", "Youtube", "App Store", "PDF", "Image Gallery", "Rating", "Feedback", "Social Media"].includes(qrType)) {
     return "url"
@@ -251,6 +266,25 @@ export default function ManagedQrPage() {
     downloadTextFile(resolvedContent, "qr-content.txt", "text/plain")
   }
 
+  function openStructuredAction() {
+    if (!resolvedContent) return
+    if (link.qrType === "vCard") {
+      openStructuredContent(resolvedContent, "contact.vcf", "text/vcard")
+      return
+    }
+    if (link.qrType === "WIFI") {
+      openStructuredContent(resolvedContent, "wifi.txt", "text/plain")
+      return
+    }
+    if (link.qrType === "Text") {
+      copyContent()
+      return
+    }
+    if (link.qrType === "Event") {
+      downloadTextFile(resolvedContent, "event.ics", "text/calendar")
+    }
+  }
+
   return (
     <main className="min-h-screen bg-slate-50 px-4 py-10">
       <section className="mx-auto max-w-2xl rounded-[2rem] border border-slate-200 bg-white p-8 shadow-sm">
@@ -318,12 +352,21 @@ export default function ManagedQrPage() {
                   <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-5">
                     <pre className="whitespace-pre-wrap break-words text-sm text-slate-700">{resolvedContent || link.content}</pre>
                     <div className="mt-4 flex flex-wrap gap-3">
+                      {link.qrType === "vCard" && (
+                        <button
+                          type="button"
+                          onClick={openStructuredAction}
+                          className="rounded-xl bg-slate-950 px-4 py-3 text-sm font-medium text-white"
+                        >
+                          Open contact card
+                        </button>
+                      )}
                       <button
                         type="button"
                         onClick={copyContent}
-                        className="rounded-xl bg-slate-950 px-4 py-3 text-sm font-medium text-white"
+                        className={`rounded-xl px-4 py-3 text-sm font-medium ${link.qrType === "vCard" ? "border border-slate-300 text-slate-700" : "bg-slate-950 text-white"}`}
                       >
-                        Copy content
+                        {link.qrType === "Text" ? "Copy text" : "Copy content"}
                       </button>
                       <button
                         type="button"
