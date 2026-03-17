@@ -1146,7 +1146,7 @@ bulkRouter.get("/jobs/:id/analysis", requireAuth, async (req, res, next) => {
            WHERE i.job_id = $2
          )
          SELECT
-           COALESCE(rs.title, MAX(links.title), 'Untitled rating form') AS title,
+           COALESCE(MAX(NULLIF(rs.title, '')), MAX(links.title), 'Untitled rating form') AS title,
            MAX(rs.style) AS style,
            MAX(rs.scale)::int AS scale,
            rs.rating,
@@ -1155,7 +1155,7 @@ bulkRouter.get("/jobs/:id/analysis", requireAuth, async (req, res, next) => {
            SUM(COUNT(*)) OVER ()::int AS total_submissions
          FROM rating_submissions rs
          INNER JOIN links ON links.url = rs.source_url
-         GROUP BY COALESCE(rs.title, links.title, 'Untitled rating form'), rs.rating
+         GROUP BY rs.rating
          ORDER BY rs.rating ASC`,
         [job.managed_link_id, job.id],
       );
