@@ -4,6 +4,7 @@ CREATE TABLE IF NOT EXISTS users (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name VARCHAR(120),
   email VARCHAR(255) NOT NULL UNIQUE,
+  phone VARCHAR(32),
   password_hash TEXT NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -11,6 +12,13 @@ CREATE TABLE IF NOT EXISTS users (
 
 ALTER TABLE users
   ADD COLUMN IF NOT EXISTS name VARCHAR(120);
+
+ALTER TABLE users
+  ADD COLUMN IF NOT EXISTS phone VARCHAR(32);
+
+CREATE UNIQUE INDEX IF NOT EXISTS users_phone_unique_idx
+  ON users(phone)
+  WHERE phone IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS sessions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

@@ -11,8 +11,10 @@ export default function AuthScreen({ defaultMode = "register" }) {
   const router = useRouter()
   const [mode, setMode] = useState(defaultMode)
   const [name, setName] = useState("")
+  const [phone, setPhone] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
+  const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
 
@@ -28,8 +30,8 @@ export default function AuthScreen({ defaultMode = "register" }) {
         method: "POST",
         body: JSON.stringify(
           isRegisterMode
-            ? { name, email, password }
-            : { email, password },
+            ? { name, email, phone, password }
+            : { identifier: email, password },
         ),
       })
 
@@ -45,6 +47,10 @@ export default function AuthScreen({ defaultMode = "register" }) {
   function switchMode(nextMode) {
     setMode(nextMode)
     setError("")
+  }
+
+  function handleSocialClick(provider) {
+    setError(`${provider} login needs OAuth app credentials and redirect setup before it can be enabled.`)
   }
 
   return (
@@ -85,21 +91,40 @@ export default function AuthScreen({ defaultMode = "register" }) {
           />
         ) : null}
 
+        {isRegisterMode ? (
+          <input
+            placeholder="Mobile number"
+            type="tel"
+            value={phone}
+            onChange={(event) => setPhone(event.target.value)}
+            className="mb-3 w-full rounded border p-2"
+          />
+        ) : null}
+
         <input
-          placeholder="Email"
-          type="email"
+          placeholder={isRegisterMode ? "Email" : "Email or Mobile number"}
+          type="text"
           value={email}
           onChange={(event) => setEmail(event.target.value)}
           className="mb-3 w-full rounded border p-2"
         />
 
-        <input
-          placeholder="Password"
-          type="password"
-          value={password}
-          onChange={(event) => setPassword(event.target.value)}
-          className="mb-3 w-full rounded border p-2"
-        />
+        <div className="relative mb-3">
+          <input
+            placeholder="Password"
+            type={showPassword ? "text" : "password"}
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+            className="w-full rounded border p-2 pr-16"
+          />
+          <button
+            type="button"
+            onClick={() => setShowPassword((value) => !value)}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-sm font-medium text-slate-600"
+          >
+            {showPassword ? "Hide" : "Show"}
+          </button>
+        </div>
 
         {!isRegisterMode ? (
           <div className="mb-3 flex justify-end text-sm">
@@ -123,6 +148,23 @@ export default function AuthScreen({ defaultMode = "register" }) {
               ? "Register"
               : "Login"}
         </button>
+
+        <div className="mt-4 space-y-3">
+          <button
+            type="button"
+            onClick={() => handleSocialClick("Google")}
+            className="w-full rounded border border-slate-300 py-2 text-slate-800"
+          >
+            Continue with Google
+          </button>
+          <button
+            type="button"
+            onClick={() => handleSocialClick("Microsoft")}
+            className="w-full rounded border border-slate-300 py-2 text-slate-800"
+          >
+            Continue with Microsoft
+          </button>
+        </div>
 
         <p className="mt-4 text-sm text-gray-600">
           {isRegisterMode ? "Already have an account?" : "Need an account?"}{" "}

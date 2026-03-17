@@ -13,7 +13,7 @@ async function requireAuth(req, _res, next) {
 
     const tokenHash = hashToken(token);
     const result = await query(
-      `SELECT users.id, users.name, users.email
+      `SELECT users.id, users.name, users.email, users.phone
        FROM sessions
        INNER JOIN users ON users.id = sessions.user_id
        WHERE sessions.token_hash = $1

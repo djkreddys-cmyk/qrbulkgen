@@ -5,7 +5,7 @@ import * as DocumentPicker from "expo-document-picker";
 
 import { useAuth } from "../context/AuthContext";
 import { apiRequest, createAuthHeaders } from "../lib/api";
-import { shareDataUrlFile } from "../lib/files";
+import { saveDataUrlFile, shareDataUrlFile } from "../lib/files";
 import { formatExpiryDateForInput, QR_TYPES } from "../lib/qr";
 
 function Card({ children }) {
@@ -65,6 +65,7 @@ export function BulkJobsScreen() {
   const [detailBusy, setDetailBusy] = useState(false);
   const [error, setError] = useState("");
   const [shareMessage, setShareMessage] = useState("");
+  const [downloadMessage, setDownloadMessage] = useState("");
 
   useEffect(() => {
     let mounted = true;
@@ -227,6 +228,7 @@ export function BulkJobsScreen() {
     setCreatingJob(true);
     setError("");
     setShareMessage("");
+    setDownloadMessage("");
 
     try {
       const formData = new FormData();
@@ -299,6 +301,22 @@ export function BulkJobsScreen() {
     }
   }
 
+  async function handleSaveArtifact() {
+    if (!selectedJob?.artifact?.filePath?.startsWith("data:")) {
+      return;
+    }
+
+    try {
+      const path = await saveDataUrlFile({
+        dataUrl: selectedJob.artifact.filePath,
+        fileName: selectedJob.artifact.fileName,
+      });
+      setDownloadMessage(`Saved ${path.split(/[\\/]/).pop()} to app files`);
+    } catch (saveError) {
+      setError(saveError.message || "Failed to save ZIP file");
+    }
+  }
+
   return (
     <ScrollView contentContainerStyle={{ gap: 16, paddingBottom: 36 }}>
       <Card>
@@ -317,6 +335,11 @@ export function BulkJobsScreen() {
       {!!shareMessage && (
         <Card>
           <Text style={{ color: "#047857" }}>{shareMessage}</Text>
+        </Card>
+      )}
+      {!!downloadMessage && (
+        <Card>
+          <Text style={{ color: "#2563eb" }}>{downloadMessage}</Text>
         </Card>
       )}
 
@@ -569,19 +592,36 @@ export function BulkJobsScreen() {
             {selectedJob.errorMessage ? (
               <Text style={{ color: "#b91c1c" }}>{selectedJob.errorMessage}</Text>
             ) : null}
-            <TouchableOpacity
-              onPress={handleDownloadArtifact}
-              disabled={!selectedJob.artifact?.filePath?.startsWith("data:")}
-              style={{
-                backgroundColor: selectedJob.artifact?.filePath?.startsWith("data:") ? "#0f172a" : "#cbd5e1",
-                paddingVertical: 14,
-                borderRadius: 16,
-              }}
-            >
-              <Text style={{ color: "#ffffff", textAlign: "center", fontWeight: "700" }}>
-                {selectedJob.artifact?.filePath?.startsWith("data:") ? "Share ZIP File" : "ZIP Not Ready"}
-              </Text>
-            </TouchableOpacity>
+            <View style={{ flexDirection: "row", gap: 12 }}>
+              <TouchableOpacity
+                onPress={handleDownloadArtifact}
+                disabled={!selectedJob.artifact?.filePath?.startsWith("data:")}
+                style={{
+                  flex: 1,
+                  backgroundColor: selectedJob.artifact?.filePath?.startsWith("data:") ? "#e2e8f0" : "#cbd5e1",
+                  paddingVertical: 14,
+                  borderRadius: 16,
+                }}
+              >
+                <Text style={{ color: "#0f172a", textAlign: "center", fontWeight: "700" }}>
+                  {selectedJob.artifact?.filePath?.startsWith("data:") ? "Share ZIP File" : "ZIP Not Ready"}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={handleSaveArtifact}
+                disabled={!selectedJob.artifact?.filePath?.startsWith("data:")}
+                style={{
+                  flex: 1,
+                  backgroundColor: selectedJob.artifact?.filePath?.startsWith("data:") ? "#0f172a" : "#cbd5e1",
+                  paddingVertical: 14,
+                  borderRadius: 16,
+                }}
+              >
+                <Text style={{ color: "#ffffff", textAlign: "center", fontWeight: "700" }}>
+                  {selectedJob.artifact?.filePath?.startsWith("data:") ? "Download ZIP" : "ZIP Not Ready"}
+                </Text>
+              </TouchableOpacity>
+            </View>
 
             <View style={{ gap: 8 }}>
               <Text style={{ fontWeight: "700", color: "#0f172a" }}>Recent failed rows</Text>

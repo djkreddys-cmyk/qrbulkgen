@@ -6,11 +6,13 @@ import { useAuth } from "../context/AuthContext";
 export function RegisterScreen() {
   const { register, error, isSubmitting } = useAuth();
   const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
 
   async function handleRegister() {
-    await register({ name, email, password });
+    await register({ name, email, phone, password });
   }
 
   return (
@@ -30,12 +32,27 @@ export function RegisterScreen() {
         style={{ borderWidth: 1, borderColor: "#ccc", padding: 12, borderRadius: 8 }}
       />
       <TextInput
-        placeholder="Password"
-        value={password}
-        onChangeText={setPassword}
-        secureTextEntry
+        placeholder="Mobile Number"
+        value={phone}
+        onChangeText={setPhone}
+        keyboardType="phone-pad"
         style={{ borderWidth: 1, borderColor: "#ccc", padding: 12, borderRadius: 8 }}
       />
+      <View style={{ position: "relative" }}>
+        <TextInput
+          placeholder="Password"
+          value={password}
+          onChangeText={setPassword}
+          secureTextEntry={!showPassword}
+          style={{ borderWidth: 1, borderColor: "#ccc", padding: 12, paddingRight: 72, borderRadius: 8 }}
+        />
+        <TouchableOpacity
+          onPress={() => setShowPassword((value) => !value)}
+          style={{ position: "absolute", right: 12, top: 12 }}
+        >
+          <Text style={{ color: "#475569", fontWeight: "600" }}>{showPassword ? "Hide" : "Show"}</Text>
+        </TouchableOpacity>
+      </View>
       {!!error && <Text style={{ color: "#b00020" }}>{error}</Text>}
       <TouchableOpacity
         onPress={handleRegister}

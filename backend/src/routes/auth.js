@@ -12,13 +12,24 @@ const { sendResetPasswordEmail } = require("../services/email");
 const authRouter = express.Router();
 const SESSION_TTL_DAYS = 30;
 
-function validateAuthPayload(body) {
+function normalizePhone(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  const cleaned = raw.replace(/[^\d+]/g, "");
+  if (cleaned.startsWith("+")) {
+    return `+${cleaned.slice(1).replace(/\+/g, "")}`;
+  }
+  return cleaned.replace(/\+/g, "");
+}
+
+function validateRegisterPayload(body) {
   const name = String(body.name || "").trim();
   const email = String(body.email || "").trim().toLowerCase();
+  const phone = normalizePhone(body.phone);
   const password = String(body.password || "");
 
-  if (!email || !password) {
-    throw createHttpError(400, "VALIDATION_ERROR", "Email and password are required");
+  if (!email || !phone || !password) {
+    throw createHttpError(400, "VALIDATION_ERROR", "Name, email, mobile number, and password are required");
   }
 
   if (body.name !== undefined && !name) {
@@ -33,7 +44,24 @@ function validateAuthPayload(body) {
     throw createHttpError(400, "VALIDATION_ERROR", "Password must be at least 8 characters long");
   }
 
-  return { name, email, password };
+  return { name, email, phone, password };
+}
+
+function validateLoginPayload(body) {
+  const identifier = String(body.identifier || body.email || body.phone || "").trim();
+  const email = identifier.includes("@") ? identifier.toLowerCase() : "";
+  const phone = email ? "" : normalizePhone(identifier);
+  const password = String(body.password || "");
+
+  if ((!email && !phone) || !password) {
+    throw createHttpError(400, "VALIDATION_ERROR", "Email or mobile number and password are required");
+  }
+
+  if (password.length < 8) {
+    throw createHttpError(400, "VALIDATION_ERROR", "Password must be at least 8 characters long");
+  }
+
+  return { email, phone, password };
 }
 
 async function createSession(userId, db = { query }) {
@@ -56,20 +84,23 @@ function buildResetPasswordUrl(token) {
 
 authRouter.post("/register", async (req, res, next) => {
   try {
-    const { name, email, password } = validateAuthPayload(req.body);
+    const { name, email, phone, password } = validateRegisterPayload(req.body);
 
     const result = await withTransaction(async (client) => {
-      const existingUser = await client.query("SELECT id FROM users WHERE email = $1 LIMIT 1", [email]);
+      const existingUser = await client.query(
+        "SELECT id FROM users WHERE email = $1 OR phone = $2 LIMIT 1",
+        [email, phone],
+      );
 
       if (existingUser.rows[0]) {
-        throw createHttpError(409, "EMAIL_ALREADY_EXISTS", "An account with this email already exists");
+        throw createHttpError(409, "ACCOUNT_ALREADY_EXISTS", "An account with this email or mobile number already exists");
       }
 
       const insertedUser = await client.query(
-        `INSERT INTO users (name, email, password_hash)
-         VALUES ($1, $2, $3)
-         RETURNING id, name, email`,
-        [name, email, hashPassword(password)],
+        `INSERT INTO users (name, email, phone, password_hash)
+         VALUES ($1, $2, $3, $4)
+         RETURNING id, name, email, phone`,
+        [name, email, phone, hashPassword(password)],
       );
 
       const user = insertedUser.rows[0];
@@ -90,11 +121,11 @@ authRouter.post("/register", async (req, res, next) => {
 
 authRouter.post("/login", async (req, res, next) => {
   try {
-    const { email, password } = validateAuthPayload(req.body);
+    const { email, phone, password } = validateLoginPayload(req.body);
 
     const result = await query(
-      "SELECT id, name, email, password_hash FROM users WHERE email = $1 LIMIT 1",
-      [email],
+      "SELECT id, name, email, phone, password_hash FROM users WHERE email = $1 OR phone = $2 LIMIT 1",
+      [email || null, phone || null],
     );
 
     const user = result.rows[0];
@@ -110,6 +141,7 @@ authRouter.post("/login", async (req, res, next) => {
         id: user.id,
         name: user.name,
         email: user.email,
+        phone: user.phone,
       },
       token,
     });
@@ -128,6 +160,7 @@ authRouter.get("/me", requireAuth, async (req, res) => {
       id: req.user.id,
       name: req.user.name,
       email: req.user.email,
+      phone: req.user.phone || "",
     },
   });
 });

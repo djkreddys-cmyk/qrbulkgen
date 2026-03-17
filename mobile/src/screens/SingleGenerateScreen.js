@@ -14,7 +14,7 @@ import { WebView } from "react-native-webview";
 
 import { useAuth } from "../context/AuthContext";
 import { apiRequest, createAuthHeaders } from "../lib/api";
-import { shareDataUrlFile } from "../lib/files";
+import { saveDataUrlFile, shareDataUrlFile } from "../lib/files";
 import {
   addMonths,
   addSocialLinkRow,
@@ -197,6 +197,7 @@ export function SingleGenerateScreen() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [shareMessage, setShareMessage] = useState("");
+  const [downloadMessage, setDownloadMessage] = useState("");
   const [uploadMessage, setUploadMessage] = useState("");
   const [showLocationPreviewModal, setShowLocationPreviewModal] = useState(false);
 
@@ -261,20 +262,20 @@ export function SingleGenerateScreen() {
   }
 
   function buildGoogleMapsPreviewUrl() {
-    const mapsUrl = String(fields.mapsUrl || "").trim();
-    if (mapsUrl) {
-      return `https://maps.google.com/maps?output=embed&q=${encodeURIComponent(mapsUrl)}`;
-    }
-
     const latitude = String(fields.latitude || "").trim();
     const longitude = String(fields.longitude || "").trim();
     if (latitude && longitude) {
-      return `https://maps.google.com/maps?output=embed&q=${encodeURIComponent(`${latitude},${longitude}`)}`;
+      return `https://www.google.com/maps?q=${encodeURIComponent(`${latitude},${longitude}`)}&z=16&output=embed`;
+    }
+
+    const mapsUrl = String(fields.mapsUrl || "").trim();
+    if (mapsUrl) {
+      return `https://www.google.com/maps?q=${encodeURIComponent(mapsUrl)}&z=16&output=embed`;
     }
 
     const query = String(fields.locationAddress || fields.locationName || "").trim();
     if (query) {
-      return `https://maps.google.com/maps?output=embed&q=${encodeURIComponent(query)}`;
+      return `https://www.google.com/maps?q=${encodeURIComponent(query)}&z=16&output=embed`;
     }
 
     return "";
@@ -367,6 +368,7 @@ export function SingleGenerateScreen() {
       setJob(null);
       setError("");
       setShareMessage("");
+      setDownloadMessage("");
       return;
     }
 
@@ -385,6 +387,7 @@ export function SingleGenerateScreen() {
     setEditingJobId("");
     setError("");
     setShareMessage("");
+    setDownloadMessage("");
     setExpiryDate("");
   }, [qrType]);
 
@@ -488,6 +491,7 @@ export function SingleGenerateScreen() {
     setBusy(true);
     setError("");
     setShareMessage("");
+    setDownloadMessage("");
     try {
       const data = await apiRequest(editingJobId ? `/qr/jobs/${editingJobId}/single` : "/qr/single", {
         method: editingJobId ? "PUT" : "POST",
@@ -538,6 +542,19 @@ export function SingleGenerateScreen() {
       setShareMessage(`Shared ${sharedPath.split(/[\\/]/).pop()}`);
     } catch (shareError) {
       setError(shareError.message || "Failed to share QR file");
+    }
+  }
+
+  async function handleDownload() {
+    if (!artifact?.dataUrl) return;
+    try {
+      const savedPath = await saveDataUrlFile({
+        dataUrl: artifact.dataUrl,
+        fileName: artifact.fileName,
+      });
+      setDownloadMessage(`Saved ${savedPath.split(/[\\/]/).pop()} to app files`);
+    } catch (saveError) {
+      setError(saveError.message || "Failed to save QR file");
     }
   }
 
@@ -938,8 +955,16 @@ export function SingleGenerateScreen() {
         ) : null}
 
         {!!shareMessage && <Text style={{ color: "#047857" }}>{shareMessage}</Text>}
+        {!!downloadMessage && <Text style={{ color: "#2563eb" }}>{downloadMessage}</Text>}
 
-        <ActionButton title="Share / Download File" onPress={handleShare} disabled={!artifact?.dataUrl} tone="light" />
+        <View style={{ flexDirection: "row", gap: 12 }}>
+          <View style={{ flex: 1 }}>
+            <ActionButton title="Share File" onPress={handleShare} disabled={!artifact?.dataUrl} tone="light" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <ActionButton title="Download File" onPress={handleDownload} disabled={!artifact?.dataUrl} />
+          </View>
+        </View>
       </Card>
 
       {analysisLoading ? (
@@ -1004,7 +1029,14 @@ export function SingleGenerateScreen() {
               </TouchableOpacity>
             </View>
             {buildGoogleMapsPreviewUrl() ? (
-              <WebView source={{ uri: buildGoogleMapsPreviewUrl() }} style={{ height: 360 }} />
+              <WebView
+                source={{ uri: buildGoogleMapsPreviewUrl() }}
+                style={{ height: 360 }}
+                originWhitelist={["*"]}
+                javaScriptEnabled
+                domStorageEnabled
+                startInLoadingState
+              />
             ) : null}
             <View style={{ padding: 16, gap: 6 }}>
               <Text style={{ color: "#0f172a", fontWeight: "700" }}>

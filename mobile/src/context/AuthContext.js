@@ -56,13 +56,13 @@ export function AuthProvider({ children }) {
     };
   }, []);
 
-  async function login({ email, password }) {
+  async function login({ identifier, password }) {
     setError("");
     setIsSubmitting(true);
     try {
       const data = await apiRequest("/auth/login", {
         method: "POST",
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ identifier, password }),
       });
       setUser(data.user || null);
       setToken(data.token || "");
@@ -83,13 +83,13 @@ export function AuthProvider({ children }) {
     }
   }
 
-  async function register({ name, email, password }) {
+  async function register({ name, email, phone, password }) {
     setError("");
     setIsSubmitting(true);
     try {
       const data = await apiRequest("/auth/register", {
         method: "POST",
-        body: JSON.stringify({ name, email, password }),
+        body: JSON.stringify({ name, email, phone, password }),
       });
       setUser(data.user || null);
       setToken(data.token || "");

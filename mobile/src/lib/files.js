@@ -43,3 +43,16 @@ export async function shareDataUrlFile({ dataUrl, fileName }) {
 
   return targetPath;
 }
+
+export async function saveDataUrlFile({ dataUrl, fileName }) {
+  const { mimeType, base64 } = splitDataUrl(dataUrl);
+  const extension = fileExtensionFromMimeType(mimeType, "bin");
+  const safeFileName = fileName || `qrbulkgen-${Date.now()}.${extension}`;
+  const targetPath = `${FileSystem.documentDirectory}${safeFileName}`;
+
+  await FileSystem.writeAsStringAsync(targetPath, base64, {
+    encoding: "base64",
+  });
+
+  return targetPath;
+}
