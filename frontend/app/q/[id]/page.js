@@ -19,7 +19,7 @@ function buildLocationHref(content) {
 }
 
 function normalizeKind(qrType, content) {
-  if (["URL", "Youtube", "App Store", "PDF", "Image Gallery", "Rating", "Feedback", "Social Media"].includes(qrType)) {
+  if (["URL", "Youtube", "App Store", "PDF", "Image Gallery", "Rating", "Feedback"].includes(qrType)) {
     return "url"
   }
   if (["Email", "Phone", "SMS", "WhatsApp", "Event"].includes(qrType)) {
@@ -28,7 +28,7 @@ function normalizeKind(qrType, content) {
   if (qrType === "Location") {
     return "location"
   }
-  if (["vCard", "WIFI", "Text"].includes(qrType)) {
+  if (["vCard", "WIFI", "Text", "Social Media"].includes(qrType)) {
     return "content"
   }
   return /^https?:\/\//i.test(String(content || "").trim()) ? "url" : "content"

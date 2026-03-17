@@ -33,6 +33,32 @@ function openStructuredContent(content, fileName, mimeType) {
 
 export default function ManagedQrClient({ link, kind, resolvedContent, openHref, error = "" }) {
   const heading = useMemo(() => link?.title || `${link?.qrType || "QR"} QR`, [link])
+  const socialDestinations = useMemo(() => {
+    if (link?.qrType !== "Social Media") return []
+
+    const payloadLinks = Array.isArray(link?.targetPayload?.socialLinks)
+      ? link.targetPayload.socialLinks
+          .map((item) => {
+            const label = String(
+              item?.platform === "Custom" ? item?.customPlatform || "" : item?.platform || "",
+            ).trim()
+            const href = String(item?.url || "").trim()
+            return label && href ? { label, href } : null
+          })
+          .filter(Boolean)
+      : []
+
+    if (payloadLinks.length) return payloadLinks
+
+    return String(resolvedContent || link?.content || "")
+      .split(/\r?\n/)
+      .map((line) => {
+        const match = line.match(/^\s*([^:]+):\s*(https?:\/\/\S+)\s*$/i)
+        if (!match) return null
+        return { label: match[1].trim(), href: match[2].trim() }
+      })
+      .filter(Boolean)
+  }, [link, resolvedContent])
 
   function copyContent() {
     if (!link?.content) return
@@ -132,7 +158,29 @@ export default function ManagedQrClient({ link, kind, resolvedContent, openHref,
               </div>
             ) : (
               <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-5">
-                <pre className="whitespace-pre-wrap break-words text-sm text-slate-700">{resolvedContent || link.content}</pre>
+                {link.qrType === "Social Media" && socialDestinations.length ? (
+                  <div className="space-y-3">
+                    <p className="text-sm text-slate-600">Choose a platform to open.</p>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      {socialDestinations.map((item) => (
+                        <a
+                          key={`${item.label}-${item.href}`}
+                          href={item.href}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-800 transition hover:border-sky-300 hover:text-sky-700"
+                        >
+                          <span className="block text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                            {item.label}
+                          </span>
+                          <span className="mt-2 block break-all text-slate-700">{item.href}</span>
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <pre className="whitespace-pre-wrap break-words text-sm text-slate-700">{resolvedContent || link.content}</pre>
+                )}
                 <div className="mt-4 flex flex-wrap gap-3">
                   {link.qrType === "vCard" && (
                     <button
@@ -146,7 +194,7 @@ export default function ManagedQrClient({ link, kind, resolvedContent, openHref,
                   <button
                     type="button"
                     onClick={copyContent}
-                    className={`rounded-xl px-4 py-3 text-sm font-medium ${link.qrType === "vCard" ? "border border-slate-300 text-slate-700" : "bg-slate-950 text-white"}`}
+                    className={`rounded-xl px-4 py-3 text-sm font-medium ${link.qrType === "vCard" || link.qrType === "Social Media" ? "border border-slate-300 text-slate-700" : "bg-slate-950 text-white"}`}
                   >
                     {link.qrType === "Text" ? "Copy text" : "Copy content"}
                   </button>
