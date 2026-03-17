@@ -12,6 +12,7 @@ const { enqueueBulkQrJob } = require("../services/queue");
 const { normalizeSingleQrPayload } = require("../services/qr-single");
 
 const bulkRouter = express.Router();
+const NORMALIZED_URL_MATCH_SQL = "(regexp_replace(lower(split_part(%s, '?exp=', 1)), '^https?://(www\\.)?', '') = regexp_replace(lower(split_part(%s, '?exp=', 1)), '^https?://(www\\.)?', ''))";
 const BULK_QR_TYPES = new Set([
   "URL",
   "Text",
@@ -931,7 +932,10 @@ bulkRouter.get("/reports/public-engagement", requireAuth, async (req, res, next)
            rating,
            COUNT(*)::int AS count
          FROM rating_submissions rs
-         INNER JOIN managed_qr_links m ON m.content = rs.source_url
+         INNER JOIN managed_qr_links m
+           ON m.content = rs.source_url
+           OR regexp_replace(lower(split_part(m.content, '?exp=', 1)), '^https?://(www\\.)?', '') =
+              regexp_replace(lower(split_part(rs.source_url, '?exp=', 1)), '^https?://(www\\.)?', '')
          WHERE m.user_id = $1
            AND ($2::timestamptz IS NULL OR rs.created_at >= $2::timestamptz)
            AND ($3::timestamptz IS NULL OR rs.created_at <= $3::timestamptz)
@@ -942,7 +946,10 @@ bulkRouter.get("/reports/public-engagement", requireAuth, async (req, res, next)
       query(
         `SELECT COALESCE(fs.title, m.title) AS title, fs.questions, fs.answers, fs.created_at
          FROM feedback_submissions fs
-         INNER JOIN managed_qr_links m ON m.content = fs.source_url
+         INNER JOIN managed_qr_links m
+           ON m.content = fs.source_url
+           OR regexp_replace(lower(split_part(m.content, '?exp=', 1)), '^https?://(www\\.)?', '') =
+              regexp_replace(lower(split_part(fs.source_url, '?exp=', 1)), '^https?://(www\\.)?', '')
          WHERE m.user_id = $1
            AND ($2::timestamptz IS NULL OR fs.created_at >= $2::timestamptz)
            AND ($3::timestamptz IS NULL OR fs.created_at <= $3::timestamptz)
@@ -1107,6 +1114,8 @@ bulkRouter.get("/jobs/:id/analysis", requireAuth, async (req, res, next) => {
         AND (
           ae.metadata->>'linkId' = links.id::text
           OR ae.metadata->>'targetUrl' = links.url
+          OR regexp_replace(lower(split_part(COALESCE(ae.metadata->>'targetUrl', ''), '?exp=', 1)), '^https?://(www\\.)?', '') =
+             regexp_replace(lower(split_part(links.url, '?exp=', 1)), '^https?://(www\\.)?', '')
         )`,
       [job.managed_link_id, job.id],
     );
@@ -1129,6 +1138,8 @@ bulkRouter.get("/jobs/:id/analysis", requireAuth, async (req, res, next) => {
        INNER JOIN links
          ON ae.metadata->>'linkId' = links.id::text
          OR ae.metadata->>'targetUrl' = links.url
+         OR regexp_replace(lower(split_part(COALESCE(ae.metadata->>'targetUrl', ''), '?exp=', 1)), '^https?://(www\\.)?', '') =
+            regexp_replace(lower(split_part(links.url, '?exp=', 1)), '^https?://(www\\.)?', '')
        WHERE ae.event_type = 'qr.public.scan'
        GROUP BY DATE(ae.created_at)
        ORDER BY DATE(ae.created_at) ASC
@@ -1166,7 +1177,10 @@ bulkRouter.get("/jobs/:id/analysis", requireAuth, async (req, res, next) => {
            MAX(rs.created_at) AS last_submission_at,
            SUM(COUNT(*)) OVER ()::int AS total_submissions
          FROM rating_submissions rs
-         INNER JOIN links ON links.url = rs.source_url
+         INNER JOIN links
+           ON links.url = rs.source_url
+           OR regexp_replace(lower(split_part(links.url, '?exp=', 1)), '^https?://(www\\.)?', '') =
+              regexp_replace(lower(split_part(rs.source_url, '?exp=', 1)), '^https?://(www\\.)?', '')
          GROUP BY rs.rating
          ORDER BY rs.rating ASC`,
         [job.managed_link_id, job.id],
@@ -1204,7 +1218,10 @@ bulkRouter.get("/jobs/:id/analysis", requireAuth, async (req, res, next) => {
          )
          SELECT fs.title, fs.questions, fs.answers, fs.created_at
          FROM feedback_submissions fs
-         INNER JOIN links ON links.url = fs.source_url
+         INNER JOIN links
+           ON links.url = fs.source_url
+           OR regexp_replace(lower(split_part(links.url, '?exp=', 1)), '^https?://(www\\.)?', '') =
+              regexp_replace(lower(split_part(fs.source_url, '?exp=', 1)), '^https?://(www\\.)?', '')
          ORDER BY fs.created_at DESC`,
         [job.managed_link_id, job.id],
       );
