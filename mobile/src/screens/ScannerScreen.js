@@ -21,6 +21,11 @@ function isManagedWrapperUrl(value) {
 function resolveManagedDestination(link) {
   if (!link) return "";
 
+  const resolvedTarget = String(link.resolvedTarget || "").trim();
+  if (resolvedTarget && !isManagedWrapperUrl(resolvedTarget)) {
+    return resolvedTarget;
+  }
+
   const targetPayload = link.targetPayload || {};
   const qrType = String(targetPayload.qrType || link.qrType || "").trim();
   const uploadIds = targetPayload.uploadIds || {};

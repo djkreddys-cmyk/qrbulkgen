@@ -90,6 +90,121 @@ function rewriteLegacyUrl(url, req) {
   }
 }
 
+function ensureExternalUrl(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  if (/^(https?:\/\/|mailto:|tel:|sms:|smsto:|upi:)/i.test(raw)) return raw;
+  if (/^www\./i.test(raw)) return `https://${raw}`;
+  return raw;
+}
+
+function extractFirstUrl(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  const match = raw.match(/https?:\/\/[^\s]+/i);
+  return match ? match[0] : "";
+}
+
+function buildSmsHref(value, fields = {}) {
+  const raw = String(value || "").trim();
+  if (/^sms:/i.test(raw)) return raw;
+  if (/^smsto:/i.test(raw)) {
+    const payload = raw.replace(/^smsto:/i, "");
+    const separatorIndex = payload.indexOf(":");
+    const phone = separatorIndex >= 0 ? payload.slice(0, separatorIndex) : payload;
+    const body = separatorIndex >= 0 ? payload.slice(separatorIndex + 1) : "";
+    return `sms:${phone}${body ? `?body=${encodeURIComponent(body)}` : ""}`;
+  }
+  const phone = String(fields.smsPhone || "").trim();
+  const body = String(fields.smsMessage || "").trim();
+  return phone ? `sms:${phone}${body ? `?body=${encodeURIComponent(body)}` : ""}` : "";
+}
+
+function buildWhatsappHref(value, fields = {}) {
+  const raw = String(value || "").trim();
+  if (/^https?:\/\/(wa\.me|api\.whatsapp\.com)\//i.test(raw)) return raw;
+  const phone = String(fields.whatsappPhone || "").replace(/[^\d]/g, "");
+  const message = String(fields.whatsappMessage || "").trim();
+  return phone
+    ? `https://api.whatsapp.com/send?phone=${phone}${message ? `&text=${encodeURIComponent(message)}` : ""}`
+    : raw;
+}
+
+function buildEventCalendarHref(fields = {}) {
+  const title = String(fields.eventTitle || "").trim();
+  if (!title) return "";
+  const params = new URLSearchParams();
+  params.set("action", "TEMPLATE");
+  params.set("text", title);
+
+  const start = String(fields.eventStart || "").trim();
+  const end = String(fields.eventEnd || "").trim();
+  if (start && end) {
+    const startDate = new Date(start);
+    const endDate = new Date(end);
+    if (!Number.isNaN(startDate.getTime()) && !Number.isNaN(endDate.getTime())) {
+      const startUtc = startDate.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
+      const endUtc = endDate.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
+      params.set("dates", `${startUtc}/${endUtc}`);
+    }
+  }
+
+  const location = String(fields.eventLocation || "").trim();
+  if (location) params.set("location", location);
+  const details = String(fields.eventDescription || "").trim();
+  if (details) params.set("details", details);
+  return `https://calendar.google.com/calendar/render?${params.toString()}`;
+}
+
+function buildLocationHref(content) {
+  const raw = String(content || "").trim();
+  if (!raw) return "";
+  if (/^https?:\/\//i.test(raw)) return raw;
+  const normalized = raw.replace(/^geo:/i, "");
+  const [lat, lng] = normalized.split(",");
+  if (!lat || !lng) return "";
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${lat},${lng}`)}`;
+}
+
+function resolveManagedLinkDestination(row) {
+  const qrType = String(row?.qr_type || "").trim();
+  const targetPayload = row?.target_payload || {};
+  const fields = targetPayload.fields || {};
+  const socialLinks = Array.isArray(targetPayload.socialLinks) ? targetPayload.socialLinks : [];
+  const rawContent = String(row?.content || "").trim();
+
+  switch (qrType) {
+    case "URL":
+      return ensureExternalUrl(fields.url || rawContent);
+    case "Youtube":
+      return ensureExternalUrl(fields.youtubeUrl || rawContent);
+    case "App Store":
+      return ensureExternalUrl(fields.appStoreUrl || rawContent);
+    case "PDF":
+      return ensureExternalUrl(fields.pdfUrl || rawContent);
+    case "Image Gallery":
+      return ensureExternalUrl(fields.galleryUrl || rawContent);
+    case "Email":
+      return rawContent || `mailto:${String(fields.email || "").trim()}?subject=${encodeURIComponent(fields.subject || "")}&body=${encodeURIComponent(fields.body || "")}`;
+    case "Phone":
+      return rawContent || `tel:${String(fields.phone || "").trim()}`;
+    case "SMS":
+      return buildSmsHref(rawContent, fields);
+    case "WhatsApp":
+      return buildWhatsappHref(rawContent, fields);
+    case "Location":
+      return buildLocationHref(fields.mapsUrl || rawContent);
+    case "Social Media": {
+      const firstUrl = socialLinks.find((item) => String(item?.url || "").trim())?.url;
+      return ensureExternalUrl(firstUrl || extractFirstUrl(rawContent) || rawContent);
+    }
+    case "Event":
+      return buildEventCalendarHref(fields) || rawContent;
+    default:
+      return rawContent;
+  }
+}
+
 function getRequestIp(req) {
   const forwarded = String(req.headers["x-forwarded-for"] || "").split(",")[0].trim();
   return forwarded || req.ip || "";
@@ -371,6 +486,7 @@ publicRouter.get("/qr-links/:id", async (req, res, next) => {
         qrType: row.qr_type,
         title: row.title,
         content: row.content,
+        resolvedTarget: resolveManagedLinkDestination(row),
         targetPayload: row.target_payload || null,
         expiresAt,
         isExpired,

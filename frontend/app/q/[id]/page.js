@@ -129,6 +129,7 @@ function buildLocationHref(content) {
 
 function resolveContent(link) {
   if (!link) return ""
+  if (link.resolvedTarget) return String(link.resolvedTarget || "").trim()
   const targetPayload = link.targetPayload || {}
   const fields = targetPayload.fields || {}
   const socialLinks = Array.isArray(targetPayload.socialLinks) ? targetPayload.socialLinks : []
@@ -283,6 +284,25 @@ export default function ManagedQrPage() {
     if (link.qrType === "Event") {
       downloadTextFile(resolvedContent, "event.ics", "text/calendar")
     }
+  }
+
+  if (link && !link.isExpired && shouldDirectJump) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-slate-50 px-4 py-10">
+        <div className="w-full max-w-md rounded-[2rem] border border-slate-200 bg-white px-8 py-10 text-center shadow-sm">
+          <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-slate-200 border-t-slate-900" />
+          <h1 className="mt-5 text-2xl font-semibold text-slate-950">Opening destination...</h1>
+          <p className="mt-2 text-sm text-slate-500">We are redirecting you now.</p>
+          <a
+            href={openHref}
+            target="_self"
+            className="mt-5 inline-flex rounded-xl bg-slate-950 px-4 py-3 text-sm font-medium text-white"
+          >
+            Open manually
+          </a>
+        </div>
+      </main>
+    )
   }
 
   return (

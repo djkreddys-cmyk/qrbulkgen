@@ -317,8 +317,10 @@ function buildQrContent(type, fields, appOrigin, ids, socialLinks, expiryDate) {
       return `SMSTO:${fields.smsPhone.trim()}:${fields.smsMessage || ""}`
     case "WhatsApp": {
       const phone = String(fields.whatsappPhone || "").replace(/[^\d]/g, "")
-      const text = fields.whatsappMessage ? `?text=${encodeURIComponent(fields.whatsappMessage)}` : ""
-      return `https://wa.me/${phone}${text}`
+      const text = String(fields.whatsappMessage || "").trim()
+      return phone
+        ? `https://api.whatsapp.com/send?phone=${phone}${text ? `&text=${encodeURIComponent(text)}` : ""}`
+        : ""
     }
     case "vCard":
       return [

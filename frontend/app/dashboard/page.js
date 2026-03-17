@@ -302,6 +302,46 @@ export default function Dashboard() {
     router.push(`/generate?${params.toString()}`)
   }
 
+  async function handleBulkArchive() {
+    const token = getAuthToken()
+    if (!token) return
+
+    const activeSelectedIds = selectedJobIds.filter((id) => {
+      const job = jobs.find((entry) => entry.id === id)
+      return job && !job.archivedAt
+    })
+
+    if (!activeSelectedIds.length) {
+      setError("Select at least one active QR job to archive.")
+      return
+    }
+
+    const confirmed = window.confirm(
+      `Archive ${activeSelectedIds.length} selected QR job${activeSelectedIds.length === 1 ? "" : "s"}? They will stay in your current view until refresh, and you can still review them later from the Archived filter.`,
+    )
+
+    if (!confirmed) return
+
+    try {
+      setBusyJobId("bulk-archive")
+      await Promise.all(
+        activeSelectedIds.map((jobId) =>
+          apiRequest(`/qr/jobs/${jobId}`, {
+            method: "DELETE",
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+        ),
+      )
+      setSelectedJobIds([])
+      await loadData(queryString)
+      setError("")
+    } catch (requestError) {
+      setError(requestError.message)
+    } finally {
+      setBusyJobId("")
+    }
+  }
+
   function toggleSelectedJob(jobId) {
     setSelectedJobIds((prev) => (prev.includes(jobId) ? prev.filter((id) => id !== jobId) : [...prev, jobId]))
   }
@@ -330,6 +370,9 @@ export default function Dashboard() {
       return true
     })
   }, [filters.qrType, filters.status, jobs])
+
+  const selectedJobs = useMemo(() => jobs.filter((job) => selectedJobIds.includes(job.id)), [jobs, selectedJobIds])
+  const activeSelectedCount = selectedJobs.filter((job) => !job.archivedAt).length
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -436,13 +479,23 @@ export default function Dashboard() {
                       <span className="font-semibold text-slate-900">{selectedJobIds.length}</span> job{selectedJobIds.length === 1 ? "" : "s"} selected
                     </p>
                     {!!selectedJobIds.length && (
-                      <button
-                        type="button"
-                        onClick={() => setSelectedJobIds([])}
-                        className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-300"
-                      >
-                        Clear selection
-                      </button>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={handleBulkArchive}
+                          disabled={!activeSelectedCount || busyJobId === "bulk-archive"}
+                          className="rounded-xl border border-rose-200 bg-white px-3 py-2 text-sm font-semibold text-rose-700 shadow-sm transition hover:border-rose-300 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          Archive selected{activeSelectedCount ? ` (${activeSelectedCount})` : ""}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedJobIds([])}
+                          className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-300"
+                        >
+                          Clear selection
+                        </button>
+                      </div>
                     )}
                   </div>
                   {filteredJobs.map((job) => (
