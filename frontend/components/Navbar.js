@@ -105,6 +105,7 @@ export default function Navbar() {
         <div className="flex items-center gap-6 text-gray-700">
           {!authed ? <Link href="/">Home</Link> : null}
           <Link href="/generate">Generate</Link>
+          <Link href="/short-links">Short Links</Link>
           <Link href="/pricing">Pricing</Link>
           <Link href="/dashboard">Dashboard</Link>
 

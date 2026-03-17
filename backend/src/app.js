@@ -6,6 +6,7 @@ const { authRouter } = require("./routes/auth");
 const { bulkRouter } = require("./routes/bulk");
 const { publicRouter, uploadsRoot } = require("./routes/public");
 const { qrRouter } = require("./routes/qr");
+const { shortLinksRouter } = require("./routes/short-links");
 
 function createApp() {
   const app = express();
@@ -71,6 +72,7 @@ function createApp() {
   app.use("/api/auth", authRouter);
   app.use("/api/qr", qrRouter);
   app.use("/api/qr", bulkRouter);
+  app.use("/api", shortLinksRouter);
   app.use("/api/public", publicRouter);
 
   app.use((err, _req, res, _next) => {

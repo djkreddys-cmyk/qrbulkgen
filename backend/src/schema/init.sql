@@ -99,6 +99,21 @@ CREATE TABLE IF NOT EXISTS managed_qr_links (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS short_links (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  slug VARCHAR(32) NOT NULL UNIQUE,
+  title VARCHAR(255),
+  target_url TEXT NOT NULL,
+  click_count INTEGER NOT NULL DEFAULT 0,
+  expires_at TIMESTAMPTZ,
+  last_visited_at TIMESTAMPTZ,
+  archived_at TIMESTAMPTZ,
+  is_active BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 CREATE TABLE IF NOT EXISTS qr_job_items (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   job_id UUID NOT NULL REFERENCES qr_jobs(id) ON DELETE CASCADE,
@@ -189,3 +204,6 @@ CREATE INDEX IF NOT EXISTS idx_analytics_events_job_created_at ON analytics_even
 CREATE INDEX IF NOT EXISTS idx_managed_qr_links_user_created_at ON managed_qr_links(user_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_managed_qr_links_job_id ON managed_qr_links(job_id);
 CREATE INDEX IF NOT EXISTS idx_managed_qr_links_expires_at ON managed_qr_links(expires_at);
+CREATE INDEX IF NOT EXISTS idx_short_links_user_created_at ON short_links(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_short_links_slug ON short_links(slug);
+CREATE INDEX IF NOT EXISTS idx_short_links_archived_at ON short_links(archived_at);

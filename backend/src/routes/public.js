@@ -438,6 +438,69 @@ publicRouter.get("/links/:id", async (req, res, next) => {
   }
 });
 
+publicRouter.get("/short-links/:slug", async (req, res, next) => {
+  try {
+    const slug = String(req.params.slug || "").trim();
+    if (!slug) {
+      throw createHttpError(400, "VALIDATION_ERROR", "short link slug is required");
+    }
+
+    const result = await query(
+      `SELECT id, slug, title, target_url, click_count, expires_at, last_visited_at, archived_at, is_active, created_at, updated_at
+       FROM short_links
+       WHERE slug = $1
+       LIMIT 1`,
+      [slug],
+    );
+
+    const row = result.rows[0];
+    if (!row) {
+      throw createHttpError(404, "NOT_FOUND", "Short link not found");
+    }
+
+    const isExpired = row.expires_at ? new Date(row.expires_at).getTime() < Date.now() : false;
+    if (!row.is_active || row.archived_at || isExpired) {
+      throw createHttpError(410, "SHORT_LINK_INACTIVE", "Short link is inactive or expired");
+    }
+
+    await query(
+      `UPDATE short_links
+       SET click_count = click_count + 1,
+           last_visited_at = NOW(),
+           updated_at = NOW()
+       WHERE id = $1`,
+      [row.id],
+    );
+
+    await trackEvent({
+      eventType: "short-link.visit",
+      metadata: {
+        shortLinkId: row.id,
+        slug: row.slug,
+        targetUrl: row.target_url,
+        visitorKey: buildVisitorKey(req, row.id),
+        userAgent: String(req.headers["user-agent"] || "").slice(0, 255),
+        ipAddress: getRequestIp(req).slice(0, 255),
+      },
+    });
+
+    res.json({
+      link: {
+        id: row.id,
+        slug: row.slug,
+        title: row.title || "",
+        targetUrl: row.target_url,
+        clickCount: Number(row.click_count || 0) + 1,
+        expiresAt: row.expires_at,
+        lastVisitedAt: new Date().toISOString(),
+        createdAt: row.created_at,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 module.exports = {
   publicRouter,
   uploadsRoot,
