@@ -8,6 +8,14 @@ import { apiRequest } from "../../../lib/api"
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
+function ensureExternalUrl(value) {
+  const raw = String(value || "").trim()
+  if (!raw) return ""
+  if (/^(https?:\/\/|mailto:|tel:|sms:|smsto:|upi:)/i.test(raw)) return raw
+  if (/^www\./i.test(raw)) return `https://${raw}`
+  return raw
+}
+
 function downloadTextFile(content, fileName, mimeType) {
   const blob = new Blob([content], { type: mimeType })
   const url = URL.createObjectURL(blob)
@@ -46,6 +54,43 @@ function buildLocationHref(content) {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${lat},${lng}`)}`
 }
 
+function resolveContent(link) {
+  if (!link) return ""
+  const targetPayload = link.targetPayload || {}
+  const fields = targetPayload.fields || {}
+  const socialLinks = Array.isArray(targetPayload.socialLinks) ? targetPayload.socialLinks : []
+  const rawContent = String(link.content || "").trim()
+
+  switch (link.qrType) {
+    case "URL":
+      return ensureExternalUrl(fields.url || rawContent)
+    case "Youtube":
+      return ensureExternalUrl(fields.youtubeUrl || rawContent)
+    case "App Store":
+      return ensureExternalUrl(fields.appStoreUrl || rawContent)
+    case "PDF":
+      return ensureExternalUrl(fields.pdfUrl || rawContent)
+    case "Image Gallery":
+      return ensureExternalUrl(fields.galleryUrl || rawContent)
+    case "Email":
+      return rawContent || `mailto:${String(fields.email || "").trim()}?subject=${encodeURIComponent(fields.subject || "")}&body=${encodeURIComponent(fields.body || "")}`
+    case "Phone":
+      return rawContent || `tel:${String(fields.phone || "").trim()}`
+    case "SMS":
+      return rawContent || `sms:${String(fields.smsPhone || "").trim()}?body=${encodeURIComponent(fields.smsMessage || "")}`
+    case "WhatsApp":
+      return ensureExternalUrl(rawContent || `https://wa.me/${String(fields.whatsappPhone || "").replace(/[^\d]/g, "")}${fields.whatsappMessage ? `?text=${encodeURIComponent(fields.whatsappMessage)}` : ""}`)
+    case "Location":
+      return fields.mapsUrl || rawContent
+    case "Social Media": {
+      const firstUrl = socialLinks.find((item) => String(item?.url || "").trim())?.url
+      return ensureExternalUrl(firstUrl || rawContent)
+    }
+    default:
+      return rawContent
+  }
+}
+
 function withManagedLinkId(href, linkId) {
   const raw = String(href || "").trim()
   const managedId = String(linkId || "").trim()
@@ -77,7 +122,6 @@ export default function ManagedQrPage() {
   const [link, setLink] = useState(null)
   const [error, setError] = useState("")
   const [opened, setOpened] = useState(false)
-  const shouldDirectJump = link && !link.isExpired && ["URL", "App Store"].includes(link.qrType)
 
   useEffect(() => {
     if (!linkId) return
@@ -97,16 +141,20 @@ export default function ManagedQrPage() {
   }, [linkId])
 
   const kind = useMemo(
-    () => normalizeKind(link?.qrType || "", link?.content || ""),
-    [link?.qrType, link?.content],
+    () => normalizeKind(link?.qrType || "", resolveContent(link)),
+    [link],
   )
 
+  const resolvedContent = useMemo(() => resolveContent(link), [link])
+
   const openHref = useMemo(() => {
-    if (!link?.content) return ""
-    if (kind === "location") return buildLocationHref(link.content)
-    if (kind === "url" || kind === "action") return withManagedLinkId(String(link.content || "").trim(), link?.id)
+    if (!resolvedContent) return ""
+    if (kind === "location") return buildLocationHref(resolvedContent)
+    if (kind === "url" || kind === "action") return withManagedLinkId(String(resolvedContent || "").trim(), link?.id)
     return ""
-  }, [kind, link])
+  }, [kind, link, resolvedContent])
+
+  const shouldDirectJump = Boolean(link && !link.isExpired && openHref && ["url", "action", "location"].includes(kind))
 
   useEffect(() => {
     if (!link || link.isExpired || !openHref || opened) return
@@ -123,24 +171,24 @@ export default function ManagedQrPage() {
 
   function copyContent() {
     if (!link?.content) return
-    navigator.clipboard?.writeText(link.content).catch(() => {})
+    navigator.clipboard?.writeText(resolvedContent || link.content).catch(() => {})
   }
 
   function downloadStructuredContent() {
-    if (!link?.content) return
+    if (!resolvedContent) return
     if (link.qrType === "vCard") {
-      downloadTextFile(link.content, "contact.vcf", "text/vcard")
+      downloadTextFile(resolvedContent, "contact.vcf", "text/vcard")
       return
     }
     if (link.qrType === "Event") {
-      downloadTextFile(link.content, "event.ics", "text/calendar")
+      downloadTextFile(resolvedContent, "event.ics", "text/calendar")
       return
     }
     if (link.qrType === "WIFI") {
-      downloadTextFile(link.content, "wifi.txt", "text/plain")
+      downloadTextFile(resolvedContent, "wifi.txt", "text/plain")
       return
     }
-    downloadTextFile(link.content, "qr-content.txt", "text/plain")
+    downloadTextFile(resolvedContent, "qr-content.txt", "text/plain")
   }
 
   return (
@@ -203,11 +251,11 @@ export default function ManagedQrPage() {
                         Copy raw content
                       </button>
                     </div>
-                    <p className="mt-4 break-all text-sm text-slate-500">{link.content}</p>
+                    <p className="mt-4 break-all text-sm text-slate-500">{resolvedContent || link.content}</p>
                   </div>
                 ) : (
                   <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-5">
-                    <pre className="whitespace-pre-wrap break-words text-sm text-slate-700">{link.content}</pre>
+                    <pre className="whitespace-pre-wrap break-words text-sm text-slate-700">{resolvedContent || link.content}</pre>
                     <div className="mt-4 flex flex-wrap gap-3">
                       <button
                         type="button"

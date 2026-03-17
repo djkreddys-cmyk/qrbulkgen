@@ -187,6 +187,7 @@ export default function Dashboard() {
   const [jobAnalysisById, setJobAnalysisById] = useState({})
   const [analysisLoadingId, setAnalysisLoadingId] = useState("")
   const [analysisTabByJobId, setAnalysisTabByJobId] = useState({})
+  const [selectedJobIds, setSelectedJobIds] = useState([])
 
   const queryString = useMemo(() => buildQuery(filters), [filters])
 
@@ -221,6 +222,10 @@ export default function Dashboard() {
     loadData()
   }, [queryString]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  useEffect(() => {
+    setSelectedJobIds((prev) => prev.filter((id) => jobs.some((job) => job.id === id)))
+  }, [jobs])
+
   async function handleDeleteJob(job) {
     const token = getAuthToken()
     if (!token) return
@@ -239,9 +244,7 @@ export default function Dashboard() {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
       })
-      if (!isArchived) {
-        setFilters((prev) => ({ ...prev, status: "archived" }))
-      }
+      setSelectedJobIds((prev) => prev.filter((id) => id !== jobId))
       await loadData(queryString)
     } catch (requestError) {
       setError(requestError.message)
@@ -297,6 +300,10 @@ export default function Dashboard() {
     const params = new URLSearchParams({ mode })
     params.set("editJob", job.id)
     router.push(`/generate?${params.toString()}`)
+  }
+
+  function toggleSelectedJob(jobId) {
+    setSelectedJobIds((prev) => (prev.includes(jobId) ? prev.filter((id) => id !== jobId) : [...prev, jobId]))
   }
   const qrTypeOptions = useMemo(() => {
     return ["all", ...Array.from(new Set(jobs.map((job) => job.qrType).filter(Boolean))).sort((a, b) => a.localeCompare(b))]
@@ -424,11 +431,33 @@ export default function Dashboard() {
 
               {!!filteredJobs.length && (
                 <div className="grid gap-5">
+                  <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                    <p className="text-sm text-slate-600">
+                      <span className="font-semibold text-slate-900">{selectedJobIds.length}</span> job{selectedJobIds.length === 1 ? "" : "s"} selected
+                    </p>
+                    {!!selectedJobIds.length && (
+                      <button
+                        type="button"
+                        onClick={() => setSelectedJobIds([])}
+                        className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-300"
+                      >
+                        Clear selection
+                      </button>
+                    )}
+                  </div>
                   {filteredJobs.map((job) => (
                     <article key={job.id} className="group relative overflow-hidden rounded-[1.9rem] border border-slate-200 bg-white p-5 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-lg hover:shadow-slate-200/60 md:p-6">
                       <div className={`absolute inset-y-0 left-0 w-1.5 ${getStatusAccent(job.status)}`} />
                       <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
                         <div className="flex items-start gap-4">
+                          <label className="mt-2 flex h-5 w-5 shrink-0 cursor-pointer items-center justify-center">
+                            <input
+                              type="checkbox"
+                              checked={selectedJobIds.includes(job.id)}
+                              onChange={() => toggleSelectedJob(job.id)}
+                              className="h-4 w-4 rounded border-slate-300 text-slate-950 focus:ring-sky-200"
+                            />
+                          </label>
                           <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-50 to-slate-100 ring-4 ring-slate-50 transition group-hover:ring-sky-50">
                             {getThumbnailSource(job) ? (
                               // eslint-disable-next-line @next/next/no-img-element
@@ -477,7 +506,7 @@ export default function Dashboard() {
                         </div>
                         </div>
 
-                        <div className="flex flex-wrap gap-2 lg:max-w-[21rem] lg:justify-end">
+                        <div className="flex flex-wrap items-start gap-2 lg:max-w-[22rem] lg:justify-end">
                           <button
                             type="button"
                             onClick={() => handleEditJob(job)}

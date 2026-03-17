@@ -316,10 +316,10 @@ export function BulkGenerateContent({ embedded = false }) {
   }
 
   const content = (
-    <main className="max-w-6xl mx-auto px-6 py-10">
+    <main className="mx-auto max-w-[90rem] px-4 py-10 md:px-5">
         <h1 className="text-3xl font-bold">Bulk QR Generator</h1>
 
-        <div className="mt-8 grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.85fr)_minmax(0,1fr)]">
+        <div className="mt-8 grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.25fr)_minmax(360px,0.95fr)_minmax(360px,1.1fr)]">
           <form onSubmit={handleSubmit} className="space-y-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm xl:max-h-[78vh] xl:overflow-y-auto xl:pr-3">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Bulk Data</p>
