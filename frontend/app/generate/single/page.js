@@ -319,7 +319,7 @@ function buildQrContent(type, fields, appOrigin, ids, socialLinks, expiryDate) {
       const phone = String(fields.whatsappPhone || "").replace(/[^\d]/g, "")
       const text = String(fields.whatsappMessage || "").trim()
       return phone
-        ? `https://api.whatsapp.com/send?phone=${phone}${text ? `&text=${encodeURIComponent(text)}` : ""}`
+        ? `https://wa.me/${phone}${text ? `?text=${encodeURIComponent(text)}` : ""}`
         : ""
     }
     case "vCard":
