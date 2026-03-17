@@ -952,100 +952,118 @@ export function SingleGenerateContent({ embedded = false, brandMode = false }) {
     qrCodeRef.current.update(options)
   }, [generatedContent, logoDataUrl, foregroundColor, backgroundColor, dotStyle, cornerSquareStyle, cornerDotStyle, errorCorrectionLevel, brandMode, brandAccentColor, brandImageSize, previewBackgroundColor])
 
+  async function buildQrArtifactForExport() {
+    if (!generatedContent) return null
+
+    const token = getAuthToken()
+    if (!token) {
+      window.location.href = "/login"
+      return null
+    }
+
+    const requestPath = editingJobId ? `/qr/jobs/${editingJobId}/single` : "/qr/single"
+    const requestMethod = editingJobId ? "PUT" : "POST"
+    const data = await apiRequest(requestPath, {
+      method: requestMethod,
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        content: generatedContent,
+        qrType,
+        fields,
+        socialLinks,
+        galleryMode,
+        pdfMode,
+        galleryLinkId,
+        pdfLinkId,
+        managedTitle: getManagedTitleForQrType(qrType, fields),
+        expiresAt: toExpiryQueryValue(expiryDate) || addMonths(new Date(), 6).toISOString(),
+        filenamePrefix,
+        trackingMode,
+        foregroundColor,
+        backgroundColor,
+        size: Number(downloadResolution),
+        margin: 2,
+        format: "png",
+        errorCorrectionLevel,
+      }),
+    })
+
+    const dataUrl = data?.artifact?.dataUrl || ""
+    if (!dataUrl) throw new Error("Unable to create QR download")
+
+    let finalDownloadUrl = dataUrl
+    const finalFileName = data?.artifact?.fileName || `${(filenamePrefix || "qr").replace(/[^a-zA-Z0-9-_]/g, "") || "qr"}.png`
+
+    if (brandMode && logoDataUrl && qrCodeRef.current) {
+      const composedCanvas = document.createElement("canvas")
+      composedCanvas.width = downloadResolution
+      composedCanvas.height = downloadResolution
+      const ctx = composedCanvas.getContext("2d")
+      if (ctx) {
+        ctx.fillStyle = "#ffffff"
+        ctx.fillRect(0, 0, downloadResolution, downloadResolution)
+
+        const backgroundImage = new window.Image()
+        backgroundImage.src = logoDataUrl
+        await new Promise((resolve, reject) => {
+          backgroundImage.onload = resolve
+          backgroundImage.onerror = reject
+        })
+
+        const logoBox = downloadResolution * brandBackgroundCoverage
+        const logoX = (downloadResolution - logoBox) / 2
+        const logoY = (downloadResolution - logoBox) / 2
+        ctx.save()
+        ctx.globalAlpha = brandBackgroundOpacity
+        ctx.drawImage(backgroundImage, logoX, logoY, logoBox, logoBox)
+        ctx.restore()
+
+        const maskSize = downloadResolution * centerMaskSize
+        const maskX = (downloadResolution - maskSize) / 2
+        const maskY = (downloadResolution - maskSize) / 2
+        ctx.save()
+        ctx.fillStyle = `rgba(255, 255, 255, ${centerMaskOpacity})`
+        drawRoundedRect(ctx, maskX, maskY, maskSize, maskSize, downloadResolution * 0.035)
+        ctx.fill()
+        ctx.restore()
+
+        const qrBlob = await qrCodeRef.current.getRawData("png")
+        if (qrBlob) {
+          const qrImage = new window.Image()
+          const qrObjectUrl = URL.createObjectURL(qrBlob)
+          qrImage.src = qrObjectUrl
+          await new Promise((resolve, reject) => {
+            qrImage.onload = resolve
+            qrImage.onerror = reject
+          })
+          ctx.drawImage(qrImage, 0, 0, downloadResolution, downloadResolution)
+          URL.revokeObjectURL(qrObjectUrl)
+        }
+
+        finalDownloadUrl = composedCanvas.toDataURL("image/png")
+      }
+    }
+
+    if (editingJobId) {
+      const analysisData = await apiRequest(`/qr/jobs/${editingJobId}/analysis`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      setAnalysis(analysisData.analysis || null)
+      setEditMessage("QR updated successfully. A fresh artifact has been saved for this job.")
+    }
+
+    return { finalDownloadUrl, finalFileName }
+  }
+
   async function handleDownload() {
     if (!generatedContent) return
 
     try {
-      const token = getAuthToken()
-      if (!token) {
-        window.location.href = "/login"
-        return
-      }
-
-      const requestPath = editingJobId ? `/qr/jobs/${editingJobId}/single` : "/qr/single"
-      const requestMethod = editingJobId ? "PUT" : "POST"
-      const data = await apiRequest(requestPath, {
-        method: requestMethod,
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          content: generatedContent,
-          qrType,
-          fields,
-          socialLinks,
-          galleryMode,
-          pdfMode,
-          galleryLinkId,
-          pdfLinkId,
-          managedTitle: getManagedTitleForQrType(qrType, fields),
-          expiresAt: toExpiryQueryValue(expiryDate) || addMonths(new Date(), 6).toISOString(),
-          filenamePrefix,
-          trackingMode,
-          foregroundColor,
-          backgroundColor,
-          size: Number(downloadResolution),
-          margin: 2,
-          format: "png",
-          errorCorrectionLevel,
-        }),
-      })
-
-      const dataUrl = data?.artifact?.dataUrl || ""
-      if (!dataUrl) throw new Error("Unable to create QR download")
-
-      let finalDownloadUrl = dataUrl
-      const finalFileName = data?.artifact?.fileName || `${(filenamePrefix || "qr").replace(/[^a-zA-Z0-9-_]/g, "") || "qr"}.png`
-
-      if (brandMode && logoDataUrl && qrCodeRef.current) {
-        const composedCanvas = document.createElement("canvas")
-        composedCanvas.width = downloadResolution
-        composedCanvas.height = downloadResolution
-        const ctx = composedCanvas.getContext("2d")
-        if (ctx) {
-          ctx.fillStyle = "#ffffff"
-          ctx.fillRect(0, 0, downloadResolution, downloadResolution)
-
-          const backgroundImage = new window.Image()
-          backgroundImage.src = logoDataUrl
-          await new Promise((resolve, reject) => {
-            backgroundImage.onload = resolve
-            backgroundImage.onerror = reject
-          })
-
-            const logoBox = downloadResolution * brandBackgroundCoverage
-            const logoX = (downloadResolution - logoBox) / 2
-            const logoY = (downloadResolution - logoBox) / 2
-            ctx.save()
-            ctx.globalAlpha = brandBackgroundOpacity
-            ctx.drawImage(backgroundImage, logoX, logoY, logoBox, logoBox)
-            ctx.restore()
-
-            const maskSize = downloadResolution * centerMaskSize
-            const maskX = (downloadResolution - maskSize) / 2
-            const maskY = (downloadResolution - maskSize) / 2
-            ctx.save()
-            ctx.fillStyle = `rgba(255, 255, 255, ${centerMaskOpacity})`
-            drawRoundedRect(ctx, maskX, maskY, maskSize, maskSize, downloadResolution * 0.035)
-            ctx.fill()
-            ctx.restore()
-
-          const qrBlob = await qrCodeRef.current.getRawData("png")
-          if (qrBlob) {
-            const qrImage = new window.Image()
-            const qrObjectUrl = URL.createObjectURL(qrBlob)
-            qrImage.src = qrObjectUrl
-            await new Promise((resolve, reject) => {
-              qrImage.onload = resolve
-              qrImage.onerror = reject
-            })
-            ctx.drawImage(qrImage, 0, 0, downloadResolution, downloadResolution)
-            URL.revokeObjectURL(qrObjectUrl)
-          }
-
-          finalDownloadUrl = composedCanvas.toDataURL("image/png")
-        }
-      }
+      const artifact = await buildQrArtifactForExport()
+      if (!artifact) return
+      const { finalDownloadUrl, finalFileName } = artifact
 
       const link = document.createElement("a")
       link.href = finalDownloadUrl
@@ -1053,15 +1071,44 @@ export function SingleGenerateContent({ embedded = false, brandMode = false }) {
       document.body.appendChild(link)
       link.click()
       document.body.removeChild(link)
-      if (editingJobId) {
-        const analysisData = await apiRequest(`/qr/jobs/${editingJobId}/analysis`, {
-          headers: { Authorization: `Bearer ${token}` },
-        })
-        setAnalysis(analysisData.analysis || null)
-        setEditMessage("QR updated successfully. A fresh artifact has been saved for this job.")
-      }
     } catch (downloadError) {
       setUploadError(downloadError.message || "Failed to create QR")
+    }
+  }
+
+  async function handleShare() {
+    if (!generatedContent) return
+
+    try {
+      const artifact = await buildQrArtifactForExport()
+      if (!artifact) return
+      const { finalDownloadUrl, finalFileName } = artifact
+
+      if (!navigator?.share) {
+        setUploadError("Sharing is not supported in this browser. Use Download instead.")
+        return
+      }
+
+      const response = await fetch(finalDownloadUrl)
+      const blob = await response.blob()
+      const file = new File([blob], finalFileName, { type: blob.type || "image/png" })
+
+      if (navigator.canShare?.({ files: [file] })) {
+        await navigator.share({
+          title: getManagedTitleForQrType(qrType, fields) || `${qrType} QR`,
+          text: `Sharing ${qrType} QR from QRBulkGen`,
+          files: [file],
+        })
+      } else {
+        await navigator.share({
+          title: getManagedTitleForQrType(qrType, fields) || `${qrType} QR`,
+          text: `Sharing ${qrType} QR from QRBulkGen`,
+          url: finalDownloadUrl,
+        })
+      }
+    } catch (shareError) {
+      if (shareError?.name === "AbortError") return
+      setUploadError(shareError.message || "Failed to share QR")
     }
   }
 
@@ -1511,7 +1558,20 @@ export function SingleGenerateContent({ embedded = false, brandMode = false }) {
                 {DOWNLOAD_RESOLUTIONS.map((res) => <option key={res} value={res}>{res} x {res}</option>)}
               </select>
             </div>
-            {generatedContent && <button type="button" onClick={handleDownload} className="inline-block px-4 py-2 bg-black text-white rounded">{editingJobId ? "Update QR" : "Download QR"}</button>}
+            {generatedContent ? (
+              <div className="grid gap-3 sm:grid-cols-2">
+                <button type="button" onClick={handleDownload} className="inline-block rounded bg-black px-4 py-2 text-white">
+                  {editingJobId ? "Update & Download" : "Download QR"}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleShare}
+                  className="inline-block rounded border border-slate-200 bg-white px-4 py-2 font-semibold text-slate-700"
+                >
+                  Share QR
+                </button>
+              </div>
+            ) : null}
           </section>
         </div>
         {locationPreviewOpen && qrType === "Location" && buildGoogleMapsPreviewUrl(fields) && (

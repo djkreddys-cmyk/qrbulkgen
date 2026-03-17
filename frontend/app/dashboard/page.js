@@ -188,6 +188,7 @@ export default function Dashboard() {
   const [analysisLoadingId, setAnalysisLoadingId] = useState("")
   const [analysisTabByJobId, setAnalysisTabByJobId] = useState({})
   const [selectedJobIds, setSelectedJobIds] = useState([])
+  const [shareJob, setShareJob] = useState(null)
 
   const queryString = useMemo(() => buildQuery(filters), [filters])
 
@@ -342,6 +343,69 @@ export default function Dashboard() {
     }
   }
 
+  async function handleBulkDelete() {
+    const token = getAuthToken()
+    if (!token) return
+
+    const archivedSelectedIds = selectedJobIds.filter((id) => {
+      const job = jobs.find((entry) => entry.id === id)
+      return job && job.archivedAt
+    })
+
+    if (!archivedSelectedIds.length) {
+      setError("Select at least one archived QR job to delete permanently.")
+      return
+    }
+
+    const confirmed = window.confirm(
+      `Delete ${archivedSelectedIds.length} archived QR job${archivedSelectedIds.length === 1 ? "" : "s"} permanently?`,
+    )
+    if (!confirmed) return
+
+    try {
+      setBusyJobId("bulk-delete")
+      await Promise.all(
+        archivedSelectedIds.map((jobId) =>
+          apiRequest(`/qr/jobs/${jobId}?force=true`, {
+            method: "DELETE",
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+        ),
+      )
+      setSelectedJobIds((prev) => prev.filter((id) => !archivedSelectedIds.includes(id)))
+      await loadData(queryString)
+      setError("")
+    } catch (requestError) {
+      setError(requestError.message)
+    } finally {
+      setBusyJobId("")
+    }
+  }
+
+  function handleBulkDownload() {
+    const downloadableJobs = selectedJobs.filter((job) => job.artifact?.filePath)
+    if (!downloadableJobs.length) {
+      setError("Select at least one QR job with a downloadable artifact.")
+      return
+    }
+
+    downloadableJobs.forEach((job, index) => {
+      const href = toAbsoluteDownloadUrl(job.artifact.filePath)
+      window.setTimeout(() => {
+        const link = document.createElement("a")
+        link.href = href
+        link.download = job.artifact?.fileName || undefined
+        if (!String(job.artifact.filePath).startsWith("data:")) {
+          link.target = "_blank"
+          link.rel = "noreferrer"
+        }
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+      }, index * 180)
+    })
+  }
+
   function toggleSelectedJob(jobId) {
     setSelectedJobIds((prev) => (prev.includes(jobId) ? prev.filter((id) => id !== jobId) : [...prev, jobId]))
   }
@@ -373,6 +437,36 @@ export default function Dashboard() {
 
   const selectedJobs = useMemo(() => jobs.filter((job) => selectedJobIds.includes(job.id)), [jobs, selectedJobIds])
   const activeSelectedCount = selectedJobs.filter((job) => !job.archivedAt).length
+  const archivedSelectedCount = selectedJobs.filter((job) => job.archivedAt).length
+  const downloadableSelectedCount = selectedJobs.filter((job) => job.artifact?.filePath).length
+  const allFilteredSelected = filteredJobs.length > 0 && filteredJobs.every((job) => selectedJobIds.includes(job.id))
+
+  function toggleSelectAllFiltered() {
+    if (allFilteredSelected) {
+      setSelectedJobIds((prev) => prev.filter((id) => !filteredJobs.some((job) => job.id === id)))
+      return
+    }
+    setSelectedJobIds((prev) => Array.from(new Set([...prev, ...filteredJobs.map((job) => job.id)])))
+  }
+
+  function getShareUrl(job) {
+    return job?.managedLink?.url || (job?.artifact?.filePath ? toAbsoluteDownloadUrl(job.artifact.filePath) : "")
+  }
+
+  function handleShareChannel(job, channel) {
+    const shareUrl = getShareUrl(job)
+    const text = encodeURIComponent(`Check this QR from QRBulkGen: ${shareUrl}`)
+    if (!shareUrl) {
+      setError("No shareable link is available for this QR job.")
+      return
+    }
+    if (channel === "whatsapp") {
+      window.open(`https://wa.me/?text=${text}`, "_blank", "noreferrer")
+    } else {
+      window.location.href = `mailto:?subject=${encodeURIComponent(job.qrType || "QR Code")}&body=${text}`
+    }
+    setShareJob(null)
+  }
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -475,11 +569,30 @@ export default function Dashboard() {
               {!!filteredJobs.length && (
                 <div className="grid gap-5">
                   <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-                    <p className="text-sm text-slate-600">
-                      <span className="font-semibold text-slate-900">{selectedJobIds.length}</span> job{selectedJobIds.length === 1 ? "" : "s"} selected
-                    </p>
+                    <div className="flex items-center gap-3">
+                      <label className="flex items-center gap-2 text-sm text-slate-600">
+                        <input
+                          type="checkbox"
+                          checked={allFilteredSelected}
+                          onChange={toggleSelectAllFiltered}
+                          className="h-4 w-4 rounded border-slate-300 text-slate-950 focus:ring-sky-200"
+                        />
+                        <span>Select all</span>
+                      </label>
+                      <p className="text-sm text-slate-600">
+                        <span className="font-semibold text-slate-900">{selectedJobIds.length}</span> job{selectedJobIds.length === 1 ? "" : "s"} selected
+                      </p>
+                    </div>
                     {!!selectedJobIds.length && (
                       <div className="flex flex-wrap items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={handleBulkDownload}
+                          disabled={!downloadableSelectedCount}
+                          className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          Download selected{downloadableSelectedCount ? ` (${downloadableSelectedCount})` : ""}
+                        </button>
                         <button
                           type="button"
                           onClick={handleBulkArchive}
@@ -487,6 +600,14 @@ export default function Dashboard() {
                           className="rounded-xl border border-rose-200 bg-white px-3 py-2 text-sm font-semibold text-rose-700 shadow-sm transition hover:border-rose-300 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           Archive selected{activeSelectedCount ? ` (${activeSelectedCount})` : ""}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleBulkDelete}
+                          disabled={!archivedSelectedCount || busyJobId === "bulk-delete"}
+                          className="rounded-xl border border-rose-200 bg-white px-3 py-2 text-sm font-semibold text-rose-700 shadow-sm transition hover:border-rose-300 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          Delete selected{archivedSelectedCount ? ` (${archivedSelectedCount})` : ""}
                         </button>
                         <button
                           type="button"
@@ -523,22 +644,10 @@ export default function Dashboard() {
                           </div>
                         <div className="space-y-3">
                           <div className="flex flex-wrap items-center gap-2">
-                            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-slate-600">
-                              {job.status}
-                            </span>
-                            <span className="rounded-full bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-700">
-                              {job.jobType === "single" ? "Single QR" : `${job.qrType} Bulk`}
-                            </span>
                             <PerformanceBadge label={job.trackingMode === "direct" ? "Direct" : "Tracked"} tone={job.trackingMode === "direct" ? "neutral" : "accent"} />
                             {job.archivedAt ? <PerformanceBadge label="Archived" tone="warning" /> : null}
-                            {job.status === "completed" && job.successCount > 0 ? (
-                              <PerformanceBadge label="Ready to share" tone="success" />
-                            ) : null}
                             {job.failureCount > 0 ? (
                               <PerformanceBadge label="Needs review" tone="danger" />
-                            ) : null}
-                            {job.status === "completed" && job.successCount > 0 && !job.failureCount ? (
-                              <PerformanceBadge label="Clean output" tone="success" />
                             ) : null}
                             {jobAnalysisById[job.id]?.typePerformance &&
                             (jobAnalysisById[job.id].job?.successCount || 0) / Math.max(jobAnalysisById[job.id].job?.totalCount || 1, 1) >=
@@ -560,20 +669,13 @@ export default function Dashboard() {
                         </div>
                         </div>
 
-                        <div className="flex flex-wrap items-start gap-2 lg:max-w-[22rem] lg:justify-end">
+                        <div className="flex flex-wrap items-center gap-2 lg:max-w-[42rem] lg:flex-nowrap lg:justify-end">
                           <button
                             type="button"
                             onClick={() => handleEditJob(job)}
                             className="rounded-2xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow"
                           >
                             {job.jobType === "single" ? "Edit QR" : "Open Bulk"}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleToggleAnalysis(job.id)}
-                            className="rounded-2xl border border-sky-200 bg-sky-50 px-3.5 py-2.5 text-sm font-semibold text-sky-700 shadow-sm transition hover:-translate-y-0.5 hover:border-sky-300 hover:bg-white"
-                          >
-                            {analysisJobId === job.id ? "Hide Analysis" : "Analysis"}
                           </button>
                           {job.artifact?.filePath && (
                             <a
@@ -586,6 +688,22 @@ export default function Dashboard() {
                               Download
                             </a>
                           )}
+                          <button
+                            type="button"
+                            onClick={() => handleToggleAnalysis(job.id)}
+                            className="rounded-2xl border border-sky-200 bg-sky-50 px-3.5 py-2.5 text-sm font-semibold text-sky-700 shadow-sm transition hover:-translate-y-0.5 hover:border-sky-300 hover:bg-white"
+                          >
+                            {analysisJobId === job.id ? "Hide Analysis" : "Analysis"}
+                          </button>
+                          {job.status === "completed" && job.successCount > 0 ? (
+                            <button
+                              type="button"
+                              onClick={() => setShareJob(job)}
+                              className="rounded-2xl border border-emerald-200 bg-emerald-50 px-3.5 py-2.5 text-sm font-semibold text-emerald-700 shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-300 hover:bg-white"
+                            >
+                              Ready to share
+                            </button>
+                          ) : null}
                           <button
                             type="button"
                             onClick={() => handleDeleteJob(job)}
@@ -958,6 +1076,40 @@ export default function Dashboard() {
 
           </>
         )}
+        {shareJob ? (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 px-4">
+            <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Share QR</p>
+              <h3 className="mt-2 text-2xl font-semibold text-slate-950">{getJobTitle(shareJob)}</h3>
+              <p className="mt-2 text-sm leading-6 text-slate-600">Choose how you want to share this QR job.</p>
+              <div className="mt-6 grid gap-3">
+                <button
+                  type="button"
+                  onClick={() => handleShareChannel(shareJob, "mail")}
+                  className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow"
+                >
+                  Share via Mail
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleShareChannel(shareJob, "whatsapp")}
+                  className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700 transition hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow"
+                >
+                  Share via WhatsApp
+                </button>
+              </div>
+              <div className="mt-6 flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setShareJob(null)}
+                  className="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
       </main>
     </div>
   )

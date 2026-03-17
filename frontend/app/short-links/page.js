@@ -398,19 +398,19 @@ export default function ShortLinksPage() {
         </section>
 
         <section className="rounded-[1.75rem] border border-slate-200 bg-white p-6 shadow-sm">
-          <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
             <div>
               <h2 className="text-xl font-semibold text-slate-950">New short link</h2>
               <p className="mt-1 text-sm text-slate-500">
                 Create a new redirect, keep the slug clean, and start tracking visits immediately.
               </p>
             </div>
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600 xl:shrink-0">
               Freshly created links appear first in the saved list below.
             </div>
           </div>
 
-          <form className="mt-5 grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.35fr)_minmax(0,0.85fr)_minmax(0,0.8fr)_auto]" onSubmit={handleCreate}>
+          <form className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_minmax(0,0.95fr)_minmax(0,0.85fr)_auto]" onSubmit={handleCreate}>
             <div>
               <label className="mb-1 block text-sm font-medium text-slate-700">Title</label>
               <input value={title} onChange={(event) => setTitle(event.target.value)} className="w-full rounded-xl border border-slate-200 px-4 py-3" placeholder="Campaign landing page" />
@@ -428,7 +428,7 @@ export default function ShortLinksPage() {
               <label className="mb-1 block text-sm font-medium text-slate-700">Expiry (optional)</label>
               <input value={expiresAt} onChange={(event) => setExpiresAt(event.target.value)} className="w-full rounded-xl border border-slate-200 px-4 py-3" placeholder="DD-MM-YYYY" />
             </div>
-            <div className="flex items-end">
+            <div className="flex items-end xl:min-w-[11rem]">
               <button disabled={isSubmitting} className="w-full rounded-xl bg-slate-950 px-4 py-3 font-semibold text-white disabled:opacity-60">
                 {isSubmitting ? "Creating..." : "Create Short Link"}
               </button>
@@ -469,7 +469,7 @@ export default function ShortLinksPage() {
           <div className="space-y-4">
             {activeLinks.map((link) => (
               <article key={link.id} className="rounded-2xl border border-slate-200 p-5 shadow-sm">
-                  <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                  <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
                     <div>
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-600">
@@ -488,7 +488,7 @@ export default function ShortLinksPage() {
                         <p>Expiry: {formatDate(link.expiresAt)}</p>
                       </div>
                     </div>
-                    <div className="flex flex-wrap gap-2">
+                    <div className="flex flex-wrap items-center gap-2 xl:max-w-[26rem] xl:justify-end">
                       <button onClick={() => copyLink(link.url)} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700">Copy</button>
                       <button onClick={() => handleToggleAnalysis(link.id)} className="rounded-xl border border-sky-200 px-4 py-2 text-sm font-semibold text-sky-700">
                         {analysisLinkId === link.id ? "Hide Analysis" : "Analysis"}
