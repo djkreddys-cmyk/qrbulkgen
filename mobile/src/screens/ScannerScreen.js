@@ -67,6 +67,7 @@ function normalizeOpenTarget(value) {
   const raw = String(value || "").trim();
   if (!raw) return "";
   if (/^https?:\/\//i.test(raw)) return raw;
+  if (/^upi:/i.test(raw)) return raw;
   if (/^mailto:/i.test(raw)) return raw;
   if (/^tel:/i.test(raw)) return raw;
   if (/^sms:/i.test(raw)) return raw;

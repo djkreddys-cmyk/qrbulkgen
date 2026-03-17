@@ -83,13 +83,13 @@ export function AuthProvider({ children }) {
     }
   }
 
-  async function register({ name, email, phone, password }) {
+  async function register({ name, identifier, password }) {
     setError("");
     setIsSubmitting(true);
     try {
       const data = await apiRequest("/auth/register", {
         method: "POST",
-        body: JSON.stringify({ name, email, phone, password }),
+        body: JSON.stringify({ name, identifier, password }),
       });
       setUser(data.user || null);
       setToken(data.token || "");

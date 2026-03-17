@@ -11,11 +11,11 @@ export default function AuthScreen({ defaultMode = "register" }) {
   const router = useRouter()
   const [mode, setMode] = useState(defaultMode)
   const [name, setName] = useState("")
-  const [phone, setPhone] = useState("")
-  const [email, setEmail] = useState("")
+  const [identifier, setIdentifier] = useState("")
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState("")
+  const [socialNotice, setSocialNotice] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const isRegisterMode = mode === "register"
@@ -30,8 +30,8 @@ export default function AuthScreen({ defaultMode = "register" }) {
         method: "POST",
         body: JSON.stringify(
           isRegisterMode
-            ? { name, email, phone, password }
-            : { identifier: email, password },
+            ? { name, identifier, password }
+            : { identifier, password },
         ),
       })
 
@@ -47,10 +47,11 @@ export default function AuthScreen({ defaultMode = "register" }) {
   function switchMode(nextMode) {
     setMode(nextMode)
     setError("")
+    setSocialNotice("")
   }
 
   function handleSocialClick(provider) {
-    setError(`${provider} login needs OAuth app credentials and redirect setup before it can be enabled.`)
+    setSocialNotice(`${provider} login will work after OAuth app credentials and redirect setup are added.`)
   }
 
   return (
@@ -91,21 +92,11 @@ export default function AuthScreen({ defaultMode = "register" }) {
           />
         ) : null}
 
-        {isRegisterMode ? (
-          <input
-            placeholder="Mobile number"
-            type="tel"
-            value={phone}
-            onChange={(event) => setPhone(event.target.value)}
-            className="mb-3 w-full rounded border p-2"
-          />
-        ) : null}
-
         <input
-          placeholder={isRegisterMode ? "Email" : "Email or Mobile number"}
+          placeholder="Email / Mobile Number"
           type="text"
-          value={email}
-          onChange={(event) => setEmail(event.target.value)}
+          value={identifier}
+          onChange={(event) => setIdentifier(event.target.value)}
           className="mb-3 w-full rounded border p-2"
         />
 
@@ -165,6 +156,8 @@ export default function AuthScreen({ defaultMode = "register" }) {
             Continue with Microsoft
           </button>
         </div>
+
+        {socialNotice ? <p className="mt-3 text-sm text-slate-600">{socialNotice}</p> : null}
 
         <p className="mt-4 text-sm text-gray-600">
           {isRegisterMode ? "Already have an account?" : "Need an account?"}{" "}

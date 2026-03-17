@@ -6,13 +6,12 @@ import { useAuth } from "../context/AuthContext";
 export function RegisterScreen() {
   const { register, error, isSubmitting } = useAuth();
   const [name, setName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [email, setEmail] = useState("");
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
 
   async function handleRegister() {
-    await register({ name, email, phone, password });
+    await register({ name, identifier, password });
   }
 
   return (
@@ -25,17 +24,10 @@ export function RegisterScreen() {
         style={{ borderWidth: 1, borderColor: "#ccc", padding: 12, borderRadius: 8 }}
       />
       <TextInput
-        placeholder="Email"
-        value={email}
-        onChangeText={setEmail}
+        placeholder="Email / Mobile Number"
+        value={identifier}
+        onChangeText={setIdentifier}
         autoCapitalize="none"
-        style={{ borderWidth: 1, borderColor: "#ccc", padding: 12, borderRadius: 8 }}
-      />
-      <TextInput
-        placeholder="Mobile Number"
-        value={phone}
-        onChangeText={setPhone}
-        keyboardType="phone-pad"
         style={{ borderWidth: 1, borderColor: "#ccc", padding: 12, borderRadius: 8 }}
       />
       <View style={{ position: "relative" }}>

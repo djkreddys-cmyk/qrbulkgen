@@ -3,7 +3,7 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 CREATE TABLE IF NOT EXISTS users (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name VARCHAR(120),
-  email VARCHAR(255) NOT NULL UNIQUE,
+  email VARCHAR(255) UNIQUE,
   phone VARCHAR(32),
   password_hash TEXT NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -15,6 +15,9 @@ ALTER TABLE users
 
 ALTER TABLE users
   ADD COLUMN IF NOT EXISTS phone VARCHAR(32);
+
+ALTER TABLE users
+  ALTER COLUMN email DROP NOT NULL;
 
 CREATE UNIQUE INDEX IF NOT EXISTS users_phone_unique_idx
   ON users(phone)

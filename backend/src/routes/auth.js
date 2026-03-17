@@ -24,16 +24,13 @@ function normalizePhone(value) {
 
 function validateRegisterPayload(body) {
   const name = String(body.name || "").trim();
-  const email = String(body.email || "").trim().toLowerCase();
-  const phone = normalizePhone(body.phone);
+  const identifier = String(body.identifier || body.email || body.phone || "").trim();
+  const email = identifier.includes("@") ? identifier.toLowerCase() : "";
+  const phone = email ? "" : normalizePhone(identifier);
   const password = String(body.password || "");
 
-  if (!email || !phone || !password) {
-    throw createHttpError(400, "VALIDATION_ERROR", "Name, email, mobile number, and password are required");
-  }
-
-  if (body.name !== undefined && !name) {
-    throw createHttpError(400, "VALIDATION_ERROR", "Name is required");
+  if (!name || (!email && !phone) || !password) {
+    throw createHttpError(400, "VALIDATION_ERROR", "Name, email or mobile number, and password are required");
   }
 
   if (name.length > 120) {
@@ -87,10 +84,10 @@ authRouter.post("/register", async (req, res, next) => {
     const { name, email, phone, password } = validateRegisterPayload(req.body);
 
     const result = await withTransaction(async (client) => {
-      const existingUser = await client.query(
-        "SELECT id FROM users WHERE email = $1 OR phone = $2 LIMIT 1",
-        [email, phone],
-      );
+      const existingUser = await client.query("SELECT id FROM users WHERE email = $1 OR phone = $2 LIMIT 1", [
+        email || null,
+        phone || null,
+      ]);
 
       if (existingUser.rows[0]) {
         throw createHttpError(409, "ACCOUNT_ALREADY_EXISTS", "An account with this email or mobile number already exists");
