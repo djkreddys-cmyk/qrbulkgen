@@ -7,11 +7,14 @@ import { apiRequest } from "../../../lib/api"
 import { getAuthToken } from "../../../lib/auth"
 import {
   DOWNLOAD_RESOLUTIONS,
+  getDefaultTrackingMode,
   INITIAL_QR_FIELDS,
   parseScannedQrDraft,
   QR_FIELD_DEFINITIONS,
   QR_TYPES,
   SOCIAL_PLATFORM_OPTIONS,
+  supportsTrackingModeSelection,
+  TRACKING_MODE_OPTIONS,
   validateQrFields,
 } from "../../../../shared/qr-config"
 
@@ -489,6 +492,7 @@ export function SingleGenerateContent({ embedded = false, brandMode = false }) {
   const [brandAccentColor, setBrandAccentColor] = useState("#1d4ed8")
   const [brandLayoutMode, setBrandLayoutMode] = useState("balanced")
   const [downloadResolution, setDownloadResolution] = useState(1024)
+  const [trackingMode, setTrackingMode] = useState(getDefaultTrackingMode("URL"))
   const [appOrigin, setAppOrigin] = useState("")
   const [expiryDate, setExpiryDate] = useState("")
 
@@ -543,6 +547,12 @@ export function SingleGenerateContent({ embedded = false, brandMode = false }) {
     setForegroundColor("#0f172a")
     setBackgroundColor("#ffffff")
   }, [brandMode, isEditing])
+
+  useEffect(() => {
+    if (!isEditing) {
+      setTrackingMode(getDefaultTrackingMode(qrType))
+    }
+  }, [qrType, isEditing])
 
   useEffect(() => {
     function handlePointerMove(event) {
@@ -632,6 +642,7 @@ export function SingleGenerateContent({ embedded = false, brandMode = false }) {
         setErrorCorrectionLevel(job.errorCorrectionLevel || "M")
         setFilenamePrefix(job.filenamePrefix || "qr")
         setExpiryDate(formatExpiryDateForInput(targetPayload.expiresAt || job.expiresAt || ""))
+        setTrackingMode(job.trackingMode || getDefaultTrackingMode(job.qrType || "URL"))
         setEditMessage("Loaded settings from selected QR job. Update and save a fresh version anytime.")
         setAnalysisLoading(true)
         const analysisData = await apiRequest(`/qr/jobs/${editJob}/analysis`, {
@@ -970,6 +981,7 @@ export function SingleGenerateContent({ embedded = false, brandMode = false }) {
           managedTitle: getManagedTitleForQrType(qrType, fields),
           expiresAt: toExpiryQueryValue(expiryDate) || addMonths(new Date(), 6).toISOString(),
           filenamePrefix,
+          trackingMode,
           foregroundColor,
           backgroundColor,
           size: Number(downloadResolution),
@@ -1340,6 +1352,19 @@ export function SingleGenerateContent({ embedded = false, brandMode = false }) {
                 Leave this blank to default validity to 6 months from creation. Use DD-MM-YYYY only. The QR stays valid until the end of the selected day.
               </p>
             </div>
+            {supportsTrackingModeSelection(qrType) ? (
+              <div>
+                <label className="block mb-1 text-sm">Tracking Mode</label>
+                <select value={trackingMode} onChange={(e) => setTrackingMode(e.target.value)} className="w-full border p-2">
+                  {TRACKING_MODE_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
+                <p className="mt-1 text-xs text-slate-500">
+                  Tracked analytics routes scans through QRBulkGen for reporting. Direct open skips the managed handoff for a smoother scan.
+                </p>
+              </div>
+            ) : null}
 
             <div className="grid grid-cols-2 gap-4">
               <div>

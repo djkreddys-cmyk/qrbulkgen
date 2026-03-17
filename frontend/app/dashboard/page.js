@@ -529,6 +529,7 @@ export default function Dashboard() {
                             <span className="rounded-full bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-700">
                               {job.jobType === "single" ? "Single QR" : `${job.qrType} Bulk`}
                             </span>
+                            <PerformanceBadge label={job.trackingMode === "direct" ? "Direct" : "Tracked"} tone={job.trackingMode === "direct" ? "neutral" : "accent"} />
                             {job.archivedAt ? <PerformanceBadge label="Archived" tone="warning" /> : null}
                             {job.status === "completed" && job.successCount > 0 ? (
                               <PerformanceBadge label="Ready to share" tone="success" />

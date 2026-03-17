@@ -577,6 +577,7 @@ export function DashboardScreen() {
                       <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
                         <MetricPill label="Status" value={job.status} />
                         <MetricPill label="Mode" value={job.jobType === "single" ? "Single QR" : `${job.qrType} Bulk`} tone="accent" />
+                        <PerformanceBadge label={job.trackingMode === "direct" ? "Direct" : "Tracked"} tone={job.trackingMode === "direct" ? "neutral" : "accent"} />
                         {job.archivedAt ? <PerformanceBadge label="Archived" tone="warning" /> : null}
                         {job.status === "completed" && job.successCount > 0 ? <PerformanceBadge label="Ready to share" tone="success" /> : null}
                         {job.failureCount > 0 ? <PerformanceBadge label="Needs review" tone="danger" /> : null}

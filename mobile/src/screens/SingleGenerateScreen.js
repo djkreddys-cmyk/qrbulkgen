@@ -22,12 +22,16 @@ import {
   formatExpiryDateForInput,
   getManagedTitleForQrType,
   getAvailableSocialPlatforms,
+  getDefaultTrackingMode,
   getQrPlaceholder,
   hasRequiredFields,
   INITIAL_QR_FIELDS,
+  normalizeTrackingMode,
   QR_FIELD_DEFINITIONS,
   QR_TYPES,
   SOCIAL_PLATFORM_OPTIONS,
+  supportsTrackingModeSelection,
+  TRACKING_MODE_OPTIONS,
   parseExpiryDate,
   supportsExpiry,
 } from "../lib/qr";
@@ -178,6 +182,7 @@ export function SingleGenerateScreen() {
   const [backgroundColor, setBackgroundColor] = useState("#ffffff");
   const [format, setFormat] = useState("png");
   const [errorCorrectionLevel, setErrorCorrectionLevel] = useState("M");
+  const [trackingMode, setTrackingMode] = useState(getDefaultTrackingMode("URL"));
   const [expiryDate, setExpiryDate] = useState("");
   const [galleryMode, setGalleryMode] = useState("url");
   const [pdfMode, setPdfMode] = useState("url");
@@ -335,6 +340,7 @@ export function SingleGenerateScreen() {
             setBackgroundColor(nextJob.backgroundColor || "#ffffff");
             setFilenamePrefix(nextJob.filenamePrefix || "mobile-qr");
             setErrorCorrectionLevel(nextJob.errorCorrectionLevel || "M");
+            setTrackingMode(nextJob.trackingMode || getDefaultTrackingMode(targetPayload.qrType || nextJob.qrType || "URL"));
             setExpiryDate(formatExpiryDateForInput(targetPayload.expiresAt || nextJob.expiresAt || ""));
             setAnalysisLoading(true);
             const analysisData = await apiRequest(`/qr/jobs/${singleDraft.editJobId}/analysis`, {
@@ -389,6 +395,7 @@ export function SingleGenerateScreen() {
     setShareMessage("");
     setDownloadMessage("");
     setExpiryDate("");
+    setTrackingMode(getDefaultTrackingMode(qrType));
   }, [qrType]);
 
   async function handlePickPdf() {
@@ -506,6 +513,7 @@ export function SingleGenerateScreen() {
           galleryLinkId,
           pdfLinkId,
           managedTitle: getManagedTitleForQrType(qrType, fields),
+          trackingMode: normalizeTrackingMode(qrType, trackingMode),
           expiresAt: (parseExpiryDate(expiryDate) || addMonths(new Date(), 6)).toISOString(),
           filenamePrefix,
           foregroundColor,
@@ -874,6 +882,14 @@ export function SingleGenerateScreen() {
             ? "Direct QR content types store the date here, while hosted experiences enforce expiry after scan."
             : "This QR type enforces expiry through the hosted experience."}
         </Text>
+        {supportsTrackingModeSelection(qrType) ? (
+          <PickerField
+            label="TRACKING MODE"
+            value={trackingMode}
+            options={TRACKING_MODE_OPTIONS}
+            onChange={setTrackingMode}
+          />
+        ) : null}
 
         <InputField
           label="FILE NAME"

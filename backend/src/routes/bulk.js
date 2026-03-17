@@ -12,24 +12,25 @@ const { enqueueBulkQrJob } = require("../services/queue");
 const { normalizeSingleQrPayload } = require("../services/qr-single");
 
 const bulkRouter = express.Router();
-const TRACKED_QR_TYPES = new Set([
+const TRACKED_ONLY_QR_TYPES = new Set(["Rating", "Feedback", "PDF", "Image Gallery"]);
+const HYBRID_TRACKING_QR_TYPES = new Set([
   "URL",
   "Text",
   "Email",
   "Phone",
   "SMS",
   "WhatsApp",
-  "vCard",
-  "Location",
   "Youtube",
+  "App Store",
+  "Location",
+]);
+const TRACKED_QR_TYPES = new Set([
+  ...TRACKED_ONLY_QR_TYPES,
+  ...HYBRID_TRACKING_QR_TYPES,
+  "vCard",
   "WIFI",
   "Event",
-  "PDF",
   "Social Media",
-  "App Store",
-  "Image Gallery",
-  "Rating",
-  "Feedback",
 ]);
 const NORMALIZED_URL_MATCH_SQL = "(regexp_replace(lower(split_part(%s, '?exp=', 1)), '^https?://(www\\.)?', '') = regexp_replace(lower(split_part(%s, '?exp=', 1)), '^https?://(www\\.)?', ''))";
 const BULK_QR_TYPES = new Set([
@@ -199,8 +200,17 @@ function normalizeBulkOptions(body) {
     throw createHttpError(400, "VALIDATION_ERROR", "Unsupported qrType for bulk job");
   }
 
+  const requestedTrackingMode = String(body.trackingMode || "").trim().toLowerCase();
+  const trackingMode =
+    TRACKED_ONLY_QR_TYPES.has(qrType) || !HYBRID_TRACKING_QR_TYPES.has(qrType)
+      ? "tracked"
+      : requestedTrackingMode === "tracked"
+        ? "tracked"
+        : "direct";
+
   return {
     qrType,
+    trackingMode,
     size: normalized.size,
     margin: normalized.margin,
     format: normalized.format,
@@ -291,15 +301,15 @@ bulkRouter.post("/bulk/upload", requireAuth, upload.single("file"), async (req, 
         total_count, success_count, failure_count,
         bulk_qr_type,
         qr_size, foreground_color, background_color, qr_margin, output_format,
-        error_correction_level, filename_prefix
+        error_correction_level, filename_prefix, tracking_mode
       ) VALUES (
         $1, 'bulk', 'queued', $2, $3,
         $4, 0, 0,
         $5,
         $6, $7, $8, $9, $10,
-        $11, $12
+        $11, $12, $13
       )
-      RETURNING id, status, total_count, bulk_qr_type, created_at`,
+      RETURNING id, status, total_count, bulk_qr_type, tracking_mode, created_at`,
       [
         req.user.id,
         file.originalname,
@@ -313,6 +323,7 @@ bulkRouter.post("/bulk/upload", requireAuth, upload.single("file"), async (req, 
         options.format,
         options.errorCorrectionLevel,
         options.filenamePrefix,
+        options.trackingMode,
       ],
     );
 
@@ -338,6 +349,7 @@ bulkRouter.post("/bulk/upload", requireAuth, upload.single("file"), async (req, 
       metadata: {
         qrType: options.qrType,
         format: options.format,
+        trackingMode: options.trackingMode,
       },
     });
 
@@ -346,6 +358,7 @@ bulkRouter.post("/bulk/upload", requireAuth, upload.single("file"), async (req, 
         id: job.id,
         status: job.status,
         qrType: job.bulk_qr_type,
+        trackingMode: job.tracking_mode,
         totalCount: job.total_count,
         createdAt: job.created_at,
       },
@@ -363,7 +376,7 @@ bulkRouter.put("/jobs/:id/bulk", requireAuth, upload.single("file"), async (req,
     }
 
     const existingResult = await query(
-      `SELECT id, source_file_name, source_file_path, bulk_qr_type
+      `SELECT id, source_file_name, source_file_path, bulk_qr_type, tracking_mode
        FROM qr_jobs
        WHERE id = $1
          AND user_id = $2
@@ -377,7 +390,11 @@ bulkRouter.put("/jobs/:id/bulk", requireAuth, upload.single("file"), async (req,
       throw createHttpError(404, "NOT_FOUND", "Bulk job not found");
     }
 
-    const options = normalizeBulkOptions({ ...(req.body || {}), qrType: existing.bulk_qr_type });
+    const options = normalizeBulkOptions({
+      ...(req.body || {}),
+      qrType: existing.bulk_qr_type,
+      trackingMode: req.body?.trackingMode || existing.tracking_mode,
+    });
     const file = req.file;
     const csvAbsolutePath = file
       ? file.path
@@ -430,13 +447,14 @@ bulkRouter.put("/jobs/:id/bulk", requireAuth, upload.single("file"), async (req,
            output_format = $10,
            error_correction_level = $11,
            filename_prefix = $12,
+           tracking_mode = $13,
            error_message = NULL,
            archived_at = NULL,
            started_at = NULL,
            completed_at = NULL,
            updated_at = NOW()
        WHERE id = $1
-       RETURNING id, status, total_count, bulk_qr_type, created_at, updated_at`,
+       RETURNING id, status, total_count, bulk_qr_type, tracking_mode, created_at, updated_at`,
       [
         jobId,
         file ? file.originalname : existing.source_file_name,
@@ -450,6 +468,7 @@ bulkRouter.put("/jobs/:id/bulk", requireAuth, upload.single("file"), async (req,
         options.format,
         options.errorCorrectionLevel,
         options.filenamePrefix,
+        options.trackingMode,
       ],
     );
 
@@ -475,6 +494,7 @@ bulkRouter.put("/jobs/:id/bulk", requireAuth, upload.single("file"), async (req,
       metadata: {
         qrType: options.qrType,
         format: options.format,
+        trackingMode: options.trackingMode,
       },
     });
 
@@ -483,6 +503,7 @@ bulkRouter.put("/jobs/:id/bulk", requireAuth, upload.single("file"), async (req,
         id: job.id,
         status: job.status,
         qrType: job.bulk_qr_type,
+        trackingMode: job.tracking_mode,
         totalCount: job.total_count,
         createdAt: job.created_at,
         updatedAt: job.updated_at,
@@ -554,7 +575,7 @@ bulkRouter.get("/jobs", requireAuth, async (req, res, next) => {
          j.id, j.job_type, j.status, j.bulk_qr_type, j.source_file_name, j.total_count, j.success_count, j.failure_count,
          j.error_message, j.created_at, j.started_at, j.completed_at,
          j.archived_at, j.qr_content, j.managed_link_id, j.qr_size, j.foreground_color, j.background_color, j.qr_margin, j.output_format,
-         j.error_correction_level, j.filename_prefix,
+         j.error_correction_level, j.filename_prefix, j.tracking_mode,
          m.qr_type AS managed_qr_type, m.title AS managed_title, m.expires_at AS managed_expires_at,
          a.artifact_type AS artifact_type, a.file_name AS artifact_file_name, a.file_path AS artifact_file_path, a.mime_type AS artifact_mime_type
        FROM qr_jobs j
@@ -596,6 +617,7 @@ bulkRouter.get("/jobs", requireAuth, async (req, res, next) => {
         startedAt: row.started_at,
         completedAt: row.completed_at,
         archivedAt: row.archived_at,
+        trackingMode: row.tracking_mode || "tracked",
         managedLink: row.managed_link_id
           ? {
               id: row.managed_link_id,
@@ -614,6 +636,7 @@ bulkRouter.get("/jobs", requireAuth, async (req, res, next) => {
           format: row.output_format,
           errorCorrectionLevel: row.error_correction_level,
           filenamePrefix: row.filename_prefix,
+          trackingMode: row.tracking_mode || "tracked",
           managedTitle: row.managed_title || getQrTypeLabel(row),
           expiresAt: row.managed_expires_at,
         },
@@ -642,7 +665,7 @@ bulkRouter.get("/jobs/:id/edit-payload", requireAuth, async (req, res, next) => 
     const result = await query(
       `SELECT
          j.id, j.job_type, j.bulk_qr_type, j.qr_content, j.qr_size, j.foreground_color, j.background_color,
-         j.qr_margin, j.output_format, j.error_correction_level, j.filename_prefix,
+         j.qr_margin, j.output_format, j.error_correction_level, j.filename_prefix, j.tracking_mode,
          m.qr_type AS managed_qr_type, m.title AS managed_title, m.expires_at AS managed_expires_at,
          m.target_payload
        FROM qr_jobs j
@@ -670,6 +693,7 @@ bulkRouter.get("/jobs/:id/edit-payload", requireAuth, async (req, res, next) => 
         format: row.output_format,
         errorCorrectionLevel: row.error_correction_level,
         filenamePrefix: row.filename_prefix || "qr",
+        trackingMode: row.tracking_mode || "tracked",
         managedTitle: row.managed_title || getQrTypeLabel(row),
         expiresAt: row.managed_expires_at,
         targetPayload: row.target_payload || null,
@@ -1053,10 +1077,11 @@ bulkRouter.get("/jobs/:id/analysis", requireAuth, async (req, res, next) => {
          j.bulk_qr_type,
          j.qr_content,
          j.total_count,
-         j.success_count,
-         j.failure_count,
-         j.status,
-         j.managed_link_id,
+       j.success_count,
+       j.failure_count,
+       j.status,
+       j.tracking_mode,
+       j.managed_link_id,
          m.qr_type AS managed_qr_type,
          m.title AS managed_title,
          m.expires_at AS managed_expires_at
@@ -1276,7 +1301,8 @@ bulkRouter.get("/jobs/:id/analysis", requireAuth, async (req, res, next) => {
       };
     }
 
-    const trackingEnabled = TRACKED_QR_TYPES.has(targetKind || typeLabel);
+    const trackingMode = String(job.tracking_mode || "tracked").toLowerCase() === "tracked" ? "tracked" : "direct";
+    const trackingEnabled = trackingMode === "tracked" && TRACKED_QR_TYPES.has(targetKind || typeLabel);
     const engagement = {
       targetUrl: linkStats.sample_url || "",
       expiryDate: linkStats.last_expiry_at || job.managed_expires_at || "",
@@ -1293,7 +1319,7 @@ bulkRouter.get("/jobs/:id/analysis", requireAuth, async (req, res, next) => {
       expiredLinks: linkStats.expired_links || 0,
       expiringSoonLinks: linkStats.expiring_soon_links || 0,
       trackingEnabled,
-      trackingMode: trackingEnabled ? "managed-redirect" : "direct",
+      trackingMode,
     };
 
     let insight = "This QR job is generating successfully.";

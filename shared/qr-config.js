@@ -35,6 +35,25 @@ export const SOCIAL_PLATFORM_OPTIONS = [
 
 export const DOWNLOAD_RESOLUTIONS = [512, 768, 1024, 1536, 2048];
 
+export const TRACKING_MODE_OPTIONS = [
+  { value: "tracked", label: "Tracked analytics" },
+  { value: "direct", label: "Direct open" },
+];
+
+export const TRACKED_ONLY_QR_TYPES = ["Rating", "Feedback", "PDF", "Image Gallery"];
+
+export const HYBRID_TRACKING_QR_TYPES = [
+  "URL",
+  "WhatsApp",
+  "Phone",
+  "Email",
+  "SMS",
+  "Youtube",
+  "App Store",
+  "Location",
+  "Text",
+];
+
 export const QR_PLACEHOLDERS = {
   URL: "https://example.com",
   Text: "Write the text you want to encode",
@@ -312,6 +331,26 @@ export const BULK_REQUIRED_COLUMNS_BY_TYPE = {
 export const BULK_OPTIONAL_COLUMNS_BY_TYPE = Object.fromEntries(
   QR_TYPES.map((type) => [type, ["expiresAt"]]),
 );
+
+export function supportsTrackingModeSelection(qrType) {
+  return HYBRID_TRACKING_QR_TYPES.includes(String(qrType || "").trim());
+}
+
+export function getDefaultTrackingMode(qrType) {
+  const type = String(qrType || "").trim();
+  if (TRACKED_ONLY_QR_TYPES.includes(type)) return "tracked";
+  if (type === "Text") return "direct";
+  if (supportsTrackingModeSelection(type)) return "direct";
+  return "tracked";
+}
+
+export function normalizeTrackingMode(qrType, requestedMode) {
+  const type = String(qrType || "").trim();
+  const mode = String(requestedMode || "").trim().toLowerCase();
+  if (TRACKED_ONLY_QR_TYPES.includes(type)) return "tracked";
+  if (!supportsTrackingModeSelection(type)) return "tracked";
+  return mode === "tracked" ? "tracked" : "direct";
+}
 
 function hasFilledValue(value, key) {
   if (Array.isArray(value)) {

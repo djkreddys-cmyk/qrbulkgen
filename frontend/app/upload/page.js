@@ -11,6 +11,9 @@ import {
   BULK_REQUIRED_COLUMNS_BY_TYPE,
   BULK_SAMPLE_ROWS_BY_TYPE,
   DOWNLOAD_RESOLUTIONS,
+  getDefaultTrackingMode,
+  supportsTrackingModeSelection,
+  TRACKING_MODE_OPTIONS,
 } from "../../../shared/qr-config"
 
 function withAuthHeader() {
@@ -56,6 +59,7 @@ export function BulkGenerateContent({ embedded = false }) {
   const [jobAnalysis, setJobAnalysis] = useState(null)
   const [analysisLoading, setAnalysisLoading] = useState(false)
   const [expiryOverride, setExpiryOverride] = useState("")
+  const [trackingMode, setTrackingMode] = useState(getDefaultTrackingMode("URL"))
 
   function formatExpiryDateForInput(value) {
     const raw = String(value || "").trim()
@@ -72,6 +76,7 @@ export function BulkGenerateContent({ embedded = false }) {
     setPreviewContent(previewFromSampleType(qrType))
     if (!editingJobId) {
       setFile(null)
+      setTrackingMode(getDefaultTrackingMode(qrType))
     }
     setError("")
     setSuccess("")
@@ -100,6 +105,7 @@ export function BulkGenerateContent({ embedded = false }) {
         setForegroundColor(job.foregroundColor || "#000000")
         setBackgroundColor(job.backgroundColor || "#ffffff")
         setExpiryOverride(formatExpiryDateForInput(job.expiresAt || ""))
+        setTrackingMode(job.trackingMode || getDefaultTrackingMode(job.qrType || "URL"))
         setSuccess("Loaded this bulk job for update. Change the settings and save a fresh run.")
         setAnalysisLoading(true)
         const analysisData = await apiRequest(`/qr/jobs/${editJob}/analysis`, {
@@ -269,6 +275,7 @@ export function BulkGenerateContent({ embedded = false }) {
       formData.append("foregroundColor", foregroundColor)
       formData.append("backgroundColor", backgroundColor)
       formData.append("expiresAt", expiryOverride)
+      formData.append("trackingMode", trackingMode)
 
       const data = await apiRequest(editingJobId ? `/qr/jobs/${editingJobId}/bulk` : "/qr/bulk/upload", {
         method: editingJobId ? "PUT" : "POST",
@@ -450,6 +457,19 @@ export function BulkGenerateContent({ embedded = false }) {
                 <input value={filenamePrefix} onChange={(e) => setFilenamePrefix(e.target.value)} className="w-full border p-2" />
               </div>
             </div>
+            {supportsTrackingModeSelection(qrType) ? (
+              <div>
+                <label className="block mb-1 text-sm">Tracking Mode</label>
+                <select value={trackingMode} onChange={(e) => setTrackingMode(e.target.value)} className="w-full border p-2">
+                  {TRACKING_MODE_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
+                <p className="mt-2 text-xs text-slate-500">
+                  Tracked analytics routes each row through QRBulkGen for reporting. Direct open writes the destination directly into each QR file.
+                </p>
+              </div>
+            ) : null}
 
             <div className="grid grid-cols-2 gap-3">
               <div>

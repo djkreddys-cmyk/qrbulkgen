@@ -69,6 +69,7 @@ CREATE TABLE IF NOT EXISTS qr_jobs (
   filename_prefix VARCHAR(120),
   error_message TEXT,
   managed_link_id UUID,
+  tracking_mode VARCHAR(16) NOT NULL DEFAULT 'tracked',
   archived_at TIMESTAMPTZ,
   started_at TIMESTAMPTZ,
   completed_at TIMESTAMPTZ,
@@ -81,6 +82,9 @@ ALTER TABLE qr_jobs
 
 ALTER TABLE qr_jobs
   ADD COLUMN IF NOT EXISTS managed_link_id UUID;
+
+ALTER TABLE qr_jobs
+  ADD COLUMN IF NOT EXISTS tracking_mode VARCHAR(16) NOT NULL DEFAULT 'tracked';
 
 ALTER TABLE qr_jobs
   ADD COLUMN IF NOT EXISTS archived_at TIMESTAMPTZ;
@@ -120,6 +124,7 @@ CREATE TABLE IF NOT EXISTS qr_job_items (
   row_index INTEGER NOT NULL,
   content TEXT,
   managed_link_id UUID,
+  tracking_mode VARCHAR(16) NOT NULL DEFAULT 'tracked',
   status VARCHAR(16) NOT NULL CHECK (status IN ('queued', 'processing', 'completed', 'failed')),
   output_file_name TEXT,
   output_path TEXT,
@@ -130,6 +135,9 @@ CREATE TABLE IF NOT EXISTS qr_job_items (
 
 ALTER TABLE qr_job_items
   ADD COLUMN IF NOT EXISTS managed_link_id UUID;
+
+ALTER TABLE qr_job_items
+  ADD COLUMN IF NOT EXISTS tracking_mode VARCHAR(16) NOT NULL DEFAULT 'tracked';
 
 CREATE TABLE IF NOT EXISTS job_artifacts (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

@@ -1,14 +1,28 @@
 import {
+  getDefaultTrackingMode,
   INITIAL_QR_FIELDS,
+  normalizeTrackingMode,
   parseScannedQrDraft,
   QR_FIELD_DEFINITIONS,
   QR_PLACEHOLDERS,
   QR_TYPES,
   SOCIAL_PLATFORM_OPTIONS,
+  supportsTrackingModeSelection,
+  TRACKING_MODE_OPTIONS,
   validateQrFields,
 } from "../../../shared/qr-config";
 
-export { INITIAL_QR_FIELDS, parseScannedQrDraft, QR_FIELD_DEFINITIONS, QR_TYPES, SOCIAL_PLATFORM_OPTIONS };
+export {
+  INITIAL_QR_FIELDS,
+  parseScannedQrDraft,
+  QR_FIELD_DEFINITIONS,
+  QR_TYPES,
+  SOCIAL_PLATFORM_OPTIONS,
+  TRACKING_MODE_OPTIONS,
+  supportsTrackingModeSelection,
+  getDefaultTrackingMode,
+  normalizeTrackingMode,
+};
 
 export function getQrPlaceholder(qrType) {
   return QR_PLACEHOLDERS[qrType] || "Enter QR content";

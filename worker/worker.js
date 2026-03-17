@@ -225,7 +225,7 @@ async function createManagedBulkLink(job, content, row) {
       job.bulk_qr_type || "URL",
       String(title || "").trim().slice(0, 255) || null,
       content,
-      JSON.stringify({ qrType: job.bulk_qr_type || "URL" }),
+      JSON.stringify({ qrType: job.bulk_qr_type || "URL", trackingMode: String(job.tracking_mode || "tracked").toLowerCase() }),
       expiresAt,
     ],
   );
@@ -276,7 +276,7 @@ async function processBulkJob(jobId, queuedRows = null) {
     `SELECT
        id, user_id, source_file_name, source_file_path, bulk_qr_type,
        qr_size, foreground_color, background_color, qr_margin, output_format,
-       error_correction_level, filename_prefix
+       error_correction_level, filename_prefix, tracking_mode
      FROM qr_jobs
      WHERE id = $1
        AND job_type = 'bulk'
@@ -313,9 +313,9 @@ async function processBulkJob(jobId, queuedRows = null) {
     if (!content) {
       failureCount += 1;
       await db.query(
-        `INSERT INTO qr_job_items (job_id, row_index, content, status, error_message)
-         VALUES ($1, $2, $3, 'failed', $4)`,
-        [jobId, i, "", "Unable to build QR content from CSV row"],
+        `INSERT INTO qr_job_items (job_id, row_index, content, tracking_mode, status, error_message)
+         VALUES ($1, $2, $3, $4, 'failed', $5)`,
+        [jobId, i, "", String(job.tracking_mode || "tracked").toLowerCase(), "Unable to build QR content from CSV row"],
       );
       continue;
     }
@@ -324,9 +324,9 @@ async function processBulkJob(jobId, queuedRows = null) {
     if (!requestedFileName) {
       failureCount += 1;
       await db.query(
-        `INSERT INTO qr_job_items (job_id, row_index, content, status, error_message)
-         VALUES ($1, $2, $3, 'failed', $4)`,
-        [jobId, i, content, "Missing filename column value"],
+        `INSERT INTO qr_job_items (job_id, row_index, content, tracking_mode, status, error_message)
+         VALUES ($1, $2, $3, $4, 'failed', $5)`,
+        [jobId, i, content, String(job.tracking_mode || "tracked").toLowerCase(), "Missing filename column value"],
       );
       continue;
     }
@@ -334,9 +334,9 @@ async function processBulkJob(jobId, queuedRows = null) {
     if (!rowFileBase) {
       failureCount += 1;
       await db.query(
-        `INSERT INTO qr_job_items (job_id, row_index, content, status, error_message)
-         VALUES ($1, $2, $3, 'failed', $4)`,
-        [jobId, i, content, "Filename could not be sanitized"],
+        `INSERT INTO qr_job_items (job_id, row_index, content, tracking_mode, status, error_message)
+         VALUES ($1, $2, $3, $4, 'failed', $5)`,
+        [jobId, i, content, String(job.tracking_mode || "tracked").toLowerCase(), "Filename could not be sanitized"],
       );
       continue;
     }
@@ -344,15 +344,20 @@ async function processBulkJob(jobId, queuedRows = null) {
     const filePath = path.join(outputDir, fileName);
 
     try {
-      const managedLink = await createManagedBulkLink(job, content, rows[i]);
-      const trackedContent = appendManagedLinkIdToUrl(content, managedLink.id);
-      if (trackedContent !== content) {
-        await db.query(`UPDATE managed_qr_links SET content = $2, updated_at = NOW() WHERE id = $1`, [
-          managedLink.id,
-          trackedContent,
-        ]);
+      let managedLink = null;
+      let qrEncodedContent = content;
+      const trackingMode = String(job.tracking_mode || "tracked").toLowerCase() === "tracked" ? "tracked" : "direct";
+      if (trackingMode === "tracked") {
+        managedLink = await createManagedBulkLink(job, content, rows[i]);
+        const trackedContent = appendManagedLinkIdToUrl(content, managedLink.id);
+        if (trackedContent !== content) {
+          await db.query(`UPDATE managed_qr_links SET content = $2, updated_at = NOW() WHERE id = $1`, [
+            managedLink.id,
+            trackedContent,
+          ]);
+        }
+        qrEncodedContent = managedLink.url;
       }
-      const qrEncodedContent = managedLink.url;
       if ((job.output_format || "png") === "svg") {
         const svg = await QRCode.toString(qrEncodedContent, {
           type: "svg",
@@ -378,13 +383,14 @@ async function processBulkJob(jobId, queuedRows = null) {
       }
       successCount += 1;
       await db.query(
-        `INSERT INTO qr_job_items (job_id, row_index, content, managed_link_id, status, output_file_name, output_path)
-         VALUES ($1, $2, $3, $4, 'completed', $5, $6)`,
+        `INSERT INTO qr_job_items (job_id, row_index, content, managed_link_id, tracking_mode, status, output_file_name, output_path)
+         VALUES ($1, $2, $3, $4, $5, 'completed', $6, $7)`,
         [
           jobId,
           i,
           qrEncodedContent,
-          managedLink.id,
+          managedLink?.id || null,
+          trackingMode,
           fileName,
           path.relative(uploadsRoot, filePath).replace(/\\/g, "/"),
         ],
@@ -392,9 +398,9 @@ async function processBulkJob(jobId, queuedRows = null) {
     } catch {
       failureCount += 1;
       await db.query(
-        `INSERT INTO qr_job_items (job_id, row_index, content, status, output_file_name, error_message)
-         VALUES ($1, $2, $3, 'failed', $4, $5)`,
-        [jobId, i, content, fileName, "QR generation failed for row"],
+        `INSERT INTO qr_job_items (job_id, row_index, content, tracking_mode, status, output_file_name, error_message)
+         VALUES ($1, $2, $3, $4, 'failed', $5, $6)`,
+        [jobId, i, content, String(job.tracking_mode || "tracked").toLowerCase(), fileName, "QR generation failed for row"],
       );
     }
   }

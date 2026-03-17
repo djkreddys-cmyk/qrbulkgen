@@ -6,7 +6,7 @@ import * as DocumentPicker from "expo-document-picker";
 import { useAuth } from "../context/AuthContext";
 import { apiRequest, createAuthHeaders } from "../lib/api";
 import { saveDataUrlFile, shareDataUrlFile } from "../lib/files";
-import { formatExpiryDateForInput, QR_TYPES } from "../lib/qr";
+import { formatExpiryDateForInput, getDefaultTrackingMode, QR_TYPES, supportsTrackingModeSelection, TRACKING_MODE_OPTIONS } from "../lib/qr";
 
 function Card({ children }) {
   return (
@@ -61,6 +61,7 @@ export function BulkJobsScreen() {
   const [jobAnalysis, setJobAnalysis] = useState(null);
   const [analysisLoading, setAnalysisLoading] = useState(false);
   const [expiryOverride, setExpiryOverride] = useState("");
+  const [trackingMode, setTrackingMode] = useState(getDefaultTrackingMode("URL"));
   const [busy, setBusy] = useState(true);
   const [detailBusy, setDetailBusy] = useState(false);
   const [error, setError] = useState("");
@@ -158,6 +159,12 @@ export function BulkJobsScreen() {
   const recentFailures = useMemo(() => items.filter((item) => item.status === "failed").slice(0, 5), [items]);
 
   useEffect(() => {
+    if (!editingJobId) {
+      setTrackingMode(getDefaultTrackingMode(createQrType));
+    }
+  }, [createQrType, editingJobId]);
+
+  useEffect(() => {
     if (!bulkDraft?.editJobId) return;
 
     async function loadEditDraft() {
@@ -174,6 +181,7 @@ export function BulkJobsScreen() {
           setCreateBackgroundColor(nextJob.backgroundColor || "#ffffff");
           setCreateFilenamePrefix(nextJob.filenamePrefix || "qr");
           setExpiryOverride(formatExpiryDateForInput(nextJob.expiresAt || ""));
+          setTrackingMode(nextJob.trackingMode || getDefaultTrackingMode(nextJob.qrType || "URL"));
           setSelectedJobId(nextJob.id || bulkDraft.editJobId);
           setAnalysisLoading(true);
           const analysisData = await apiRequest(`/qr/jobs/${bulkDraft.editJobId}/analysis`, {
@@ -251,6 +259,7 @@ export function BulkJobsScreen() {
       formData.append("foregroundColor", createForegroundColor);
       formData.append("backgroundColor", createBackgroundColor);
       formData.append("expiresAt", expiryOverride);
+      formData.append("trackingMode", trackingMode);
 
       const data = await apiRequest(editingJobId ? `/qr/jobs/${editingJobId}/bulk` : "/qr/bulk/upload", {
         method: editingJobId ? "PUT" : "POST",
@@ -393,6 +402,22 @@ export function BulkJobsScreen() {
             </Picker>
           )}
         </View>
+        {supportsTrackingModeSelection(createQrType) ? (
+          <View
+            style={{
+              borderWidth: 1,
+              borderColor: "#cbd5e1",
+              borderRadius: 16,
+              overflow: "hidden",
+            }}
+          >
+            <Picker selectedValue={trackingMode} onValueChange={setTrackingMode}>
+              {TRACKING_MODE_OPTIONS.map((option) => (
+                <Picker.Item key={option.value} label={option.label} value={option.value} />
+              ))}
+            </Picker>
+          </View>
+        ) : null}
         <View
           style={{
             borderWidth: 1,

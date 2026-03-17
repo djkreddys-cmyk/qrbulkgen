@@ -8,6 +8,26 @@ const { createManagedQrLink } = require("../services/managed-links");
 const { createSingleQrDataUrl, normalizeSingleQrPayload } = require("../services/qr-single");
 
 const qrRouter = express.Router();
+const TRACKED_ONLY_QR_TYPES = new Set(["Rating", "Feedback", "PDF", "Image Gallery"]);
+const HYBRID_TRACKING_QR_TYPES = new Set([
+  "URL",
+  "WhatsApp",
+  "Phone",
+  "Email",
+  "SMS",
+  "Youtube",
+  "App Store",
+  "Location",
+  "Text",
+]);
+
+function normalizeTrackingMode(qrType, requestedMode) {
+  const type = String(qrType || "").trim() || "Text";
+  const mode = String(requestedMode || "").trim().toLowerCase();
+  if (TRACKED_ONLY_QR_TYPES.has(type)) return "tracked";
+  if (!HYBRID_TRACKING_QR_TYPES.has(type)) return "tracked";
+  return mode === "tracked" ? "tracked" : "direct";
+}
 
 function parseExpiryDate(value) {
   const raw = String(value || "").trim();
@@ -51,6 +71,7 @@ function normalizeHostedUploadId(value) {
 function buildSingleTargetPayload(body, qrType) {
   return {
     qrType,
+    trackingMode: normalizeTrackingMode(qrType, body.trackingMode),
     fields: body.fields || {},
     socialLinks: Array.isArray(body.socialLinks) ? body.socialLinks : [],
     galleryMode: body.galleryMode || "url",
@@ -92,28 +113,33 @@ async function upsertSingleJob({
 }) {
   const payload = normalizeSingleQrPayload(body);
   const qrType = String(body.qrType || "Text").trim() || "Text";
+  const trackingMode = normalizeTrackingMode(qrType, body.trackingMode);
   const managedTitle = body.managedTitle || qrType;
   const expiresAt = toExpiryIso(body.expiresAt) || null;
   const targetPayload = buildSingleTargetPayload(body, qrType);
 
   if (!jobId) {
-    const managedLink = await createManagedQrLink({
-      userId,
-      qrType,
-      title: managedTitle,
-      content: payload.content,
-      targetPayload,
-      expiresAt,
-    });
-    const trackedContent = appendManagedLinkIdToUrl(managedLink.content, managedLink.id);
-    if (trackedContent !== managedLink.content) {
-      await query(`UPDATE managed_qr_links SET content = $2, updated_at = NOW() WHERE id = $1`, [
-        managedLink.id,
-        trackedContent,
-      ]);
-      managedLink.content = trackedContent;
+    let managedLink = null;
+    let qrEncodedContent = payload.content;
+    if (trackingMode === "tracked") {
+      managedLink = await createManagedQrLink({
+        userId,
+        qrType,
+        title: managedTitle,
+        content: payload.content,
+        targetPayload,
+        expiresAt,
+      });
+      const trackedContent = appendManagedLinkIdToUrl(managedLink.content, managedLink.id);
+      if (trackedContent !== managedLink.content) {
+        await query(`UPDATE managed_qr_links SET content = $2, updated_at = NOW() WHERE id = $1`, [
+          managedLink.id,
+          trackedContent,
+        ]);
+        managedLink.content = trackedContent;
+      }
+      qrEncodedContent = managedLink.url;
     }
-    const qrEncodedContent = managedLink.url;
     const dataUrl = await createSingleQrDataUrl({
       ...payload,
       content: qrEncodedContent,
@@ -125,17 +151,17 @@ async function upsertSingleJob({
       `INSERT INTO qr_jobs (
         user_id, job_type, status, total_count, success_count, failure_count,
         qr_content, managed_link_id, qr_size, foreground_color, background_color, qr_margin, output_format,
-        error_correction_level, filename_prefix, started_at, completed_at
+        error_correction_level, filename_prefix, tracking_mode, started_at, completed_at
       ) VALUES (
         $1, 'single', 'completed', 1, 1, 0,
         $2, $3, $4, $5, $6, $7, $8,
-        $9, $10, NOW(), NOW()
+        $9, $10, $11, NOW(), NOW()
       )
       RETURNING id, status, created_at, updated_at`,
       [
         userId,
         qrEncodedContent,
-        managedLink.id,
+        managedLink?.id || null,
         payload.size,
         payload.foregroundColor,
         payload.backgroundColor,
@@ -143,15 +169,18 @@ async function upsertSingleJob({
         payload.format,
         payload.errorCorrectionLevel,
         payload.filenamePrefix,
+        trackingMode,
       ],
     );
 
     const job = jobResult.rows[0];
 
-    await query(`UPDATE managed_qr_links SET job_id = $2, updated_at = NOW() WHERE id = $1`, [
-      managedLink.id,
-      job.id,
-    ]);
+    if (managedLink?.id) {
+      await query(`UPDATE managed_qr_links SET job_id = $2, updated_at = NOW() WHERE id = $1`, [
+        managedLink.id,
+        job.id,
+      ]);
+    }
 
     await query(
       `INSERT INTO job_artifacts (job_id, artifact_type, file_name, file_path, mime_type, file_size_bytes)
@@ -235,8 +264,9 @@ async function upsertSingleJob({
     nextContent = appendManagedLinkIdToUrl(nextContent, existing.managed_link_id);
   }
 
-  let managedLink;
-  if (existing.managed_link_id) {
+  let managedLink = null;
+  let qrEncodedContent = payload.content;
+  if (trackingMode === "tracked" && existing.managed_link_id) {
     await query(
       `UPDATE managed_qr_links
        SET qr_type = $2,
@@ -272,7 +302,7 @@ async function upsertSingleJob({
       createdAt: row.created_at,
       url: require("../services/managed-links").buildManagedQrUrl(row.id),
     };
-  } else {
+  } else if (trackingMode === "tracked") {
     managedLink = await createManagedQrLink({
       userId,
       jobId,
@@ -283,7 +313,9 @@ async function upsertSingleJob({
       expiresAt,
     });
   }
-  const qrEncodedContent = managedLink.url;
+  if (managedLink?.id) {
+    qrEncodedContent = managedLink.url;
+  }
 
   const dataUrl = await createSingleQrDataUrl({
     ...payload,
@@ -308,6 +340,7 @@ async function upsertSingleJob({
          output_format = $8,
          error_correction_level = $9,
          filename_prefix = $10,
+         tracking_mode = $11,
          started_at = NOW(),
          completed_at = NOW(),
          updated_at = NOW()
@@ -315,7 +348,7 @@ async function upsertSingleJob({
     [
       jobId,
       qrEncodedContent,
-      managedLink.id,
+      managedLink?.id || null,
       payload.size,
       payload.foregroundColor,
       payload.backgroundColor,
@@ -323,6 +356,7 @@ async function upsertSingleJob({
       payload.format,
       payload.errorCorrectionLevel,
       payload.filenamePrefix,
+      trackingMode,
     ],
   );
 
@@ -367,6 +401,7 @@ qrRouter.post("/single", requireAuth, async (req, res, next) => {
       userId: req.user.id,
       body: req.body,
     });
+    const trackingMode = normalizeTrackingMode(result.qrType, req.body?.trackingMode);
 
     await trackEvent({
       userId: req.user.id,
@@ -376,7 +411,8 @@ qrRouter.post("/single", requireAuth, async (req, res, next) => {
       metadata: {
         format: result.payload.format,
         qrType: result.qrType,
-        managedLinkId: result.managedLink.id,
+        managedLinkId: result.managedLink?.id || null,
+        trackingMode,
       },
     });
 
@@ -385,15 +421,16 @@ qrRouter.post("/single", requireAuth, async (req, res, next) => {
         id: result.job.id,
         type: "single",
         qrType: result.qrType,
+        trackingMode,
         status: result.job.status,
         createdAt: result.job.created_at,
         updatedAt: result.job.updated_at,
       },
       artifact: result.artifact,
       managedLink: {
-        id: result.managedLink.id,
-        url: result.managedLink.url,
-        expiresAt: result.managedLink.expiresAt,
+        id: result.managedLink?.id || null,
+        url: result.managedLink?.url || null,
+        expiresAt: result.managedLink?.expiresAt || null,
       },
     });
   } catch (error) {
@@ -415,6 +452,7 @@ qrRouter.put("/jobs/:id/single", requireAuth, async (req, res, next) => {
       jobId,
       body: req.body,
     });
+    const trackingMode = normalizeTrackingMode(result.qrType, req.body?.trackingMode);
 
     await trackEvent({
       userId: req.user.id,
@@ -424,7 +462,8 @@ qrRouter.put("/jobs/:id/single", requireAuth, async (req, res, next) => {
       metadata: {
         format: result.payload.format,
         qrType: result.qrType,
-        managedLinkId: result.managedLink.id,
+        managedLinkId: result.managedLink?.id || null,
+        trackingMode,
       },
     });
 
@@ -433,15 +472,16 @@ qrRouter.put("/jobs/:id/single", requireAuth, async (req, res, next) => {
         id: result.job.id,
         type: "single",
         qrType: result.qrType,
+        trackingMode,
         status: result.job.status,
         createdAt: result.job.created_at,
         updatedAt: result.job.updated_at,
       },
       artifact: result.artifact,
       managedLink: {
-        id: result.managedLink.id,
-        url: result.managedLink.url,
-        expiresAt: result.managedLink.expiresAt,
+        id: result.managedLink?.id || null,
+        url: result.managedLink?.url || null,
+        expiresAt: result.managedLink?.expiresAt || null,
       },
     });
   } catch (error) {
