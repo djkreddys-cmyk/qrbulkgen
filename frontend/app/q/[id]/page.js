@@ -56,6 +56,7 @@ export default function ManagedQrPage() {
   const [link, setLink] = useState(null)
   const [error, setError] = useState("")
   const [opened, setOpened] = useState(false)
+  const shouldDirectJump = link && !link.isExpired && ["URL", "App Store"].includes(link.qrType)
 
   useEffect(() => {
     if (!linkId) return
@@ -89,11 +90,15 @@ export default function ManagedQrPage() {
   useEffect(() => {
     if (!link || link.isExpired || !openHref || opened) return
     const timer = window.setTimeout(() => {
-      window.location.href = openHref
+      if (shouldDirectJump) {
+        window.location.replace(openHref)
+      } else {
+        window.location.href = openHref
+      }
       setOpened(true)
-    }, 350)
+    }, shouldDirectJump ? 80 : 350)
     return () => window.clearTimeout(timer)
-  }, [link, openHref, opened])
+  }, [link, openHref, opened, shouldDirectJump])
 
   function copyContent() {
     if (!link?.content) return
@@ -156,7 +161,11 @@ export default function ManagedQrPage() {
                 {kind === "url" || kind === "action" || kind === "location" ? (
                   <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-5">
                     <p className="text-sm text-slate-600">
-                      {opened ? "If nothing opened automatically, use the button below." : "Opening your destination..."}
+                      {opened
+                        ? "If nothing opened automatically, use the button below."
+                        : shouldDirectJump
+                          ? "Redirecting to your destination..."
+                          : "Opening your destination..."}
                     </p>
                     <div className="mt-4 flex flex-wrap gap-3">
                       <a
