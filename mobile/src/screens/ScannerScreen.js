@@ -4,7 +4,23 @@ import * as DocumentPicker from "expo-document-picker";
 import { Camera, CameraView, useCameraPermissions } from "expo-camera";
 
 import { useAuth } from "../context/AuthContext";
+import { apiRequest } from "../lib/api";
 import { looksLikeUrl, parseScannedQrDraft } from "../lib/qr";
+
+function getManagedLinkId(value) {
+  const raw = String(value || "").trim();
+  if (!/^https?:\/\//i.test(raw)) return "";
+  try {
+    const parsed = new URL(raw);
+    const host = parsed.hostname.toLowerCase();
+    const pathMatch = parsed.pathname.match(/^\/q\/([0-9a-f-]+)$/i);
+    if (!pathMatch) return "";
+    if (!host.includes("qrbulkgen")) return "";
+    return pathMatch[1] || "";
+  } catch (_error) {
+    return "";
+  }
+}
 
 function Card({ children }) {
   return (
@@ -29,6 +45,20 @@ export function ScannerScreen() {
   const [scannedValue, setScannedValue] = useState("");
   const [lastScanAt, setLastScanAt] = useState(0);
   const [fileScanMessage, setFileScanMessage] = useState("");
+
+  async function resolveScannedValue(rawValue) {
+    const managedLinkId = getManagedLinkId(rawValue);
+    if (!managedLinkId) {
+      return String(rawValue || "");
+    }
+
+    try {
+      const data = await apiRequest(`/public/qr-links/${managedLinkId}`);
+      return String(data?.link?.content || rawValue || "");
+    } catch (_error) {
+      return String(rawValue || "");
+    }
+  }
 
   async function handleOpen() {
     if (!looksLikeUrl(scannedValue)) return;
@@ -66,12 +96,13 @@ export function ScannerScreen() {
         return;
       }
 
-      setScannedValue(first);
+      const resolved = await resolveScannedValue(first);
+      setScannedValue(resolved);
       setLastScanAt(Date.now());
       setFileScanMessage("Saved QR opened successfully.");
 
-      if (looksLikeUrl(first)) {
-        Linking.openURL(first).catch(() => {});
+      if (looksLikeUrl(resolved)) {
+        Linking.openURL(resolved).catch(() => {});
       }
     } catch (_error) {
       setFileScanMessage("Unable to scan that image right now.");
@@ -131,15 +162,16 @@ export function ScannerScreen() {
             style={{ height: 320 }}
             facing="back"
             barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
-            onBarcodeScanned={({ data }) => {
+            onBarcodeScanned={async ({ data }) => {
               const now = Date.now();
               if (now - lastScanAt < 1800) {
                 return;
               }
               setLastScanAt(now);
-              setScannedValue(data || "");
-              if (looksLikeUrl(data)) {
-                Linking.openURL(data).catch(() => {});
+              const resolved = await resolveScannedValue(data || "");
+              setScannedValue(resolved);
+              if (looksLikeUrl(resolved)) {
+                Linking.openURL(resolved).catch(() => {});
               }
             }}
           />

@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import { useParams } from "next/navigation"
 
 import PublicScanTracker from "../../../components/PublicScanTracker"
 import { apiRequest } from "../../../lib/api"
@@ -43,14 +44,17 @@ function buildLocationHref(content) {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${lat},${lng}`)}`
 }
 
-export default function ManagedQrPage({ params }) {
+export default function ManagedQrPage() {
+  const params = useParams()
+  const linkId = Array.isArray(params?.id) ? params.id[0] : params?.id
   const [link, setLink] = useState(null)
   const [error, setError] = useState("")
   const [opened, setOpened] = useState(false)
 
   useEffect(() => {
+    if (!linkId) return
     let mounted = true
-    apiRequest(`/public/qr-links/${params.id}`)
+    apiRequest(`/public/qr-links/${linkId}`)
       .then((data) => {
         if (!mounted) return
         setLink(data.link)
@@ -62,7 +66,7 @@ export default function ManagedQrPage({ params }) {
     return () => {
       mounted = false
     }
-  }, [params.id])
+  }, [linkId])
 
   const kind = useMemo(
     () => normalizeKind(link?.qrType || "", link?.content || ""),
