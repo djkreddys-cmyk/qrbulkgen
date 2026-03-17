@@ -784,7 +784,9 @@ bulkRouter.get("/reports/overview", requireAuth, async (req, res, next) => {
            COUNT(DISTINCT metadata->>'visitorKey')::int AS unique_scans,
            MAX(ae.created_at) AS last_scan_at
          FROM analytics_events ae
-         INNER JOIN managed_qr_links m ON m.id::text = ae.metadata->>'linkId'
+         INNER JOIN managed_qr_links m
+           ON m.id::text = ae.metadata->>'linkId'
+           OR m.content = ae.metadata->>'targetUrl'
          WHERE ae.event_type = 'qr.public.scan'
            AND m.user_id = $1
            AND ($2::timestamptz IS NULL OR ae.created_at >= $2::timestamptz)
@@ -797,7 +799,9 @@ bulkRouter.get("/reports/overview", requireAuth, async (req, res, next) => {
            COUNT(*)::int AS total_scans,
            COUNT(DISTINCT ae.metadata->>'visitorKey')::int AS unique_scans
          FROM analytics_events ae
-         INNER JOIN managed_qr_links m ON m.id::text = ae.metadata->>'linkId'
+         INNER JOIN managed_qr_links m
+           ON m.id::text = ae.metadata->>'linkId'
+           OR m.content = ae.metadata->>'targetUrl'
          WHERE ae.event_type = 'qr.public.scan'
            AND m.user_id = $1
            AND ($2::timestamptz IS NULL OR ae.created_at >= $2::timestamptz)
@@ -818,7 +822,10 @@ bulkRouter.get("/reports/overview", requireAuth, async (req, res, next) => {
          FROM managed_qr_links m
          LEFT JOIN analytics_events ae
            ON ae.event_type = 'qr.public.scan'
-          AND ae.metadata->>'linkId' = m.id::text
+          AND (
+            ae.metadata->>'linkId' = m.id::text
+            OR ae.metadata->>'targetUrl' = m.content
+          )
           AND ($2::timestamptz IS NULL OR ae.created_at >= $2::timestamptz)
           AND ($3::timestamptz IS NULL OR ae.created_at <= $3::timestamptz)
          WHERE m.user_id = $1
@@ -1097,17 +1104,20 @@ bulkRouter.get("/jobs/:id/analysis", requireAuth, async (req, res, next) => {
        FROM links
        LEFT JOIN analytics_events ae
          ON ae.event_type = 'qr.public.scan'
-        AND ae.metadata->>'linkId' = links.id::text`,
+        AND (
+          ae.metadata->>'linkId' = links.id::text
+          OR ae.metadata->>'targetUrl' = links.url
+        )`,
       [job.managed_link_id, job.id],
     );
 
     const scanTrendResult = await query(
       `WITH links AS (
-         SELECT id
+         SELECT id, content AS url
          FROM managed_qr_links
          WHERE id = $1
          UNION
-         SELECT m.id
+         SELECT m.id, m.content AS url
          FROM qr_job_items i
          INNER JOIN managed_qr_links m ON m.id = i.managed_link_id
          WHERE i.job_id = $2
@@ -1116,7 +1126,9 @@ bulkRouter.get("/jobs/:id/analysis", requireAuth, async (req, res, next) => {
          TO_CHAR(DATE(ae.created_at), 'YYYY-MM-DD') AS label,
          COUNT(*)::int AS count
        FROM analytics_events ae
-       INNER JOIN links ON ae.metadata->>'linkId' = links.id::text
+       INNER JOIN links
+         ON ae.metadata->>'linkId' = links.id::text
+         OR ae.metadata->>'targetUrl' = links.url
        WHERE ae.event_type = 'qr.public.scan'
        GROUP BY DATE(ae.created_at)
        ORDER BY DATE(ae.created_at) ASC
