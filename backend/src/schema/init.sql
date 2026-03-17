@@ -39,6 +39,15 @@ CREATE TABLE IF NOT EXISTS password_reset_tokens (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS password_reset_phone_otps (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  phone VARCHAR(32) NOT NULL,
+  code_hash TEXT NOT NULL UNIQUE,
+  expires_at TIMESTAMPTZ NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 CREATE TABLE IF NOT EXISTS qr_jobs (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -165,6 +174,9 @@ CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id);
 CREATE INDEX IF NOT EXISTS idx_sessions_token_hash ON sessions(token_hash);
 CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_user_id ON password_reset_tokens(user_id);
 CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_token_hash ON password_reset_tokens(token_hash);
+CREATE INDEX IF NOT EXISTS idx_password_reset_phone_otps_user_id ON password_reset_phone_otps(user_id);
+CREATE INDEX IF NOT EXISTS idx_password_reset_phone_otps_phone ON password_reset_phone_otps(phone);
+CREATE INDEX IF NOT EXISTS idx_password_reset_phone_otps_code_hash ON password_reset_phone_otps(code_hash);
 CREATE INDEX IF NOT EXISTS idx_qr_jobs_user_created_at ON qr_jobs(user_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_qr_jobs_user_archived_at ON qr_jobs(user_id, archived_at);
 CREATE INDEX IF NOT EXISTS idx_qr_job_items_job_id ON qr_job_items(job_id);

@@ -122,17 +122,34 @@ export function AuthProvider({ children }) {
     return data.user || null;
   }
 
-  async function forgotPassword(email) {
+  async function forgotPassword(identifier) {
     setError("");
     setIsSubmitting(true);
     try {
       const data = await apiRequest("/auth/forgot-password", {
         method: "POST",
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ identifier }),
       });
       return data;
     } catch (requestError) {
-      setError(requestError.message || "Failed to send reset link");
+      setError(requestError.message || "Failed to start password reset");
+      throw requestError;
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  async function resetPasswordWithOtp({ identifier, code, password }) {
+    setError("");
+    setIsSubmitting(true);
+    try {
+      const data = await apiRequest("/auth/reset-password-otp", {
+        method: "POST",
+        body: JSON.stringify({ identifier, code, password }),
+      });
+      return data;
+    } catch (requestError) {
+      setError(requestError.message || "Failed to reset password");
       throw requestError;
     } finally {
       setIsSubmitting(false);
@@ -209,6 +226,7 @@ export function AuthProvider({ children }) {
       login,
       register,
       forgotPassword,
+      resetPasswordWithOtp,
       openResetPassword,
       completePasswordReset,
       refreshSession,
