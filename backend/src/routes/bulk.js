@@ -12,6 +12,7 @@ const { enqueueBulkQrJob } = require("../services/queue");
 const { normalizeSingleQrPayload } = require("../services/qr-single");
 
 const bulkRouter = express.Router();
+const TRACKED_QR_TYPES = new Set(["Rating", "Feedback", "PDF", "Image Gallery"]);
 const NORMALIZED_URL_MATCH_SQL = "(regexp_replace(lower(split_part(%s, '?exp=', 1)), '^https?://(www\\.)?', '') = regexp_replace(lower(split_part(%s, '?exp=', 1)), '^https?://(www\\.)?', ''))";
 const BULK_QR_TYPES = new Set([
   "URL",
@@ -1257,6 +1258,7 @@ bulkRouter.get("/jobs/:id/analysis", requireAuth, async (req, res, next) => {
       };
     }
 
+    const trackingEnabled = TRACKED_QR_TYPES.has(targetKind || typeLabel);
     const engagement = {
       targetUrl: linkStats.sample_url || "",
       expiryDate: linkStats.last_expiry_at || job.managed_expires_at || "",
@@ -1272,6 +1274,8 @@ bulkRouter.get("/jobs/:id/analysis", requireAuth, async (req, res, next) => {
       managedLinks: linkStats.managed_links || 0,
       expiredLinks: linkStats.expired_links || 0,
       expiringSoonLinks: linkStats.expiring_soon_links || 0,
+      trackingEnabled,
+      trackingMode: trackingEnabled ? "app-hosted" : "direct",
     };
 
     let insight = "This QR job is generating successfully.";

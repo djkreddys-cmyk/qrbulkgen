@@ -67,6 +67,24 @@ function encodeFeedbackPayload(payload) {
   return Buffer.from(JSON.stringify(payload), "utf8").toString("base64");
 }
 
+function appendManagedLinkIdToUrl(value, linkId) {
+  const raw = String(value || "").trim();
+  const managedId = String(linkId || "").trim();
+  if (!raw || !managedId || !/^https?:\/\//i.test(raw)) return raw;
+
+  try {
+    const parsed = new URL(raw);
+    const isTrackedPath = ["/rate", "/feedback"].includes(parsed.pathname) || /^\/(pdf|gallery)\//.test(parsed.pathname);
+    if (!isTrackedPath) return raw;
+    if (!parsed.searchParams.get("lid")) {
+      parsed.searchParams.set("lid", managedId);
+    }
+    return parsed.toString();
+  } catch {
+    return raw;
+  }
+}
+
 async function upsertSingleJob({
   userId,
   jobId = null,
@@ -87,9 +105,17 @@ async function upsertSingleJob({
       targetPayload,
       expiresAt,
     });
+    const trackedContent = appendManagedLinkIdToUrl(managedLink.content, managedLink.id);
+    if (trackedContent !== managedLink.content) {
+      await query(`UPDATE managed_qr_links SET content = $2, updated_at = NOW() WHERE id = $1`, [
+        managedLink.id,
+        trackedContent,
+      ]);
+      managedLink.content = trackedContent;
+    }
     const dataUrl = await createSingleQrDataUrl({
       ...payload,
-      content: payload.content,
+      content: trackedContent || payload.content,
     });
     const fileName = `${payload.filenamePrefix}-${Date.now()}.${payload.format}`;
     const payloadSizeBytes = Buffer.byteLength(dataUrl, "utf8");
@@ -107,7 +133,7 @@ async function upsertSingleJob({
       RETURNING id, status, created_at, updated_at`,
       [
         userId,
-        payload.content,
+        trackedContent || payload.content,
         managedLink.id,
         payload.size,
         payload.foregroundColor,
@@ -204,6 +230,10 @@ async function upsertSingleJob({
     nextManagedTitle = feedbackTitle;
   }
 
+  if (existing.managed_link_id) {
+    nextContent = appendManagedLinkIdToUrl(nextContent, existing.managed_link_id);
+  }
+
   let managedLink;
   if (existing.managed_link_id) {
     await query(
@@ -282,7 +312,7 @@ async function upsertSingleJob({
      WHERE id = $1`,
     [
       jobId,
-      payload.content,
+      nextContent || payload.content,
       managedLink.id,
       payload.size,
       payload.foregroundColor,

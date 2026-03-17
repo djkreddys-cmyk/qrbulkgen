@@ -52,6 +52,24 @@ function encodeFeedbackPayload(payload) {
   return Buffer.from(JSON.stringify(payload), "utf8").toString("base64");
 }
 
+function appendManagedLinkIdToUrl(value, linkId) {
+  const raw = String(value || "").trim();
+  const managedId = String(linkId || "").trim();
+  if (!raw || !managedId || !/^https?:\/\//i.test(raw)) return raw;
+
+  try {
+    const parsed = new URL(raw);
+    const isTrackedPath = ["/rate", "/feedback"].includes(parsed.pathname) || /^\/(pdf|gallery)\//.test(parsed.pathname);
+    if (!isTrackedPath) return raw;
+    if (!parsed.searchParams.get("lid")) {
+      parsed.searchParams.set("lid", managedId);
+    }
+    return parsed.toString();
+  } catch {
+    return raw;
+  }
+}
+
 function addMonths(date, months) {
   const copy = new Date(date);
   copy.setMonth(copy.getMonth() + months);
@@ -327,8 +345,15 @@ async function processBulkJob(jobId, queuedRows = null) {
 
     try {
       const managedLink = await createManagedBulkLink(job, content, rows[i]);
+      const trackedContent = appendManagedLinkIdToUrl(content, managedLink.id);
+      if (trackedContent !== content) {
+        await db.query(`UPDATE managed_qr_links SET content = $2, updated_at = NOW() WHERE id = $1`, [
+          managedLink.id,
+          trackedContent,
+        ]);
+      }
       if ((job.output_format || "png") === "svg") {
-        const svg = await QRCode.toString(content, {
+        const svg = await QRCode.toString(trackedContent || content, {
           type: "svg",
           width: job.qr_size || 512,
           margin: job.qr_margin || 2,
@@ -340,7 +365,7 @@ async function processBulkJob(jobId, queuedRows = null) {
         });
         await fsp.writeFile(filePath, svg, "utf8");
       } else {
-        await QRCode.toFile(filePath, content, {
+        await QRCode.toFile(filePath, trackedContent || content, {
           width: job.qr_size || 512,
           margin: job.qr_margin || 2,
           errorCorrectionLevel: job.error_correction_level || "M",
@@ -357,7 +382,7 @@ async function processBulkJob(jobId, queuedRows = null) {
         [
           jobId,
           i,
-          content,
+          trackedContent || content,
           managedLink.id,
           fileName,
           path.relative(uploadsRoot, filePath).replace(/\\/g, "/"),

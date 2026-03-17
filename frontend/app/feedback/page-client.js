@@ -30,6 +30,7 @@ export default function FeedbackClientPage() {
   const encoded = searchParams.get("f") || ""
   const payload = useMemo(() => decodePayload(encoded), [encoded])
   const expiryValue = searchParams.get("exp") || ""
+  const linkId = searchParams.get("lid") || ""
   const isExpired = expiryValue ? new Date(expiryValue).getTime() < Date.now() : false
 
   const questions = payload?.questions?.length
@@ -74,7 +75,7 @@ export default function FeedbackClientPage() {
     <main className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
       <section className="w-full max-w-2xl bg-white border rounded-lg p-8">
         <h1 className="text-2xl font-bold">{title}</h1>
-        <PublicScanTracker title={title} targetKind="feedback" expired={isExpired} />
+        <PublicScanTracker title={title} targetKind="feedback" expired={isExpired} linkId={linkId} />
 
         {isExpired ? (
           <div className="mt-6 rounded border border-amber-200 bg-amber-50 p-4 text-amber-800">

@@ -9,6 +9,7 @@ export default function GalleryPage() {
   const params = useParams()
   const searchParams = useSearchParams()
   const id = params?.id
+  const linkId = searchParams.get("lid") || ""
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
   const [title, setTitle] = useState("Image Gallery")
@@ -52,7 +53,7 @@ export default function GalleryPage() {
   return (
     <main className="max-w-5xl mx-auto p-6">
       <h1 className="text-3xl font-bold mb-6">{title}</h1>
-      <PublicScanTracker title={title} targetKind="gallery" expired={isExpired} />
+      <PublicScanTracker title={title} targetKind="gallery" expired={isExpired} linkId={linkId} />
       {loading && <p>Loading gallery...</p>}
       {!!error && <p className="text-red-600">{error}</p>}
       {!loading && !error && isExpired && (

@@ -541,7 +541,7 @@ export default function Dashboard() {
                               const uniqueScans = analysis.engagement?.uniqueScans || 0
                               const repeatedScans = analysis.engagement?.repeatedScans || 0
                               const totalSubmissions = analysis.engagement?.totalSubmissions || 0
-                              const hasTrackedEngagement = analysis.engagement?.managedLinks > 0
+                              const hasTrackedEngagement = Boolean(analysis.engagement?.trackingEnabled)
                               const currentTab = getAnalysisTab(job.id)
                               const scanTrendPoints = analysis.scanTrend || []
                               const typeAverageSuccessRate = analysis.typePerformance
@@ -644,11 +644,15 @@ export default function Dashboard() {
                                   <div className="flex items-start justify-between gap-4">
                                     <div>
                                       <p className="font-medium text-slate-900">Usage Report</p>
-                                      <p className="mt-1 text-sm text-slate-500">Scan volume, returning visitors, submissions, and expiry health for this QR.</p>
+                                      <p className="mt-1 text-sm text-slate-500">
+                                        {hasTrackedEngagement
+                                          ? "Scan volume, returning visitors, submissions, and expiry health for this QR."
+                                          : "This QR type opens directly on the device, so usage tracking is limited. Hosted QR types like Rating, Feedback, PDF, and Image Gallery show full scan reports."}
+                                      </p>
                                     </div>
                                     <MetricPill
-                                      label="Tracked"
-                                      value={hasTrackedEngagement ? "Yes" : "No"}
+                                      label="Tracking"
+                                      value={hasTrackedEngagement ? "Active" : "Limited"}
                                       tone={hasTrackedEngagement ? "success" : "default"}
                                     />
                                   </div>
@@ -698,8 +702,8 @@ export default function Dashboard() {
                                       {formatDateTime(analysis.engagement?.lastSubmissionAt)}
                                     </p>
                                     <p>
-                                      <span className="font-medium text-slate-900">Tracked links:</span>{" "}
-                                      {analysis.engagement?.managedLinks || 0}
+                                      <span className="font-medium text-slate-900">Tracking mode:</span>{" "}
+                                      {analysis.engagement?.trackingMode === "app-hosted" ? "App-hosted" : "Direct / device handled"}
                                     </p>
                                     <p>
                                       <span className="font-medium text-slate-900">Expiry date:</span>{" "}
@@ -707,7 +711,7 @@ export default function Dashboard() {
                                     </p>
                                     <p>
                                       <span className="font-medium text-slate-900">Engagement type:</span>{" "}
-                                      {analysis.engagement?.targetKind || "Direct QR / not tracked"}
+                                      {analysis.engagement?.targetKind || job.qrType || "Direct QR"}
                                     </p>
                                     <p>
                                       <span className="font-medium text-slate-900">Expiring soon:</span>{" "}
@@ -725,6 +729,11 @@ export default function Dashboard() {
                                 <div className="rounded-2xl border border-slate-200 bg-white p-4">
                                   <p className="font-medium text-slate-900">Actionable Insights</p>
                                   <ul className="mt-3 list-disc space-y-2 pl-5 text-sm text-slate-600">
+                                    {!hasTrackedEngagement ? (
+                                      <li>
+                                        This QR type opens directly from the scan target, so visitor tracking is limited unless it uses an app-hosted destination.
+                                      </li>
+                                    ) : null}
                                     {extraInsights.map((insight, index) => (
                                       <li key={`${job.id}-insight-${index}`}>{insight}</li>
                                     ))}

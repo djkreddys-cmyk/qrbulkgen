@@ -44,6 +44,24 @@ function buildLocationHref(content) {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${lat},${lng}`)}`
 }
 
+function withManagedLinkId(href, linkId) {
+  const raw = String(href || "").trim()
+  const managedId = String(linkId || "").trim()
+  if (!raw || !managedId || !/^https?:\/\//i.test(raw)) return raw
+
+  try {
+    const parsed = new URL(raw)
+    const isTrackedPath = ["/rate", "/feedback"].includes(parsed.pathname) || /^\/(pdf|gallery)\//.test(parsed.pathname)
+    if (!isTrackedPath) return raw
+    if (!parsed.searchParams.get("lid")) {
+      parsed.searchParams.set("lid", managedId)
+    }
+    return parsed.toString()
+  } catch {
+    return raw
+  }
+}
+
 export default function ManagedQrPage() {
   const params = useParams()
   const routeParamId = Array.isArray(params?.id) ? params.id[0] : params?.id
@@ -83,7 +101,7 @@ export default function ManagedQrPage() {
   const openHref = useMemo(() => {
     if (!link?.content) return ""
     if (kind === "location") return buildLocationHref(link.content)
-    if (kind === "url" || kind === "action") return String(link.content || "").trim()
+    if (kind === "url" || kind === "action") return withManagedLinkId(String(link.content || "").trim(), link?.id)
     return ""
   }, [kind, link])
 
