@@ -6,6 +6,8 @@ import { useParams } from "next/navigation"
 import PublicScanTracker from "../../../components/PublicScanTracker"
 import { apiRequest } from "../../../lib/api"
 
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+
 function downloadTextFile(content, fileName, mimeType) {
   const blob = new Blob([content], { type: mimeType })
   const url = URL.createObjectURL(blob)
@@ -66,10 +68,11 @@ export default function ManagedQrPage() {
   const params = useParams()
   const routeParamId = Array.isArray(params?.id) ? params.id[0] : params?.id
   const linkId = useMemo(() => {
-    if (routeParamId) return routeParamId
+    if (routeParamId && UUID_PATTERN.test(String(routeParamId).trim())) return String(routeParamId).trim()
     if (typeof window === "undefined") return ""
-    const match = window.location.pathname.match(/\/q\/([0-9a-f-]+)/i)
-    return match?.[1] || ""
+    const match = window.location.pathname.match(/\/q\/([0-9a-f-]{36})/i)
+    const fromPath = match?.[1] || ""
+    return UUID_PATTERN.test(fromPath) ? fromPath : ""
   }, [routeParamId])
   const [link, setLink] = useState(null)
   const [error, setError] = useState("")
