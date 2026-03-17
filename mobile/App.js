@@ -10,6 +10,7 @@ import { LoginScreen } from "./src/screens/LoginScreen";
 import { RegisterScreen } from "./src/screens/RegisterScreen";
 import { ResetPasswordScreen } from "./src/screens/ResetPasswordScreen";
 import { ScannerScreen } from "./src/screens/ScannerScreen";
+import { ShortLinksScreen } from "./src/screens/ShortLinksScreen";
 import { SingleGenerateScreen } from "./src/screens/SingleGenerateScreen";
 
 function TabButton({ label, route, activeRoute, navigate }) {
@@ -98,6 +99,8 @@ function MobileShell() {
       screenContent = <ScannerScreen />;
     } else if (activeRoute === "bulk-jobs") {
       screenContent = <BulkJobsScreen />;
+    } else if (activeRoute === "short-links") {
+      screenContent = <ShortLinksScreen />;
     }
 
     return (
@@ -119,6 +122,12 @@ function MobileShell() {
           </View>
           <View style={{ flexDirection: "row", gap: 12 }}>
             <TabButton label="Bulk QR" route="bulk-jobs" activeRoute={activeRoute} navigate={navigate} />
+            <TabButton
+              label="Short Links"
+              route="short-links"
+              activeRoute={activeRoute}
+              navigate={navigate}
+            />
           </View>
           {screenContent}
           <TouchableOpacity

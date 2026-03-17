@@ -4,7 +4,7 @@ import { apiRequest, createAuthHeaders } from "../lib/api";
 import { clearStoredSession, loadStoredSession, saveStoredSession } from "../lib/storage";
 
 const AuthContext = createContext(null);
-const PROTECTED_ROUTES = ["dashboard", "scanner", "single-generate", "bulk-jobs"];
+const PROTECTED_ROUTES = ["dashboard", "scanner", "single-generate", "bulk-jobs", "short-links"];
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
