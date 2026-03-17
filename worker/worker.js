@@ -133,7 +133,7 @@ function buildBulkContent(qrType, row) {
     case "WhatsApp": {
       const phone = getCell(row, "phone").replace(/[^\d]/g, "");
       const text = getCell(row, "message");
-      return `whatsapp://send?phone=${phone}${text ? `&text=${encodeURIComponent(text)}` : ""}`;
+      return `https://api.whatsapp.com/send?phone=${phone}${text ? `&text=${encodeURIComponent(text)}` : ""}`;
     }
     case "vCard":
       return [

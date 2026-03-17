@@ -131,7 +131,7 @@ function buildWhatsappHref(value, fields = {}) {
         : parsed.pathname.replace(/\//g, "").replace(/[^\d]/g, "");
       const message = String(parsed.searchParams.get("text") || "").trim();
       return phone
-        ? `whatsapp://send?phone=${phone}${message ? `&text=${encodeURIComponent(message)}` : ""}`
+        ? `https://api.whatsapp.com/send?phone=${phone}${message ? `&text=${encodeURIComponent(message)}` : ""}`
         : raw;
     } catch {
       return raw;
@@ -140,7 +140,7 @@ function buildWhatsappHref(value, fields = {}) {
   const phone = String(fields.whatsappPhone || "").replace(/[^\d]/g, "");
   const message = String(fields.whatsappMessage || "").trim();
   return phone
-    ? `whatsapp://send?phone=${phone}${message ? `&text=${encodeURIComponent(message)}` : ""}`
+    ? `https://api.whatsapp.com/send?phone=${phone}${message ? `&text=${encodeURIComponent(message)}` : ""}`
     : raw;
 }
 
