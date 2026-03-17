@@ -84,6 +84,12 @@ function serializeShortLink(row) {
   };
 }
 
+function buildTrendLabel(value) {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "";
+  return parsed.toISOString().slice(5, 10);
+}
+
 shortLinksRouter.post("/short-links", requireAuth, async (req, res, next) => {
   try {
     const targetUrl = String(req.body.targetUrl || "").trim();
@@ -129,6 +135,116 @@ shortLinksRouter.get("/short-links", requireAuth, async (req, res, next) => {
     );
 
     res.json({ links: result.rows.map(serializeShortLink) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+shortLinksRouter.get("/short-links/:id/analysis", requireAuth, async (req, res, next) => {
+  try {
+    const id = String(req.params.id || "").trim();
+    if (!id) {
+      throw createHttpError(400, "VALIDATION_ERROR", "Short link id is required");
+    }
+
+    const linkResult = await query(
+      `SELECT id, slug, title, target_url, click_count, expires_at, last_visited_at, archived_at, is_active, created_at
+       FROM short_links
+       WHERE id = $1 AND user_id = $2
+       LIMIT 1`,
+      [id, req.user.id],
+    );
+
+    const link = linkResult.rows[0];
+    if (!link) {
+      throw createHttpError(404, "NOT_FOUND", "Short link not found");
+    }
+
+    const eventsResult = await query(
+      `SELECT
+         COUNT(*)::int AS total_visits,
+         COUNT(DISTINCT COALESCE(metadata->>'visitorKey', ''))::int AS unique_visits
+       FROM analytics_events
+       WHERE event_type = 'short-link.visit'
+         AND metadata->>'shortLinkId' = $1`,
+      [id],
+    );
+
+    const trendResult = await query(
+      `SELECT
+         DATE(created_at) AS day,
+         COUNT(*)::int AS visit_count
+       FROM analytics_events
+       WHERE event_type = 'short-link.visit'
+         AND metadata->>'shortLinkId' = $1
+         AND created_at >= NOW() - INTERVAL '7 days'
+       GROUP BY DATE(created_at)
+       ORDER BY DATE(created_at) ASC`,
+      [id],
+    );
+
+    const latestVisitorsResult = await query(
+      `SELECT
+         created_at,
+         metadata->>'userAgent' AS user_agent,
+         metadata->>'ipAddress' AS ip_address
+       FROM analytics_events
+       WHERE event_type = 'short-link.visit'
+         AND metadata->>'shortLinkId' = $1
+       ORDER BY created_at DESC
+       LIMIT 3`,
+      [id],
+    );
+
+    const totals = eventsResult.rows[0] || { total_visits: 0, unique_visits: 0 };
+    const totalVisits = Number(totals.total_visits || 0);
+    const uniqueVisits = Number(totals.unique_visits || 0);
+    const repeatVisits = Math.max(totalVisits - uniqueVisits, 0);
+    const expiresAt = link.expires_at || null;
+    const isExpired = expiresAt ? new Date(expiresAt).getTime() < Date.now() : false;
+    const trend = trendResult.rows.map((row) => ({
+      label: buildTrendLabel(row.day),
+      count: Number(row.visit_count || 0),
+    }));
+
+    let quickInsight = "This short link is ready for sharing."
+    if (isExpired) {
+      quickInsight = "This short link has expired and is no longer redirecting."
+    } else if (link.archived_at || !link.is_active) {
+      quickInsight = "This short link is archived, so new visitors should no longer use it."
+    } else if (totalVisits === 0) {
+      quickInsight = "This short link has not received clicks yet."
+    } else if (repeatVisits > uniqueVisits) {
+      quickInsight = "This short link is getting repeat traffic from returning visitors."
+    } else if (uniqueVisits > 0) {
+      quickInsight = "This short link is attracting fresh visitors."
+    }
+
+    res.json({
+      analysis: {
+        id: link.id,
+        slug: link.slug,
+        title: link.title || "",
+        targetUrl: link.target_url,
+        totalVisits,
+        uniqueVisits,
+        repeatVisits,
+        clickCount: Number(link.click_count || 0),
+        lastVisitedAt: link.last_visited_at,
+        createdAt: link.created_at,
+        expiresAt,
+        isExpired,
+        isArchived: Boolean(link.archived_at),
+        isActive: Boolean(link.is_active),
+        quickInsight,
+        trend,
+        latestVisitors: latestVisitorsResult.rows.map((row) => ({
+          visitedAt: row.created_at,
+          userAgent: row.user_agent || "",
+          ipAddress: row.ip_address || "",
+        })),
+      },
+    });
   } catch (error) {
     next(error);
   }

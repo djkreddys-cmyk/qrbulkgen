@@ -59,6 +59,36 @@ function ProgressRow({ label, value, total, colorClass = "bg-sky-500", helper = 
   )
 }
 
+function Sparkline({ points }) {
+  if (!points.length) {
+    return <p className="text-xs text-slate-400">No visit trend recorded yet.</p>
+  }
+
+  const width = 180
+  const height = 42
+  const max = Math.max(...points.map((point) => point.count), 1)
+  const step = points.length === 1 ? width : width / (points.length - 1)
+  const path = points
+    .map((point, index) => {
+      const x = Math.round(index * step)
+      const y = Math.round(height - (point.count / max) * (height - 8) - 4)
+      return `${index === 0 ? "M" : "L"} ${x} ${y}`
+    })
+    .join(" ")
+
+  return (
+    <div className="space-y-2">
+      <svg viewBox={`0 0 ${width} ${height}`} className="h-12 w-full overflow-visible">
+        <path d={path} fill="none" stroke="currentColor" strokeWidth="3" className="text-sky-500" strokeLinecap="round" />
+      </svg>
+      <div className="flex items-center justify-between gap-2 text-[11px] text-slate-400">
+        <span>{points[0]?.label || ""}</span>
+        <span>{points[points.length - 1]?.label || ""}</span>
+      </div>
+    </div>
+  )
+}
+
 export default function ShortLinksPage() {
   const router = useRouter()
   const [title, setTitle] = useState("")
@@ -72,6 +102,9 @@ export default function ShortLinksPage() {
   const [message, setMessage] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
+  const [analysisLinkId, setAnalysisLinkId] = useState("")
+  const [analysisLoadingId, setAnalysisLoadingId] = useState("")
+  const [analysisById, setAnalysisById] = useState({})
 
   const activeLinks = useMemo(
     () => links.filter((link) => (showArchived ? true : !link.archivedAt)),
@@ -216,6 +249,40 @@ export default function ShortLinksPage() {
       setError("")
     } catch {
       setError("Unable to copy short link.")
+    }
+  }
+
+  async function handleToggleAnalysis(linkId) {
+    const token = getAuthToken()
+    if (!token) {
+      router.replace("/login")
+      return
+    }
+
+    if (analysisLinkId === linkId) {
+      setAnalysisLinkId("")
+      return
+    }
+
+    setAnalysisLinkId(linkId)
+
+    if (analysisById[linkId]) {
+      return
+    }
+
+    try {
+      setAnalysisLoadingId(linkId)
+      const data = await apiRequest(`/short-links/${linkId}/analysis`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      setAnalysisById((prev) => ({
+        ...prev,
+        [linkId]: data.analysis,
+      }))
+    } catch (requestError) {
+      setError(requestError.message)
+    } finally {
+      setAnalysisLoadingId("")
     }
   }
 
@@ -410,12 +477,100 @@ export default function ShortLinksPage() {
                     </div>
                     <div className="flex flex-wrap gap-2">
                       <button onClick={() => copyLink(link.url)} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700">Copy</button>
+                      <button onClick={() => handleToggleAnalysis(link.id)} className="rounded-xl border border-sky-200 px-4 py-2 text-sm font-semibold text-sky-700">
+                        {analysisLinkId === link.id ? "Hide Analysis" : "Analysis"}
+                      </button>
                       <a href={link.url} target="_blank" rel="noreferrer" className="rounded-xl border border-sky-200 px-4 py-2 text-sm font-semibold text-sky-700">Open</a>
                       <button onClick={() => handleDelete(link)} className={`rounded-xl px-4 py-2 text-sm font-semibold ${link.archivedAt ? "border border-rose-200 text-rose-700" : "border border-amber-200 text-amber-700"}`}>
                         {link.archivedAt ? "Delete Permanently" : "Archive"}
                       </button>
                     </div>
                   </div>
+
+                  {analysisLinkId === link.id ? (
+                    <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-5">
+                      {analysisLoadingId === link.id ? (
+                        <p className="text-sm text-slate-500">Loading analysis...</p>
+                      ) : analysisById[link.id] ? (
+                        <div className="space-y-5">
+                          <div className="rounded-2xl border border-sky-200 bg-sky-50 p-4">
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-700">Quick Insight</p>
+                            <p className="mt-2 text-sm leading-6 text-slate-700">{analysisById[link.id].quickInsight}</p>
+                          </div>
+
+                          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                            <AnalyticsCard label="Total Visits" value={analysisById[link.id].totalVisits} tone="accent" />
+                            <AnalyticsCard label="Unique Visits" value={analysisById[link.id].uniqueVisits} tone="success" />
+                            <AnalyticsCard label="Repeat Visits" value={analysisById[link.id].repeatVisits} />
+                            <AnalyticsCard
+                              label="Expiry State"
+                              value={analysisById[link.id].isExpired ? "Expired" : analysisById[link.id].expiresAt ? "Scheduled" : "Open"}
+                              tone={analysisById[link.id].isExpired ? "danger" : "default"}
+                            />
+                          </div>
+
+                          <div className="grid gap-4 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
+                            <div className="rounded-2xl border border-slate-200 bg-white p-5">
+                              <h4 className="text-base font-semibold text-slate-950">Visit breakdown</h4>
+                              <div className="mt-4 space-y-4">
+                                <ProgressRow
+                                  label="Unique visitors"
+                                  value={analysisById[link.id].uniqueVisits}
+                                  total={Math.max(analysisById[link.id].totalVisits, 1)}
+                                  colorClass="bg-sky-500"
+                                />
+                                <ProgressRow
+                                  label="Repeat visits"
+                                  value={analysisById[link.id].repeatVisits}
+                                  total={Math.max(analysisById[link.id].totalVisits, 1)}
+                                  colorClass="bg-emerald-500"
+                                />
+                              </div>
+                            </div>
+
+                            <div className="rounded-2xl border border-slate-200 bg-white p-5">
+                              <h4 className="text-base font-semibold text-slate-950">7-day trend</h4>
+                              <div className="mt-4">
+                                <Sparkline points={analysisById[link.id].trend || []} />
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="grid gap-4 lg:grid-cols-2">
+                            <div className="rounded-2xl border border-slate-200 bg-white p-5">
+                              <h4 className="text-base font-semibold text-slate-950">Link details</h4>
+                              <div className="mt-4 space-y-2 text-sm text-slate-600">
+                                <p><span className="font-semibold text-slate-900">Short URL:</span> {link.url}</p>
+                                <p><span className="font-semibold text-slate-900">Target:</span> {analysisById[link.id].targetUrl}</p>
+                                <p><span className="font-semibold text-slate-900">Created:</span> {formatDate(analysisById[link.id].createdAt)}</p>
+                                <p><span className="font-semibold text-slate-900">Last visit:</span> {formatDate(analysisById[link.id].lastVisitedAt)}</p>
+                                <p><span className="font-semibold text-slate-900">Expiry:</span> {formatDate(analysisById[link.id].expiresAt)}</p>
+                              </div>
+                            </div>
+
+                            <div className="rounded-2xl border border-slate-200 bg-white p-5">
+                              <h4 className="text-base font-semibold text-slate-950">Recent visitors</h4>
+                              {(analysisById[link.id].latestVisitors || []).length ? (
+                                <div className="mt-4 space-y-3">
+                                  {analysisById[link.id].latestVisitors.map((visitor, index) => (
+                                    <div key={`${visitor.visitedAt}-${index}`} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-600">
+                                      <p className="font-medium text-slate-900">{formatDate(visitor.visitedAt)}</p>
+                                      <p className="mt-1 break-all">{visitor.userAgent || "Unknown browser"}</p>
+                                      <p className="mt-1 text-xs text-slate-500">{visitor.ipAddress || "IP unavailable"}</p>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <p className="mt-4 text-sm leading-6 text-slate-500">
+                                  No visitor log has been recorded yet for this short link.
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : null}
                 </article>
               ))}
             </div>
