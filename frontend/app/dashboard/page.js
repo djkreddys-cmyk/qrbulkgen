@@ -338,7 +338,8 @@ export default function Dashboard() {
         </section>
 
         <section className="rounded-[1.75rem] border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="flex flex-col gap-3 xl:flex-row xl:items-end">
+          <div className="sticky top-4 z-20 -mx-4 -mt-4 rounded-t-[1.75rem] border-b border-slate-200 bg-white px-4 pt-4 pb-3 shadow-sm">
+            <div className="flex flex-col gap-3 xl:flex-row xl:items-end">
             <label className="text-[12px] font-semibold uppercase tracking-[0.14em] text-slate-500 xl:min-w-[11rem]">
               QR Type
               <select
@@ -397,8 +398,9 @@ export default function Dashboard() {
             >
               Clear Filters
             </button>
+            </div>
           </div>
-          <div className="mt-3 border-t border-slate-200 pt-3 text-xs text-slate-500">
+          <div className="pt-4 text-xs text-slate-500">
             Archived QR jobs appear when Status is set to <span className="font-semibold text-slate-700">Archived</span> or <span className="font-semibold text-slate-700">All</span>. Archived rows show a <span className="font-semibold text-slate-700">Delete Permanently</span> action.
           </div>
         </section>
