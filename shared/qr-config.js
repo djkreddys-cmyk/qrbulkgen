@@ -443,10 +443,13 @@ export function parseScannedQrDraft(rawValue) {
     return { qrType: "vCard", fields };
   }
 
-  if (/^https:\/\/(wa\.me|api\.whatsapp\.com)\//i.test(value)) {
+  if (/^(whatsapp:\/\/send\?|https:\/\/(wa\.me|api\.whatsapp\.com)\/)/i.test(value)) {
     try {
       const parsed = new URL(value);
-      if (parsed.hostname.toLowerCase().includes("api.whatsapp.com")) {
+      if (parsed.protocol.toLowerCase() === "whatsapp:") {
+        fields.whatsappPhone = parsed.searchParams.get("phone") || "";
+        fields.whatsappMessage = parsed.searchParams.get("text") || "";
+      } else if (parsed.hostname.toLowerCase().includes("api.whatsapp.com")) {
         fields.whatsappPhone = parsed.searchParams.get("phone") || "";
         fields.whatsappMessage = parsed.searchParams.get("text") || "";
       } else {

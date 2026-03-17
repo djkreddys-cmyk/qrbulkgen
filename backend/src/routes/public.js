@@ -122,11 +122,25 @@ function buildSmsHref(value, fields = {}) {
 
 function buildWhatsappHref(value, fields = {}) {
   const raw = String(value || "").trim();
-  if (/^https?:\/\/(wa\.me|api\.whatsapp\.com)\//i.test(raw)) return raw;
+  if (/^whatsapp:\/\/send\?/i.test(raw)) return raw;
+  if (/^https?:\/\/(wa\.me|api\.whatsapp\.com)\//i.test(raw)) {
+    try {
+      const parsed = new URL(raw);
+      const phone = parsed.hostname.toLowerCase().includes("api.whatsapp.com")
+        ? String(parsed.searchParams.get("phone") || "").replace(/[^\d]/g, "")
+        : parsed.pathname.replace(/\//g, "").replace(/[^\d]/g, "");
+      const message = String(parsed.searchParams.get("text") || "").trim();
+      return phone
+        ? `whatsapp://send?phone=${phone}${message ? `&text=${encodeURIComponent(message)}` : ""}`
+        : raw;
+    } catch {
+      return raw;
+    }
+  }
   const phone = String(fields.whatsappPhone || "").replace(/[^\d]/g, "");
   const message = String(fields.whatsappMessage || "").trim();
   return phone
-    ? `https://api.whatsapp.com/send?phone=${phone}${message ? `&text=${encodeURIComponent(message)}` : ""}`
+    ? `whatsapp://send?phone=${phone}${message ? `&text=${encodeURIComponent(message)}` : ""}`
     : raw;
 }
 
