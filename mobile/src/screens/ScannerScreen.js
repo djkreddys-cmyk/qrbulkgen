@@ -7,6 +7,49 @@ import { useAuth } from "../context/AuthContext";
 import { apiRequest } from "../lib/api";
 import { buildQrContent, looksLikeUrl, parseScannedQrDraft } from "../lib/qr";
 
+function isManagedWrapperUrl(value) {
+  const raw = String(value || "").trim();
+  if (!/^https?:\/\//i.test(raw)) return false;
+  try {
+    const parsed = new URL(raw);
+    return parsed.hostname.toLowerCase().includes("qrbulkgen") && /^\/q\/[0-9a-f-]+/i.test(parsed.pathname);
+  } catch (_error) {
+    return false;
+  }
+}
+
+function resolveManagedDestination(link) {
+  if (!link) return "";
+
+  const targetPayload = link.targetPayload || {};
+  const qrType = String(targetPayload.qrType || link.qrType || "").trim();
+  const uploadIds = targetPayload.uploadIds || {};
+  const built = buildQrContent(
+    qrType,
+    targetPayload.fields || {},
+    {
+      appOrigin: "https://www.qrbulkgen.com",
+      socialLinks: Array.isArray(targetPayload.socialLinks) ? targetPayload.socialLinks : [],
+      ids: {
+        galleryLinkId: uploadIds.galleryLinkId || "",
+        pdfLinkId: uploadIds.pdfLinkId || "",
+      },
+      modes: {
+        galleryMode: targetPayload.galleryMode || "url",
+        pdfMode: targetPayload.pdfMode || "url",
+      },
+      expiryDate: targetPayload.expiresAt || "",
+    },
+  );
+
+  const builtValue = String(built || "").trim();
+  if (builtValue && !isManagedWrapperUrl(builtValue)) {
+    return builtValue;
+  }
+
+  return String(link.content || "").trim();
+}
+
 function getManagedLinkId(value) {
   const raw = String(value || "").trim();
   if (!/^https?:\/\//i.test(raw)) return "";
@@ -92,7 +135,7 @@ export function ScannerScreen() {
     if (managedLinkId) {
       try {
         const data = await apiRequest(`/public/qr-links/${managedLinkId}`);
-        return String(data?.link?.content || rawValue || "");
+        return resolveManagedDestination(data?.link) || String(rawValue || "");
       } catch (_error) {
         return String(rawValue || "");
       }
