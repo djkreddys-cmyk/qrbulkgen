@@ -15,7 +15,6 @@ export default function AuthScreen({ defaultMode = "register" }) {
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState("")
-  const [socialNotice, setSocialNotice] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const isRegisterMode = mode === "register"
@@ -47,11 +46,6 @@ export default function AuthScreen({ defaultMode = "register" }) {
   function switchMode(nextMode) {
     setMode(nextMode)
     setError("")
-    setSocialNotice("")
-  }
-
-  function handleSocialClick(provider) {
-    setSocialNotice(`${provider} login will work after OAuth app credentials and redirect setup are added.`)
   }
 
   return (
@@ -139,25 +133,6 @@ export default function AuthScreen({ defaultMode = "register" }) {
               ? "Register"
               : "Login"}
         </button>
-
-        <div className="mt-4 space-y-3">
-          <button
-            type="button"
-            onClick={() => handleSocialClick("Google")}
-            className="w-full rounded border border-slate-300 py-2 text-slate-800"
-          >
-            Continue with Google
-          </button>
-          <button
-            type="button"
-            onClick={() => handleSocialClick("Microsoft")}
-            className="w-full rounded border border-slate-300 py-2 text-slate-800"
-          >
-            Continue with Microsoft
-          </button>
-        </div>
-
-        {socialNotice ? <p className="mt-3 text-sm text-slate-600">{socialNotice}</p> : null}
 
         <p className="mt-4 text-sm text-gray-600">
           {isRegisterMode ? "Already have an account?" : "Need an account?"}{" "}

@@ -4,17 +4,13 @@ import { Text, TextInput, TouchableOpacity, View } from "react-native";
 import { useAuth } from "../context/AuthContext";
 
 export function LoginScreen() {
-  const { login, navigate, error, isSubmitting, resetNotice, setResetNotice, setError } = useAuth();
+  const { login, navigate, error, isSubmitting, resetNotice, setResetNotice } = useAuth();
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
 
   async function handleLogin() {
     await login({ identifier, password });
-  }
-
-  function handleSocialPress(provider) {
-    setError(`${provider} login needs OAuth app credentials before it can be enabled.`);
   }
 
   return (
@@ -60,21 +56,6 @@ export function LoginScreen() {
           {isSubmitting ? "Logging in..." : "Login"}
         </Text>
       </TouchableOpacity>
-      <TouchableOpacity
-        onPress={() => handleSocialPress("Google")}
-        style={{ borderWidth: 1, borderColor: "#ccc", padding: 14, borderRadius: 10 }}
-      >
-        <Text style={{ textAlign: "center", fontWeight: "600", color: "#0f172a" }}>Continue with Google</Text>
-      </TouchableOpacity>
-      <TouchableOpacity
-        onPress={() => handleSocialPress("Microsoft")}
-        style={{ borderWidth: 1, borderColor: "#ccc", padding: 14, borderRadius: 10 }}
-      >
-        <Text style={{ textAlign: "center", fontWeight: "600", color: "#0f172a" }}>Continue with Microsoft</Text>
-      </TouchableOpacity>
-      <Text style={{ color: "#64748b", fontSize: 12, lineHeight: 18 }}>
-        Google and Microsoft login need OAuth app credentials before they can be enabled.
-      </Text>
       {!!resetNotice && (
         <TouchableOpacity onPress={() => setResetNotice("")} style={{ paddingVertical: 4 }}>
           <Text style={{ textAlign: "center", color: "#64748b" }}>Dismiss message</Text>
