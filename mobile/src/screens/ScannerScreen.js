@@ -120,13 +120,67 @@ function normalizeOpenTarget(value) {
     const body = parts.join(":");
     return `sms:${phone}${body ? `?body=${encodeURIComponent(body)}` : ""}`;
   }
+  const firstUrlMatch = raw.match(/https?:\/\/[^\s]+/i);
+  if (firstUrlMatch) return firstUrlMatch[0];
   return "";
+}
+
+function buildEventOpenTarget(fields = {}) {
+  const title = String(fields.eventTitle || "").trim();
+  if (!title) return "";
+  const params = new URLSearchParams();
+  params.set("action", "TEMPLATE");
+  params.set("text", title);
+
+  const start = String(fields.eventStart || "").trim();
+  const end = String(fields.eventEnd || "").trim();
+  if (start && end) {
+    const startDate = new Date(start);
+    const endDate = new Date(end);
+    if (!Number.isNaN(startDate.getTime()) && !Number.isNaN(endDate.getTime())) {
+      const startUtc = startDate.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
+      const endUtc = endDate.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
+      params.set("dates", `${startUtc}/${endUtc}`);
+    }
+  }
+
+  const location = String(fields.eventLocation || "").trim();
+  if (location) params.set("location", location);
+  const details = String(fields.eventDescription || "").trim();
+  if (details) params.set("details", details);
+  return `https://calendar.google.com/calendar/render?${params.toString()}`;
+}
+
+function getScannedDisplayValue(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  const direct = normalizeOpenTarget(raw);
+  if (direct) return direct;
+
+  const draft = parseScannedQrDraft(raw);
+  if (draft.qrType === "Event") {
+    return buildEventOpenTarget(draft.fields || {}) || raw;
+  }
+
+  if (draft.qrType === "Social Media") {
+    const built = buildQrContent(draft.qrType, draft.fields || {}, {
+      appOrigin: "https://www.qrbulkgen.com",
+      socialLinks: draft.socialLinks || [],
+      ids: draft.ids || {},
+      modes: draft.modes || {},
+      expiryDate: draft.expiryDate || "",
+    });
+    return normalizeOpenTarget(built) || raw;
+  }
+
+  return raw;
 }
 
 export function ScannerScreen() {
   const { navigate, setSingleDraft } = useAuth();
   const [permission, requestPermission] = useCameraPermissions();
   const [scannedValue, setScannedValue] = useState("");
+  const [displayValue, setDisplayValue] = useState("");
   const [lastScanAt, setLastScanAt] = useState(0);
   const [fileScanMessage, setFileScanMessage] = useState("");
 
@@ -164,6 +218,9 @@ export function ScannerScreen() {
     if (direct) return direct;
 
     const draft = parseScannedQrDraft(value);
+    if (draft.qrType === "Event") {
+      return buildEventOpenTarget(draft.fields || {});
+    }
     const rebuilt = buildQrContent(draft.qrType, draft.fields || {}, {
       appOrigin: "https://www.qrbulkgen.com",
       socialLinks: draft.socialLinks || [],
@@ -213,6 +270,7 @@ export function ScannerScreen() {
 
       const resolved = await resolveScannedValue(first);
       setScannedValue(resolved);
+      setDisplayValue(getScannedDisplayValue(resolved));
       setLastScanAt(Date.now());
       setFileScanMessage("Saved QR opened successfully.");
 
@@ -286,6 +344,7 @@ export function ScannerScreen() {
               setLastScanAt(now);
               const resolved = await resolveScannedValue(data || "");
               setScannedValue(resolved);
+              setDisplayValue(getScannedDisplayValue(resolved));
               const target = resolveOpenTarget(resolved);
               if (target) {
                 Linking.openURL(target).catch(() => {});
@@ -296,6 +355,7 @@ export function ScannerScreen() {
         <TouchableOpacity
           onPress={() => {
             setScannedValue("");
+            setDisplayValue("");
             setLastScanAt(0);
           }}
           style={{ backgroundColor: "#e2e8f0", paddingVertical: 14, borderRadius: 16 }}
@@ -309,7 +369,7 @@ export function ScannerScreen() {
       <Card>
         <Text style={{ fontSize: 20, fontWeight: "700", color: "#0f172a" }}>Scanned Result</Text>
         <Text style={{ color: scannedValue ? "#0f172a" : "#64748b", lineHeight: 22 }}>
-          {scannedValue || "Scan a QR code to see its content here."}
+          {displayValue || scannedValue || "Scan a QR code to see its content here."}
         </Text>
         <View style={{ flexDirection: "row", gap: 12 }}>
           <TouchableOpacity

@@ -50,6 +50,25 @@ export default function GalleryPage() {
     }
   }, [id])
 
+  async function handleSaveImage(image) {
+    const url = String(image?.url || "").trim()
+    if (!url) return
+    try {
+      const response = await fetch(url)
+      const blob = await response.blob()
+      const objectUrl = URL.createObjectURL(blob)
+      const anchor = document.createElement("a")
+      anchor.href = objectUrl
+      anchor.download = image?.fileName || "image"
+      document.body.appendChild(anchor)
+      anchor.click()
+      document.body.removeChild(anchor)
+      URL.revokeObjectURL(objectUrl)
+    } catch (_error) {
+      window.open(url, "_blank", "noopener,noreferrer")
+    }
+  }
+
   return (
     <main className="max-w-5xl mx-auto p-6">
       <h1 className="text-3xl font-bold mb-6">{title}</h1>
@@ -66,18 +85,18 @@ export default function GalleryPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {images.map((image, index) => (
             <div key={`${image.url}-${index}`} className="border rounded overflow-hidden bg-white">
-              <a href={image.url} target="_blank" rel="noreferrer">
-                <img src={image.url} alt={image.fileName || `Image ${index + 1}`} className="w-full h-56 object-cover" />
-              </a>
+                <a href={image.url} target="_blank" rel="noreferrer">
+                  <img src={image.url} alt={image.fileName || `Image ${index + 1}`} className="w-full h-56 object-cover" />
+                </a>
               <div className="flex items-center justify-between gap-3 p-3">
                 <p className="min-w-0 truncate text-sm text-slate-600">{image.fileName || `Image ${index + 1}`}</p>
-                <a
-                  href={image.url}
-                  download
+                <button
+                  type="button"
+                  onClick={() => handleSaveImage(image)}
                   className="shrink-0 rounded bg-slate-950 px-3 py-2 text-sm font-medium text-white"
                 >
                   Save
-                </a>
+                </button>
               </div>
             </div>
           ))}

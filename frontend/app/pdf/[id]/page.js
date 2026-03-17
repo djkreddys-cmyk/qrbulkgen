@@ -50,6 +50,24 @@ export default function PdfPage() {
     }
   }, [id])
 
+  async function handleSavePdf() {
+    if (!pdfUrl) return
+    try {
+      const response = await fetch(pdfUrl)
+      const blob = await response.blob()
+      const objectUrl = URL.createObjectURL(blob)
+      const anchor = document.createElement("a")
+      anchor.href = objectUrl
+      anchor.download = `${title || "document"}.pdf`
+      document.body.appendChild(anchor)
+      anchor.click()
+      document.body.removeChild(anchor)
+      URL.revokeObjectURL(objectUrl)
+    } catch (_error) {
+      window.open(pdfUrl, "_blank", "noopener,noreferrer")
+    }
+  }
+
   return (
     <main className="max-w-5xl mx-auto p-6">
       <h1 className="text-3xl font-bold mb-6">{title}</h1>
@@ -65,22 +83,14 @@ export default function PdfPage() {
       {!loading && !error && !isExpired && !pdfUrl && <p>PDF URL missing</p>}
       {!loading && !error && !isExpired && !!pdfUrl && (
         <div className="space-y-4">
-          <div className="flex flex-wrap gap-3">
-            <a
-              href={pdfUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="rounded border border-slate-300 px-4 py-2 font-medium text-slate-900"
-            >
-              Open PDF
-            </a>
-            <a
-              href={pdfUrl}
-              download
+          <div className="flex flex-wrap gap-3 justify-end">
+            <button
+              type="button"
+              onClick={handleSavePdf}
               className="rounded bg-slate-950 px-4 py-2 font-medium text-white"
             >
               Save PDF
-            </a>
+            </button>
           </div>
           <iframe title={title} src={pdfUrl} className="w-full min-h-[80vh] border rounded" />
         </div>

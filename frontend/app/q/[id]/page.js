@@ -16,6 +16,61 @@ function ensureExternalUrl(value) {
   return raw
 }
 
+function extractFirstUrl(value) {
+  const raw = String(value || "").trim()
+  if (!raw) return ""
+  const match = raw.match(/https?:\/\/[^\s]+/i)
+  return match ? match[0] : ""
+}
+
+function buildSmsHref(value, fields = {}) {
+  const raw = String(value || "").trim()
+  if (/^sms:/i.test(raw)) return raw
+  if (/^smsto:/i.test(raw)) {
+    const payload = raw.replace(/^smsto:/i, "")
+    const separatorIndex = payload.indexOf(":")
+    const phone = separatorIndex >= 0 ? payload.slice(0, separatorIndex) : payload
+    const body = separatorIndex >= 0 ? payload.slice(separatorIndex + 1) : ""
+    return `sms:${phone}${body ? `?body=${encodeURIComponent(body)}` : ""}`
+  }
+  const phone = String(fields.smsPhone || "").trim()
+  const body = String(fields.smsMessage || "").trim()
+  return phone ? `sms:${phone}${body ? `?body=${encodeURIComponent(body)}` : ""}` : ""
+}
+
+function buildWhatsappHref(value, fields = {}) {
+  const raw = String(value || "").trim()
+  if (/^https?:\/\/(wa\.me|api\.whatsapp\.com)\//i.test(raw)) return raw
+  const phone = String(fields.whatsappPhone || "").replace(/[^\d]/g, "")
+  const message = String(fields.whatsappMessage || "").trim()
+  return phone
+    ? `https://api.whatsapp.com/send?phone=${phone}${message ? `&text=${encodeURIComponent(message)}` : ""}`
+    : raw
+}
+
+function buildEventCalendarHref(fields = {}) {
+  const title = String(fields.eventTitle || "").trim()
+  if (!title) return ""
+  const start = String(fields.eventStart || "").trim()
+  const end = String(fields.eventEnd || "").trim()
+  const location = String(fields.eventLocation || "").trim()
+  const details = String(fields.eventDescription || "").trim()
+
+  const params = new URLSearchParams()
+  params.set("action", "TEMPLATE")
+  params.set("text", title)
+  if (start && end) {
+    const startUtc = start.includes("T") ? new Date(start).toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z") : ""
+    const endUtc = end.includes("T") ? new Date(end).toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z") : ""
+    if (startUtc && endUtc) {
+      params.set("dates", `${startUtc}/${endUtc}`)
+    }
+  }
+  if (location) params.set("location", location)
+  if (details) params.set("details", details)
+  return `https://calendar.google.com/calendar/render?${params.toString()}`
+}
+
 function downloadTextFile(content, fileName, mimeType) {
   const blob = new Blob([content], { type: mimeType })
   const url = URL.createObjectURL(blob)
@@ -29,10 +84,10 @@ function downloadTextFile(content, fileName, mimeType) {
 }
 
 function normalizeKind(qrType, content) {
-  if (["URL", "Youtube", "App Store", "PDF", "Image Gallery", "Rating", "Feedback"].includes(qrType)) {
+  if (["URL", "Youtube", "App Store", "PDF", "Image Gallery", "Rating", "Feedback", "Social Media"].includes(qrType)) {
     return "url"
   }
-  if (["Email", "Phone", "SMS", "WhatsApp"].includes(qrType)) {
+  if (["Email", "Phone", "SMS", "WhatsApp", "Event"].includes(qrType)) {
     return "action"
   }
   if (qrType === "Location") {
@@ -48,8 +103,11 @@ function normalizeKind(qrType, content) {
 }
 
 function buildLocationHref(content) {
-  const raw = String(content || "").trim().replace(/^geo:/i, "")
-  const [lat, lng] = raw.split(",")
+  const raw = String(content || "").trim()
+  if (!raw) return ""
+  if (/^https?:\/\//i.test(raw)) return raw
+  const normalized = raw.replace(/^geo:/i, "")
+  const [lat, lng] = normalized.split(",")
   if (!lat || !lng) return ""
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${lat},${lng}`)}`
 }
@@ -77,15 +135,17 @@ function resolveContent(link) {
     case "Phone":
       return rawContent || `tel:${String(fields.phone || "").trim()}`
     case "SMS":
-      return rawContent || `sms:${String(fields.smsPhone || "").trim()}?body=${encodeURIComponent(fields.smsMessage || "")}`
+      return buildSmsHref(rawContent, fields)
     case "WhatsApp":
-      return ensureExternalUrl(rawContent || `https://wa.me/${String(fields.whatsappPhone || "").replace(/[^\d]/g, "")}${fields.whatsappMessage ? `?text=${encodeURIComponent(fields.whatsappMessage)}` : ""}`)
+      return buildWhatsappHref(rawContent, fields)
     case "Location":
       return fields.mapsUrl || rawContent
     case "Social Media": {
       const firstUrl = socialLinks.find((item) => String(item?.url || "").trim())?.url
-      return ensureExternalUrl(firstUrl || rawContent)
+      return ensureExternalUrl(firstUrl || extractFirstUrl(rawContent) || rawContent)
     }
+    case "Event":
+      return buildEventCalendarHref(fields) || rawContent
     default:
       return rawContent
   }
@@ -239,9 +299,10 @@ export default function ManagedQrPage() {
                     <div className="mt-4 flex flex-wrap gap-3">
                       <a
                         href={openHref}
+                        target="_self"
                         className="rounded-xl bg-slate-950 px-4 py-3 text-sm font-medium text-white"
                       >
-                        Open destination
+                        {link.qrType === "Event" ? "Open in Google Calendar" : "Open destination"}
                       </a>
                       <button
                         type="button"
@@ -269,7 +330,13 @@ export default function ManagedQrPage() {
                         onClick={downloadStructuredContent}
                         className="rounded-xl border border-slate-300 px-4 py-3 text-sm font-medium text-slate-700"
                       >
-                        Download content
+                        {link.qrType === "vCard"
+                          ? "Save contact"
+                          : link.qrType === "WIFI"
+                            ? "Download WiFi details"
+                            : link.qrType === "Event"
+                              ? "Download event file"
+                              : "Download content"}
                       </button>
                     </div>
                   </div>
