@@ -1,5 +1,4 @@
 const express = require("express");
-const { randomInt } = require("crypto");
 
 const { loadEnv } = require("../config/env");
 const { query, withTransaction } = require("../db/postgres");
@@ -9,7 +8,6 @@ const { generateOpaqueToken, hashToken } = require("../lib/token");
 const { requireAuth } = require("../middleware/auth");
 const { trackEvent } = require("../services/analytics");
 const { sendResetPasswordEmail } = require("../services/email");
-const { sendResetPasswordSms } = require("../services/sms");
 
 const authRouter = express.Router();
 const SESSION_TTL_DAYS = 30;
@@ -26,10 +24,6 @@ function normalizePhone(value) {
 
 function isEmailIdentifier(value) {
   return String(value || "").includes("@");
-}
-
-function generateOtpCode() {
-  return String(randomInt(100000, 1000000));
 }
 
 function validateRegisterPayload(body) {
@@ -75,12 +69,21 @@ function validateForgotPasswordPayload(body) {
   const identifier = String(body.identifier || body.email || body.phone || "").trim();
   const email = isEmailIdentifier(identifier) ? identifier.toLowerCase() : "";
   const phone = email ? "" : normalizePhone(identifier);
+  const recoveryEmail = String(body.recoveryEmail || "").trim().toLowerCase();
 
   if (!email && !phone) {
     throw createHttpError(400, "VALIDATION_ERROR", "Email or mobile number is required");
   }
 
-  return { identifier, email, phone };
+  if (phone && !recoveryEmail) {
+    throw createHttpError(400, "VALIDATION_ERROR", "Recovery email is required when using a mobile number");
+  }
+
+  if (recoveryEmail && !isEmailIdentifier(recoveryEmail)) {
+    throw createHttpError(400, "VALIDATION_ERROR", "Recovery email must be a valid email address");
+  }
+
+  return { identifier, email, phone, recoveryEmail };
 }
 
 async function createSession(userId, db = { query }) {
@@ -186,7 +189,8 @@ authRouter.get("/me", requireAuth, async (req, res) => {
 
 authRouter.post("/forgot-password", async (req, res, next) => {
   try {
-    const { email, phone } = validateForgotPasswordPayload(req.body);
+    const { email, phone, recoveryEmail } = validateForgotPasswordPayload(req.body);
+    const ttlMinutes = loadEnv().resetPasswordTokenTtlMinutes;
 
     if (email) {
       const result = await query("SELECT id, email FROM users WHERE email = $1 LIMIT 1", [email]);
@@ -195,7 +199,6 @@ authRouter.post("/forgot-password", async (req, res, next) => {
       if (user) {
         const rawToken = generateOpaqueToken();
         const tokenHash = hashToken(rawToken);
-        const ttlMinutes = loadEnv().resetPasswordTokenTtlMinutes;
 
         await withTransaction(async (client) => {
           await client.query("DELETE FROM password_reset_tokens WHERE user_id = $1", [user.id]);
@@ -221,34 +224,29 @@ authRouter.post("/forgot-password", async (req, res, next) => {
 
     const result = await query("SELECT id, phone FROM users WHERE phone = $1 LIMIT 1", [phone]);
     const user = result.rows[0];
-    let previewCode = "";
 
     if (user) {
-      const rawCode = generateOtpCode();
-      const codeHash = hashToken(rawCode);
-      const ttlMinutes = loadEnv().resetPasswordOtpTtlMinutes;
+      const rawToken = generateOpaqueToken();
+      const tokenHash = hashToken(rawToken);
 
       await withTransaction(async (client) => {
-        await client.query("DELETE FROM password_reset_phone_otps WHERE user_id = $1", [user.id]);
+        await client.query("DELETE FROM password_reset_tokens WHERE user_id = $1", [user.id]);
         await client.query(
-          `INSERT INTO password_reset_phone_otps (user_id, phone, code_hash, expires_at)
-           VALUES ($1, $2, $3, NOW() + ($4 * INTERVAL '1 minute'))`,
-          [user.id, user.phone, codeHash, ttlMinutes],
+          `INSERT INTO password_reset_tokens (user_id, token_hash, expires_at)
+           VALUES ($1, $2, NOW() + ($3 * INTERVAL '1 minute'))`,
+          [user.id, tokenHash, ttlMinutes],
         );
       });
 
-      const smsResult = await sendResetPasswordSms({
-        to: user.phone,
-        code: rawCode,
+      await sendResetPasswordEmail({
+        to: recoveryEmail,
+        resetUrl: buildResetPasswordUrl(rawToken),
       });
-      previewCode = smsResult.previewCode || "";
     }
 
     res.json({
-      method: "phone",
-      requiresOtp: true,
-      message: "If the mobile number is registered, a reset OTP has been sent.",
-      ...(previewCode ? { otpPreview: previewCode } : {}),
+      method: "phone-email",
+      message: "If the mobile number is registered, a reset link has been sent to the recovery email you entered.",
     });
   } catch (error) {
     next(error);
@@ -295,67 +293,6 @@ authRouter.post("/reset-password", async (req, res, next) => {
 
       await client.query("DELETE FROM password_reset_tokens WHERE user_id = $1", [resetToken.user_id]);
       await client.query("DELETE FROM sessions WHERE user_id = $1", [resetToken.user_id]);
-    });
-
-    res.json({
-      message: "Password reset successful. Please log in again.",
-    });
-  } catch (error) {
-    next(error);
-  }
-});
-
-authRouter.post("/reset-password-otp", async (req, res, next) => {
-  try {
-    const identifier = String(req.body.identifier || req.body.phone || "").trim();
-    const phone = normalizePhone(identifier);
-    const code = String(req.body.code || "").trim();
-    const password = String(req.body.password || "");
-
-    if (!phone || !code || !password) {
-      throw createHttpError(400, "VALIDATION_ERROR", "Mobile number, OTP, and password are required");
-    }
-
-    if (password.length < 8) {
-      throw createHttpError(400, "VALIDATION_ERROR", "Password must be at least 8 characters long");
-    }
-
-    const userResult = await query("SELECT id FROM users WHERE phone = $1 LIMIT 1", [phone]);
-    const user = userResult.rows[0];
-
-    if (!user) {
-      throw createHttpError(400, "INVALID_RESET_OTP", "OTP is invalid or expired");
-    }
-
-    const codeHash = hashToken(code);
-
-    await withTransaction(async (client) => {
-      const otpResult = await client.query(
-        `SELECT id
-         FROM password_reset_phone_otps
-         WHERE user_id = $1
-           AND code_hash = $2
-           AND expires_at > NOW()
-         LIMIT 1`,
-        [user.id, codeHash],
-      );
-
-      const otp = otpResult.rows[0];
-
-      if (!otp) {
-        throw createHttpError(400, "INVALID_RESET_OTP", "OTP is invalid or expired");
-      }
-
-      await client.query(
-        `UPDATE users
-         SET password_hash = $1, updated_at = NOW()
-         WHERE id = $2`,
-        [hashPassword(password), user.id],
-      );
-
-      await client.query("DELETE FROM password_reset_phone_otps WHERE user_id = $1", [user.id]);
-      await client.query("DELETE FROM password_reset_tokens WHERE user_id = $1", [user.id]);
-      await client.query("DELETE FROM sessions WHERE user_id = $1", [user.id]);
     });
 
     res.json({
