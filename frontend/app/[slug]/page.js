@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation"
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:4000/api"
+export const dynamic = "force-dynamic"
 
 const RESERVED_SLUGS = new Set([
   "api",
@@ -27,7 +28,8 @@ const RESERVED_SLUGS = new Set([
 ])
 
 export default async function ShortLinkRedirectPage({ params }) {
-  const slug = String(params?.slug || "").trim()
+  const resolvedParams = typeof params?.then === "function" ? await params : params
+  const slug = String(resolvedParams?.slug || "").trim()
   if (!slug || RESERVED_SLUGS.has(slug)) {
     notFound()
   }
