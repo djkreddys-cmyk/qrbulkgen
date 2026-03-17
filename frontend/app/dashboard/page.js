@@ -337,7 +337,7 @@ export default function Dashboard() {
           </div>
         </section>
 
-        <section className="sticky top-20 z-10 rounded-[1.75rem] border border-slate-200 bg-white/95 p-4 shadow-md shadow-slate-200/40 backdrop-blur">
+        <section className="rounded-[1.75rem] border border-slate-200 bg-white p-4 shadow-sm">
           <div className="flex flex-col gap-3 xl:flex-row xl:items-end">
             <label className="text-[12px] font-semibold uppercase tracking-[0.14em] text-slate-500 xl:min-w-[11rem]">
               QR Type
