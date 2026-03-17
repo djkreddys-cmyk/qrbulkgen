@@ -397,65 +397,78 @@ export default function ShortLinksPage() {
           </div>
         </section>
 
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,420px)_minmax(0,1fr)]">
-          <section className="rounded-[1.75rem] border border-slate-200 bg-white p-6 shadow-sm">
-            <h2 className="text-xl font-semibold text-slate-950">New short link</h2>
-            <form className="mt-5 space-y-4" onSubmit={handleCreate}>
-              <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">Title</label>
-                <input value={title} onChange={(event) => setTitle(event.target.value)} className="w-full rounded-xl border border-slate-200 px-4 py-3" placeholder="Campaign landing page" />
-              </div>
-              <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">Target URL</label>
-                <input value={targetUrl} onChange={(event) => setTargetUrl(event.target.value)} className="w-full rounded-xl border border-slate-200 px-4 py-3" placeholder="https://example.com" />
-              </div>
-              <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">Custom slug (optional)</label>
-                <input value={slug} onChange={(event) => setSlug(event.target.value)} className="w-full rounded-xl border border-slate-200 px-4 py-3" placeholder="event2026" />
-                <p className="mt-1 text-xs text-slate-500">Leave blank to auto-generate a short code.</p>
-              </div>
-              <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">Expiry (optional)</label>
-                <input value={expiresAt} onChange={(event) => setExpiresAt(event.target.value)} className="w-full rounded-xl border border-slate-200 px-4 py-3" placeholder="DD-MM-YYYY" />
-              </div>
+        <section className="rounded-[1.75rem] border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <h2 className="text-xl font-semibold text-slate-950">New short link</h2>
+              <p className="mt-1 text-sm text-slate-500">
+                Create a new redirect, keep the slug clean, and start tracking visits immediately.
+              </p>
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+              Freshly created links appear first in the saved list below.
+            </div>
+          </div>
+
+          <form className="mt-5 grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.35fr)_minmax(0,0.85fr)_minmax(0,0.8fr)_auto]" onSubmit={handleCreate}>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">Title</label>
+              <input value={title} onChange={(event) => setTitle(event.target.value)} className="w-full rounded-xl border border-slate-200 px-4 py-3" placeholder="Campaign landing page" />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">Target URL</label>
+              <input value={targetUrl} onChange={(event) => setTargetUrl(event.target.value)} className="w-full rounded-xl border border-slate-200 px-4 py-3" placeholder="https://example.com" />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">Custom slug (optional)</label>
+              <input value={slug} onChange={(event) => setSlug(event.target.value)} className="w-full rounded-xl border border-slate-200 px-4 py-3" placeholder="event2026" />
+              <p className="mt-1 text-xs text-slate-500">Leave blank to auto-generate.</p>
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">Expiry (optional)</label>
+              <input value={expiresAt} onChange={(event) => setExpiresAt(event.target.value)} className="w-full rounded-xl border border-slate-200 px-4 py-3" placeholder="DD-MM-YYYY" />
+            </div>
+            <div className="flex items-end">
               <button disabled={isSubmitting} className="w-full rounded-xl bg-slate-950 px-4 py-3 font-semibold text-white disabled:opacity-60">
                 {isSubmitting ? "Creating..." : "Create Short Link"}
               </button>
-            </form>
-            {message ? <p className="mt-4 text-sm text-emerald-700">{message}</p> : null}
-            {error ? <p className="mt-4 text-sm text-rose-600">{error}</p> : null}
-          </section>
-
-          <section className="space-y-4 rounded-[1.75rem] border border-slate-200 bg-white p-6 shadow-sm">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <h2 className="text-xl font-semibold text-slate-950">Saved short links</h2>
-                <p className="mt-1 text-sm text-slate-500">Track click counts and manage active or archived links separately.</p>
-              </div>
-              <label className="inline-flex items-center gap-2 text-sm font-medium text-slate-700">
-                <input type="checkbox" checked={showArchived} onChange={(event) => setShowArchived(event.target.checked)} />
-                Show archived
-              </label>
             </div>
+          </form>
 
-            {createdLink ? (
-              <div className="rounded-2xl border border-sky-200 bg-sky-50 p-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-700">Latest short link</p>
-                <p className="mt-2 text-lg font-semibold text-slate-950">{createdLink.url}</p>
-                <p className="mt-1 text-sm text-slate-600">Target: {createdLink.targetUrl}</p>
-              </div>
-            ) : null}
+          {message ? <p className="mt-4 text-sm text-emerald-700">{message}</p> : null}
+          {error ? <p className="mt-4 text-sm text-rose-600">{error}</p> : null}
+        </section>
 
-            {isLoading ? <p className="text-slate-600">Loading short links...</p> : null}
-            {!isLoading && !activeLinks.length ? (
-              <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-5 py-8 text-center text-slate-500">
-                No short links yet. Create your first one here.
-              </div>
-            ) : null}
+        <section className="space-y-4 rounded-[1.75rem] border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-xl font-semibold text-slate-950">Saved short links</h2>
+              <p className="mt-1 text-sm text-slate-500">Track click counts and manage active or archived links separately.</p>
+            </div>
+            <label className="inline-flex items-center gap-2 text-sm font-medium text-slate-700">
+              <input type="checkbox" checked={showArchived} onChange={(event) => setShowArchived(event.target.checked)} />
+              Show archived
+            </label>
+          </div>
 
-            <div className="space-y-4">
-              {activeLinks.map((link) => (
-                <article key={link.id} className="rounded-2xl border border-slate-200 p-5 shadow-sm">
+          {createdLink ? (
+            <div className="rounded-2xl border border-sky-200 bg-sky-50 p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-700">Latest short link</p>
+              <p className="mt-2 text-lg font-semibold text-slate-950">{createdLink.url}</p>
+              <p className="mt-1 text-sm text-slate-600">Target: {createdLink.targetUrl}</p>
+            </div>
+          ) : null}
+
+          {isLoading ? <p className="text-slate-600">Loading short links...</p> : null}
+          {!isLoading && !activeLinks.length ? (
+            <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-5 py-8 text-center text-slate-500">
+              No short links yet. Create your first one here.
+            </div>
+          ) : null}
+
+          <div className="space-y-4">
+            {activeLinks.map((link) => (
+              <article key={link.id} className="rounded-2xl border border-slate-200 p-5 shadow-sm">
                   <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                     <div>
                       <div className="flex flex-wrap items-center gap-2">
@@ -571,11 +584,10 @@ export default function ShortLinksPage() {
                       ) : null}
                     </div>
                   ) : null}
-                </article>
-              ))}
-            </div>
-          </section>
-        </div>
+              </article>
+            ))}
+          </div>
+        </section>
       </main>
     </div>
   )
