@@ -118,7 +118,13 @@ export default async function ManagedQrPage({ params }) {
         ? withManagedLinkId(resolvedContent, link.id)
         : ""
 
-  const shouldDirectJump = Boolean(link && !link.isExpired && openHref && ["url", "action", "location"].includes(kind))
+  const shouldDirectJump = Boolean(
+    link &&
+      !link.isExpired &&
+      openHref &&
+      ["url", "action", "location"].includes(kind) &&
+      String(link.qrType || "").trim() !== "WhatsApp",
+  )
 
   if (shouldDirectJump) {
     await trackManagedView(await headers(), link)

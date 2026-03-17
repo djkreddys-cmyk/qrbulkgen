@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo } from "react"
+import { useEffect, useMemo } from "react"
 
 import PublicScanTracker from "../../../components/PublicScanTracker"
 
@@ -59,6 +59,18 @@ export default function ManagedQrClient({ link, kind, resolvedContent, openHref,
       })
       .filter(Boolean)
   }, [link, resolvedContent])
+
+  useEffect(() => {
+    if (link?.isExpired) return
+    if (link?.qrType !== "WhatsApp") return
+    if (!openHref) return
+
+    const timer = window.setTimeout(() => {
+      window.location.href = openHref
+    }, 150)
+
+    return () => window.clearTimeout(timer)
+  }, [link, openHref])
 
   function copyContent() {
     if (!link?.content) return
@@ -137,14 +149,20 @@ export default function ManagedQrClient({ link, kind, resolvedContent, openHref,
               </div>
             ) : kind === "url" || kind === "action" || kind === "location" ? (
               <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-5">
-                <p className="text-sm text-slate-600">Opening your destination...</p>
+                <p className="text-sm text-slate-600">
+                  {link.qrType === "WhatsApp" ? "Opening WhatsApp..." : "Opening your destination..."}
+                </p>
                 <div className="mt-4 flex flex-wrap gap-3">
                   <a
                     href={openHref}
                     target="_self"
                     className="rounded-xl bg-slate-950 px-4 py-3 text-sm font-medium text-white"
                   >
-                    {link.qrType === "Event" ? "Open in Google Calendar" : "Open destination"}
+                    {link.qrType === "Event"
+                      ? "Open in Google Calendar"
+                      : link.qrType === "WhatsApp"
+                        ? "Open WhatsApp"
+                        : "Open destination"}
                   </a>
                   <button
                     type="button"
