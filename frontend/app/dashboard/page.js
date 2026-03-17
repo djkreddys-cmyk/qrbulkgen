@@ -647,12 +647,12 @@ export default function Dashboard() {
                                       <p className="mt-1 text-sm text-slate-500">
                                         {hasTrackedEngagement
                                           ? "Scan volume, returning visitors, submissions, and expiry health for this QR."
-                                          : "This QR type opens directly on the device, so usage tracking is limited. Hosted QR types like Rating, Feedback, PDF, and Image Gallery show full scan reports."}
+                                          : "Tracking is unavailable for this QR right now."}
                                       </p>
                                     </div>
                                     <MetricPill
                                       label="Tracking"
-                                      value={hasTrackedEngagement ? "Active" : "Limited"}
+                                      value={hasTrackedEngagement ? "Active" : "Unavailable"}
                                       tone={hasTrackedEngagement ? "success" : "default"}
                                     />
                                   </div>
@@ -703,7 +703,7 @@ export default function Dashboard() {
                                     </p>
                                     <p>
                                       <span className="font-medium text-slate-900">Tracking mode:</span>{" "}
-                                      {analysis.engagement?.trackingMode === "app-hosted" ? "App-hosted" : "Direct / device handled"}
+                                      {analysis.engagement?.trackingMode === "managed-redirect" ? "Managed redirect" : "Direct / device handled"}
                                     </p>
                                     <p>
                                       <span className="font-medium text-slate-900">Expiry date:</span>{" "}
@@ -729,11 +729,7 @@ export default function Dashboard() {
                                 <div className="rounded-2xl border border-slate-200 bg-white p-4">
                                   <p className="font-medium text-slate-900">Actionable Insights</p>
                                   <ul className="mt-3 list-disc space-y-2 pl-5 text-sm text-slate-600">
-                                    {!hasTrackedEngagement ? (
-                                      <li>
-                                        This QR type opens directly from the scan target, so visitor tracking is limited unless it uses an app-hosted destination.
-                                      </li>
-                                    ) : null}
+                                    {!hasTrackedEngagement ? <li>Tracking is unavailable for this QR right now.</li> : null}
                                     {extraInsights.map((insight, index) => (
                                       <li key={`${job.id}-insight-${index}`}>{insight}</li>
                                     ))}

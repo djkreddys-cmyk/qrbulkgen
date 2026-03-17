@@ -113,9 +113,10 @@ async function upsertSingleJob({
       ]);
       managedLink.content = trackedContent;
     }
+    const qrEncodedContent = managedLink.url;
     const dataUrl = await createSingleQrDataUrl({
       ...payload,
-      content: trackedContent || payload.content,
+      content: qrEncodedContent,
     });
     const fileName = `${payload.filenamePrefix}-${Date.now()}.${payload.format}`;
     const payloadSizeBytes = Buffer.byteLength(dataUrl, "utf8");
@@ -133,7 +134,7 @@ async function upsertSingleJob({
       RETURNING id, status, created_at, updated_at`,
       [
         userId,
-        trackedContent || payload.content,
+        qrEncodedContent,
         managedLink.id,
         payload.size,
         payload.foregroundColor,
@@ -282,10 +283,11 @@ async function upsertSingleJob({
       expiresAt,
     });
   }
+  const qrEncodedContent = managedLink.url;
 
   const dataUrl = await createSingleQrDataUrl({
     ...payload,
-    content: nextContent || payload.content,
+    content: qrEncodedContent,
   });
   const fileName = `${payload.filenamePrefix}-${Date.now()}.${payload.format}`;
   const payloadSizeBytes = Buffer.byteLength(dataUrl, "utf8");
@@ -309,10 +311,10 @@ async function upsertSingleJob({
          started_at = NOW(),
          completed_at = NOW(),
          updated_at = NOW()
-     WHERE id = $1`,
+    WHERE id = $1`,
     [
       jobId,
-      nextContent || payload.content,
+      qrEncodedContent,
       managedLink.id,
       payload.size,
       payload.foregroundColor,

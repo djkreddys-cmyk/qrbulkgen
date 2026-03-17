@@ -352,8 +352,9 @@ async function processBulkJob(jobId, queuedRows = null) {
           trackedContent,
         ]);
       }
+      const qrEncodedContent = managedLink.url;
       if ((job.output_format || "png") === "svg") {
-        const svg = await QRCode.toString(trackedContent || content, {
+        const svg = await QRCode.toString(qrEncodedContent, {
           type: "svg",
           width: job.qr_size || 512,
           margin: job.qr_margin || 2,
@@ -365,7 +366,7 @@ async function processBulkJob(jobId, queuedRows = null) {
         });
         await fsp.writeFile(filePath, svg, "utf8");
       } else {
-        await QRCode.toFile(filePath, trackedContent || content, {
+        await QRCode.toFile(filePath, qrEncodedContent, {
           width: job.qr_size || 512,
           margin: job.qr_margin || 2,
           errorCorrectionLevel: job.error_correction_level || "M",
@@ -382,7 +383,7 @@ async function processBulkJob(jobId, queuedRows = null) {
         [
           jobId,
           i,
-          trackedContent || content,
+          qrEncodedContent,
           managedLink.id,
           fileName,
           path.relative(uploadsRoot, filePath).replace(/\\/g, "/"),

@@ -707,10 +707,10 @@ export function DashboardScreen() {
                           <Text style={{ color: "#64748b" }}>
                             {hasTrackedEngagement
                               ? "Scan volume, returning visitors, submissions, and expiry health for this QR."
-                              : "This QR type opens directly on the device, so usage tracking is limited. Hosted QR types like Rating, Feedback, PDF, and Image Gallery show full scan reports."}
+                              : "Tracking is unavailable for this QR right now."}
                           </Text>
                           <View style={{ alignSelf: "flex-start" }}>
-                            <PerformanceBadge label={hasTrackedEngagement ? "Tracking active" : "Tracking limited"} tone={hasTrackedEngagement ? "success" : "default"} />
+                            <PerformanceBadge label={hasTrackedEngagement ? "Tracking active" : "Tracking unavailable"} tone={hasTrackedEngagement ? "success" : "default"} />
                           </View>
                           <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}>
                             <AnalysisStat label="Scans" value={analysis.engagement?.totalScans || 0} />
@@ -730,7 +730,7 @@ export function DashboardScreen() {
                           <Text style={{ color: "#475569" }}><Text style={{ fontWeight: "700", color: "#0f172a" }}>Last scan: </Text>{formatDateTime(analysis.engagement?.lastScanAt)}</Text>
                           <Text style={{ color: "#475569" }}><Text style={{ fontWeight: "700", color: "#0f172a" }}>Last submission: </Text>{formatDateTime(analysis.engagement?.lastSubmissionAt)}</Text>
                           <Text style={{ color: "#475569" }}><Text style={{ fontWeight: "700", color: "#0f172a" }}>Expiry date: </Text>{analysis.engagement?.expiryDate ? formatDateTime(analysis.engagement.expiryDate) : "Not set"}</Text>
-                          <Text style={{ color: "#475569" }}><Text style={{ fontWeight: "700", color: "#0f172a" }}>Tracking mode: </Text>{analysis.engagement?.trackingMode === "app-hosted" ? "App-hosted" : "Direct / device handled"}</Text>
+                          <Text style={{ color: "#475569" }}><Text style={{ fontWeight: "700", color: "#0f172a" }}>Tracking mode: </Text>{analysis.engagement?.trackingMode === "managed-redirect" ? "Managed redirect" : "Direct / device handled"}</Text>
                           <Text style={{ color: "#475569" }}><Text style={{ fontWeight: "700", color: "#0f172a" }}>Engagement type: </Text>{analysis.engagement?.targetKind || job.qrType || "Direct QR"}</Text>
                         </View>
                       )}
@@ -738,11 +738,7 @@ export function DashboardScreen() {
                       {currentTab === "overview" && (
                         <View style={{ borderWidth: 1, borderColor: "#dbe3f0", borderRadius: 16, padding: 12, backgroundColor: "#ffffff", gap: 8 }}>
                           <Text style={{ color: "#0f172a", fontWeight: "700" }}>Actionable Insights</Text>
-                          {!hasTrackedEngagement ? (
-                            <Text style={{ color: "#475569" }}>
-                              This QR type opens directly from the scan target, so visitor tracking is limited unless it uses an app-hosted destination.
-                            </Text>
-                          ) : null}
+                          {!hasTrackedEngagement ? <Text style={{ color: "#475569" }}>Tracking is unavailable for this QR right now.</Text> : null}
                           <Text style={{ color: "#475569" }}>{analysis.job?.failureCount > 0 ? `${analysis.job.failureCount} output(s) failed and may need a rerun.` : "Generation quality is clean with no failed outputs recorded."}</Text>
                           <Text style={{ color: "#475569" }}>{(analysis.engagement?.totalScans || 0) > 0 ? `This QR has ${analysis.engagement.uniqueScans || 0} unique scan(s) and ${analysis.engagement.repeatedScans || 0} repeat visit(s).` : "No scan activity yet. Share or print this QR to start collecting engagement."}</Text>
                           <Text style={{ color: "#475569" }}>{analysis.engagement?.expiryDate ? (analysis.engagement?.isExpired ? "Expiry has already been reached." : `Expiry is set for ${formatDateTime(analysis.engagement.expiryDate)}.`) : "No expiry date is set for this QR yet."}</Text>
