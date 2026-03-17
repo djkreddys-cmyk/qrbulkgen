@@ -14,6 +14,51 @@ function formatDate(value) {
   return parsed.toLocaleString()
 }
 
+function formatCompactDate(value) {
+  if (!value) return "Not set"
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) return "Not set"
+  return parsed.toLocaleDateString()
+}
+
+function AnalyticsCard({ label, value, tone = "default", helper = "" }) {
+  const toneClass =
+    tone === "success"
+      ? "text-emerald-600"
+      : tone === "danger"
+        ? "text-rose-600"
+        : tone === "accent"
+          ? "text-sky-700"
+          : "text-slate-950"
+
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">{label}</p>
+      <p className={`mt-2 text-2xl font-semibold ${toneClass}`}>{value}</p>
+      {helper ? <p className="mt-2 text-xs leading-5 text-slate-500">{helper}</p> : null}
+    </div>
+  )
+}
+
+function ProgressRow({ label, value, total, colorClass = "bg-sky-500", helper = "" }) {
+  const percent = total ? Math.max(Math.round((value / total) * 100), value > 0 ? 4 : 0) : 0
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between gap-3 text-sm">
+        <span className="font-medium text-slate-700">{label}</span>
+        <span className="text-slate-500">
+          {value}
+          {helper ? ` • ${helper}` : ""}
+        </span>
+      </div>
+      <div className="h-2 overflow-hidden rounded-full bg-slate-100">
+        <div className={`h-full rounded-full ${colorClass}`} style={{ width: `${percent}%` }} />
+      </div>
+    </div>
+  )
+}
+
 export default function ShortLinksPage() {
   const router = useRouter()
   const [title, setTitle] = useState("")
@@ -32,6 +77,42 @@ export default function ShortLinksPage() {
     () => links.filter((link) => (showArchived ? true : !link.archivedAt)),
     [links, showArchived],
   )
+
+  const analytics = useMemo(() => {
+    const totalLinks = links.length
+    const archivedLinks = links.filter((link) => Boolean(link.archivedAt)).length
+    const activeOnlyLinks = links.filter((link) => !link.archivedAt).length
+    const totalClicks = links.reduce((sum, link) => sum + Number(link.clickCount || 0), 0)
+    const clickedLinks = links.filter((link) => Number(link.clickCount || 0) > 0)
+    const topLink = [...links].sort((a, b) => Number(b.clickCount || 0) - Number(a.clickCount || 0))[0] || null
+    const expiredLinks = links.filter((link) => {
+      if (!link.expiresAt) return false
+      const parsed = new Date(link.expiresAt)
+      return !Number.isNaN(parsed.getTime()) && parsed.getTime() < Date.now()
+    }).length
+    const expiringSoonLinks = links.filter((link) => {
+      if (!link.expiresAt) return false
+      const parsed = new Date(link.expiresAt)
+      if (Number.isNaN(parsed.getTime())) return false
+      const diff = parsed.getTime() - Date.now()
+      return diff >= 0 && diff <= 1000 * 60 * 60 * 24 * 7
+    }).length
+    const latestVisit = [...links]
+      .filter((link) => link.lastVisitedAt)
+      .sort((a, b) => new Date(b.lastVisitedAt).getTime() - new Date(a.lastVisitedAt).getTime())[0] || null
+
+    return {
+      totalLinks,
+      archivedLinks,
+      activeOnlyLinks,
+      totalClicks,
+      clickedLinks: clickedLinks.length,
+      topLink,
+      expiredLinks,
+      expiringSoonLinks,
+      latestVisit,
+    }
+  }, [links])
 
   async function loadLinks(nextShowArchived = showArchived) {
     const token = getAuthToken()
@@ -146,8 +227,107 @@ export default function ShortLinksPage() {
           <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">Short Links</p>
           <h1 className="mt-3 text-4xl font-semibold tracking-tight text-slate-950">Create shareable short links</h1>
           <p className="mt-3 max-w-3xl text-slate-600">
-            Create Bitly-style short links like <span className="font-semibold text-slate-900">qrbulkgen.com/a7K9xQ</span> with optional custom slugs, expiry, click counts, and archive support.
+            Create clean short links like <span className="font-semibold text-slate-900">qrbulkgen.com/a7K9xQ</span>, manage custom slugs, set expiry dates, and track click performance from one place.
           </p>
+        </section>
+
+        <section className="space-y-5 rounded-[1.75rem] border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <h2 className="text-xl font-semibold text-slate-950">Short link analytics</h2>
+              <p className="mt-1 text-sm text-slate-500">
+                Monitor active links, click activity, expiry watch, and top-performing destinations in one dashboard-style view.
+              </p>
+            </div>
+            {analytics.topLink ? (
+              <div className="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-slate-700">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-700">Top performer</p>
+                <p className="mt-1 font-semibold text-slate-950">{analytics.topLink.title || analytics.topLink.slug}</p>
+                <p className="mt-1 text-slate-600">{analytics.topLink.clickCount} clicks</p>
+              </div>
+            ) : null}
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <AnalyticsCard
+              label="Total Links"
+              value={analytics.totalLinks}
+              helper="All short links created under this account."
+            />
+            <AnalyticsCard
+              label="Active Links"
+              value={analytics.activeOnlyLinks}
+              tone="success"
+              helper="Links currently available for sharing and redirects."
+            />
+            <AnalyticsCard
+              label="Total Clicks"
+              value={analytics.totalClicks}
+              tone="accent"
+              helper="Combined visits recorded across your short links."
+            />
+            <AnalyticsCard
+              label="Archived Links"
+              value={analytics.archivedLinks}
+              tone="danger"
+              helper="Archived links stay reviewable and can be permanently deleted."
+            />
+          </div>
+
+          <div className="grid gap-4 lg:grid-cols-3">
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+              <h3 className="text-base font-semibold text-slate-950">Click activity</h3>
+              <div className="mt-4 space-y-4">
+                <ProgressRow
+                  label="Links with visits"
+                  value={analytics.clickedLinks}
+                  total={Math.max(analytics.totalLinks, 1)}
+                  colorClass="bg-sky-500"
+                  helper={`${analytics.totalClicks} total clicks`}
+                />
+                <ProgressRow
+                  label="Links without visits"
+                  value={Math.max(analytics.totalLinks - analytics.clickedLinks, 0)}
+                  total={Math.max(analytics.totalLinks, 1)}
+                  colorClass="bg-slate-400"
+                />
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+              <h3 className="text-base font-semibold text-slate-950">Expiry watch</h3>
+              <div className="mt-4 space-y-4">
+                <ProgressRow
+                  label="Expiring in 7 days"
+                  value={analytics.expiringSoonLinks}
+                  total={Math.max(analytics.totalLinks, 1)}
+                  colorClass="bg-amber-500"
+                />
+                <ProgressRow
+                  label="Expired"
+                  value={analytics.expiredLinks}
+                  total={Math.max(analytics.totalLinks, 1)}
+                  colorClass="bg-rose-500"
+                />
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+              <h3 className="text-base font-semibold text-slate-950">Latest activity</h3>
+              {analytics.latestVisit ? (
+                <div className="mt-4 space-y-2 text-sm text-slate-600">
+                  <p className="font-semibold text-slate-950">{analytics.latestVisit.title || analytics.latestVisit.slug}</p>
+                  <p>{analytics.latestVisit.url}</p>
+                  <p>Visited: {formatDate(analytics.latestVisit.lastVisitedAt)}</p>
+                  <p>Created: {formatCompactDate(analytics.latestVisit.createdAt)}</p>
+                </div>
+              ) : (
+                <p className="mt-4 text-sm leading-6 text-slate-500">
+                  No visit activity has been recorded yet. Once people start opening your short links, the latest activity will appear here.
+                </p>
+              )}
+            </div>
+          </div>
         </section>
 
         <div className="grid gap-6 lg:grid-cols-[minmax(0,420px)_minmax(0,1fr)]">
