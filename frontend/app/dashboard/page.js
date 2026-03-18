@@ -1500,10 +1500,7 @@ export default function Dashboard() {
           </>
         )}
 
-        {activeWorkspace === "short-links" && isLoading && <p className="text-slate-600">Loading short links...</p>}
-        {activeWorkspace === "short-links" && !isLoading && error && <p className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-rose-700">{error}</p>}
-
-        {activeWorkspace === "short-links" && !isLoading && (
+        {activeWorkspace === "short-links" && (
             <section id="short-links-dashboard" className="overflow-hidden rounded-[1.75rem] border border-slate-200 bg-white shadow-sm">
               <div className="border-b border-slate-200 bg-white px-4 pt-4 pb-3">
                 <div className="flex flex-col gap-3 xl:flex-row xl:items-end">
@@ -1565,12 +1562,15 @@ export default function Dashboard() {
               </div>
 
               <div className="rounded-3xl bg-white p-5 shadow-sm md:p-6">
-                {!filteredShortLinks.length ? (
+                {isLoading ? <p className="text-slate-600">Loading short links...</p> : null}
+                {!isLoading && error ? <p className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-rose-700">{error}</p> : null}
+                {!isLoading && !error && !filteredShortLinks.length ? (
                   <EmptyState
                     title="No short URLs found"
                     body="Create a short URL from the Generate screen, then come back here to review visits, expiry, and analytics."
                   />
-                ) : (
+                ) : null}
+                {!isLoading && !error && !!filteredShortLinks.length ? (
                   <div className="grid gap-5">
                     <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
                       <div className="flex items-center gap-3">
@@ -1740,7 +1740,7 @@ export default function Dashboard() {
                       </article>
                     ))}
                   </div>
-                )}
+                ) : null}
               </div>
             </section>
             )}
