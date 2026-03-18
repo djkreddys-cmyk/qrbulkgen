@@ -189,6 +189,7 @@ export default function Dashboard() {
   const [analysisTabByJobId, setAnalysisTabByJobId] = useState({})
   const [selectedJobIds, setSelectedJobIds] = useState([])
   const [shareJob, setShareJob] = useState(null)
+  const [exportingReportJobId, setExportingReportJobId] = useState("")
 
   const queryString = useMemo(() => buildQuery(filters), [filters])
 
@@ -497,6 +498,43 @@ export default function Dashboard() {
     } catch (shareError) {
       if (shareError?.name === "AbortError") return
       setError(shareError.message || "Failed to share QR image.")
+    }
+  }
+
+  async function handleDownloadAnalysisReport(job) {
+    const token = getAuthToken()
+    if (!token) {
+      router.replace("/login")
+      return
+    }
+
+    try {
+      setExportingReportJobId(job.id)
+      const response = await fetch(`${API_BASE_URL}/qr/jobs/${job.id}/analysis-report.csv`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => null)
+        throw new Error(data?.error?.message || "Failed to download analysis report")
+      }
+
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const link = document.createElement("a")
+      const safeType = String(job.qrType || "qr").replace(/[^a-z0-9]+/gi, "-").toLowerCase()
+      link.href = url
+      link.download = `${safeType || "qr"}-analysis-report-${job.id}.csv`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(url)
+    } catch (downloadError) {
+      setError(downloadError.message || "Failed to download analysis report.")
+    } finally {
+      setExportingReportJobId("")
     }
   }
 
@@ -885,11 +923,23 @@ export default function Dashboard() {
                                           : "Tracking is unavailable for this QR right now."}
                                       </p>
                                     </div>
-                                    <MetricPill
-                                      label="Tracking"
-                                      value={hasTrackedEngagement ? "Active" : "Unavailable"}
-                                      tone={hasTrackedEngagement ? "success" : "default"}
-                                    />
+                                    <div className="flex flex-wrap items-center justify-end gap-2">
+                                      {hasTrackedEngagement ? (
+                                        <button
+                                          type="button"
+                                          onClick={() => handleDownloadAnalysisReport(job)}
+                                          disabled={exportingReportJobId === job.id}
+                                          className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 disabled:cursor-not-allowed disabled:opacity-60"
+                                        >
+                                          {exportingReportJobId === job.id ? "Preparing Excel..." : "Download Excel"}
+                                        </button>
+                                      ) : null}
+                                      <MetricPill
+                                        label="Tracking"
+                                        value={hasTrackedEngagement ? "Active" : "Unavailable"}
+                                        tone={hasTrackedEngagement ? "success" : "default"}
+                                      />
+                                    </div>
                                   </div>
                                   <div className="mt-4 grid gap-3 md:grid-cols-4">
                                     <AnalysisStat label="Scans" value={totalScans} />
@@ -897,6 +947,11 @@ export default function Dashboard() {
                                     <AnalysisStat label="Repeated" value={repeatedScans} />
                                     <AnalysisStat label="Submissions" value={totalSubmissions} tone="success" />
                                   </div>
+                                  {hasTrackedEngagement ? (
+                                    <p className="mt-3 text-xs text-slate-500">
+                                      Excel export includes scan date, scan time, destination/output, IP, visitor key, and any stored location metadata.
+                                    </p>
+                                  ) : null}
                                   {(currentTab === "scans" || currentTab === "overview") && (
                                     <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
                                       <div className="flex items-center justify-between gap-3">

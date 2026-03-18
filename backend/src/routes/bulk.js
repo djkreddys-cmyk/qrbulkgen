@@ -118,6 +118,21 @@ function parseBooleanFlag(value) {
   return raw === "1" || raw === "true" || raw === "yes";
 }
 
+function toCsvCell(value) {
+  const raw = value == null ? "" : String(value);
+  return `"${raw.replace(/"/g, '""')}"`;
+}
+
+function buildCsv(columns, rows) {
+  const header = columns.map((column) => toCsvCell(column.label)).join(",");
+  const lines = rows.map((row) =>
+    columns
+      .map((column) => toCsvCell(row[column.key]))
+      .join(","),
+  );
+  return [header, ...lines].join("\r\n");
+}
+
 function getQrTypeLabel(row) {
   return row.job_type === "single"
     ? String(row.managed_qr_type || row.bulk_qr_type || "Text")
@@ -1365,6 +1380,126 @@ bulkRouter.get("/jobs/:id/analysis", requireAuth, async (req, res, next) => {
         feedback,
       },
     });
+  } catch (error) {
+    next(error);
+  }
+});
+
+bulkRouter.get("/jobs/:id/analysis-report.csv", requireAuth, async (req, res, next) => {
+  try {
+    const jobId = String(req.params.id || "").trim();
+    if (!jobId) {
+      throw createHttpError(400, "VALIDATION_ERROR", "job id is required");
+    }
+
+    const jobResult = await query(
+      `SELECT
+         j.id,
+         j.user_id,
+         j.job_type,
+         j.status,
+         j.total_count,
+         j.success_count,
+         j.failure_count,
+         j.source_file_name,
+         j.bulk_qr_type,
+         j.managed_link_id,
+         j.tracking_mode,
+         m.qr_type AS managed_qr_type,
+         m.title AS managed_title
+       FROM qr_jobs j
+       LEFT JOIN managed_qr_links m ON m.id = j.managed_link_id
+       WHERE j.id = $1
+         AND j.user_id = $2
+       LIMIT 1`,
+      [jobId, req.user.id],
+    );
+
+    const job = jobResult.rows[0];
+    if (!job) {
+      throw createHttpError(404, "NOT_FOUND", "QR job not found");
+    }
+
+    const typeLabel = getQrTypeLabel(job);
+    const trackingMode = String(job.tracking_mode || "tracked").toLowerCase() === "tracked" ? "tracked" : "direct";
+
+    const scanRowsResult = await query(
+      `WITH links AS (
+         SELECT id, content AS url, qr_type, title
+         FROM managed_qr_links
+         WHERE id = $1
+         UNION
+         SELECT m.id, m.content AS url, m.qr_type, m.title
+         FROM qr_job_items i
+         INNER JOIN managed_qr_links m ON m.id = i.managed_link_id
+         WHERE i.job_id = $2
+       )
+       SELECT
+         ae.created_at,
+         COALESCE(ae.metadata->>'targetUrl', links.url, '') AS scan_output,
+         COALESCE(ae.metadata->>'targetKind', links.qr_type, '') AS target_kind,
+         COALESCE(ae.metadata->>'title', links.title, '') AS target_title,
+         COALESCE(ae.metadata->>'visitorKey', '') AS visitor_key,
+         COALESCE(ae.metadata->>'linkId', links.id::text, '') AS link_id,
+         COALESCE(ae.metadata->>'userAgent', '') AS user_agent,
+         COALESCE(ae.metadata->>'ipAddress', '') AS ip_address,
+         COALESCE(ae.metadata->>'location', '') AS location
+       FROM analytics_events ae
+       INNER JOIN links
+         ON ae.metadata->>'linkId' = links.id::text
+         OR ae.metadata->>'targetUrl' = links.url
+         OR regexp_replace(lower(split_part(COALESCE(ae.metadata->>'targetUrl', ''), '?exp=', 1)), '^https?://(www\\.)?', '') =
+            regexp_replace(lower(split_part(links.url, '?exp=', 1)), '^https?://(www\\.)?', '')
+       WHERE ae.event_type = 'qr.public.scan'
+       ORDER BY ae.created_at DESC`,
+      [job.managed_link_id, job.id],
+    );
+
+    const columns = [
+      { key: "jobId", label: "Job ID" },
+      { key: "qrType", label: "QR Type" },
+      { key: "trackingMode", label: "Tracking Mode" },
+      { key: "scanDate", label: "Scan Date" },
+      { key: "scanTime", label: "Scan Time" },
+      { key: "scanDateTime", label: "Scan Date Time" },
+      { key: "scanOutput", label: "Scan Output" },
+      { key: "targetKind", label: "Scan Output Type" },
+      { key: "targetTitle", label: "Title" },
+      { key: "location", label: "Location" },
+      { key: "ipAddress", label: "IP Address" },
+      { key: "visitorKey", label: "Visitor Key" },
+      { key: "linkId", label: "Managed Link ID" },
+      { key: "userAgent", label: "User Agent" },
+    ];
+
+    const rows = scanRowsResult.rows.map((row) => {
+      const scannedAt = row.created_at ? new Date(row.created_at) : null;
+      const validDate = scannedAt && !Number.isNaN(scannedAt.getTime()) ? scannedAt : null;
+      return {
+        jobId: job.id,
+        qrType: typeLabel,
+        trackingMode,
+        scanDate: validDate ? validDate.toISOString().slice(0, 10) : "",
+        scanTime: validDate ? validDate.toISOString().slice(11, 19) : "",
+        scanDateTime: validDate ? validDate.toISOString() : "",
+        scanOutput: row.scan_output || "",
+        targetKind: row.target_kind || "",
+        targetTitle: row.target_title || "",
+        location: row.location || "",
+        ipAddress: row.ip_address || "",
+        visitorKey: row.visitor_key || "",
+        linkId: row.link_id || "",
+        userAgent: row.user_agent || "",
+      };
+    });
+
+    const csv = buildCsv(columns, rows);
+    const safeType = String(typeLabel || "qr").replace(/[^a-z0-9]+/gi, "-").toLowerCase();
+    const fileName = `${safeType || "qr"}-analysis-report-${job.id}.csv`;
+
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
+    res.status(200).send(csv);
   } catch (error) {
     next(error);
   }
