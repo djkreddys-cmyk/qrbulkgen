@@ -531,7 +531,7 @@ export function BulkJobsScreen() {
           }}
         >
           <Text style={{ color: "#ffffff", textAlign: "center", fontWeight: "700" }}>
-            {creatingJob ? (editingJobId ? "Updating..." : "Queuing...") : (editingJobId ? "Update Bulk Job" : "Queue Bulk Job")}
+            {creatingJob ? (editingJobId ? "Updating..." : "Generating...") : (editingJobId ? "Update Bulk QR" : "Generate Bulk QR")}
           </Text>
         </TouchableOpacity>
       </Card>

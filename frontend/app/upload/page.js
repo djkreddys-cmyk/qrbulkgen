@@ -53,8 +53,10 @@ export function BulkGenerateContent({ embedded = false }) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState("")
   const [success, setSuccess] = useState("")
+  const [uploadStatus, setUploadStatus] = useState("")
   const [recentJobs, setRecentJobs] = useState([])
   const [loadingJobs, setLoadingJobs] = useState(false)
+  const [activeBulkJobId, setActiveBulkJobId] = useState("")
   const [editingJobId, setEditingJobId] = useState("")
   const [jobAnalysis, setJobAnalysis] = useState(null)
   const [analysisLoading, setAnalysisLoading] = useState(false)
@@ -77,6 +79,7 @@ export function BulkGenerateContent({ embedded = false }) {
     if (!editingJobId) {
       setFile(null)
       setTrackingMode(getDefaultTrackingMode(qrType))
+      setUploadStatus("")
     }
     setError("")
     setSuccess("")
@@ -105,13 +108,19 @@ export function BulkGenerateContent({ embedded = false }) {
         setForegroundColor(job.foregroundColor || "#000000")
         setBackgroundColor(job.backgroundColor || "#ffffff")
         setExpiryOverride(formatExpiryDateForInput(job.expiresAt || ""))
-        setTrackingMode(job.trackingMode || getDefaultTrackingMode(job.qrType || "URL"))
-        setSuccess("Loaded this bulk job for update. Change the settings and save a fresh run.")
-        setAnalysisLoading(true)
+      setTrackingMode(job.trackingMode || getDefaultTrackingMode(job.qrType || "URL"))
+      setSuccess("Loaded this bulk job for update. Change the settings and save a fresh run.")
+      setUploadStatus("Using the existing CSV for this bulk job.")
+      setAnalysisLoading(true)
         const analysisData = await apiRequest(`/qr/jobs/${editJob}/analysis`, {
           headers: withAuthHeader(),
         })
         setJobAnalysis(analysisData.analysis || null)
+        if (typeof window !== "undefined") {
+          const currentUrl = new URL(window.location.href)
+          currentUrl.searchParams.delete("editJob")
+          window.history.replaceState({}, "", currentUrl.toString())
+        }
       } catch (requestError) {
         setError(requestError.message || "Unable to load that bulk job for editing.")
       } finally {
@@ -150,18 +159,60 @@ export function BulkGenerateContent({ embedded = false }) {
     document.body.removeChild(link)
   }
 
-  async function fetchRecentJobs() {
+  function getBulkJobProgress(job) {
+    const total = Number(job?.totalCount || 0)
+    const success = Number(job?.successCount || 0)
+    const failure = Number(job?.failureCount || 0)
+    const processed = success + failure
+    return {
+      total,
+      processed,
+      percent: total > 0 ? Math.min(100, Math.round((processed / total) * 100)) : 0,
+    }
+  }
+
+  async function handleArtifactShare(job) {
+    const fileUrl = toArtifactUrl(job?.artifact?.filePath)
+    if (!fileUrl) {
+      setError("ZIP file is not ready yet.")
+      return
+    }
+
     try {
-      setLoadingJobs(true)
-      const data = await apiRequest("/qr/jobs?limit=10", {
-        method: "GET",
-        headers: withAuthHeader(),
-      })
-      setRecentJobs(Array.isArray(data?.jobs) ? data.jobs : [])
-    } catch {
-      setRecentJobs([])
-    } finally {
-      setLoadingJobs(false)
+      if (navigator?.share) {
+        const response = await fetch(fileUrl)
+        const blob = await response.blob()
+        const file = new File([blob], job?.artifact?.fileName || `bulk-${job?.id || "job"}.zip`, {
+          type: blob.type || "application/zip",
+        })
+
+        if (navigator.canShare?.({ files: [file] })) {
+          await navigator.share({
+            title: "Bulk QR ZIP",
+            text: `Sharing bulk QR ZIP for job ${job?.id || ""}`.trim(),
+            files: [file],
+          })
+        } else {
+          await navigator.share({
+            title: "Bulk QR ZIP",
+            text: "Download the generated bulk QR ZIP",
+            url: fileUrl,
+          })
+        }
+        setSuccess("ZIP share sheet opened.")
+        return
+      }
+
+      if (navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(fileUrl)
+        setSuccess("ZIP download link copied to clipboard.")
+        return
+      }
+
+      setError("Sharing is not supported in this browser. Use Download ZIP instead.")
+    } catch (shareError) {
+      if (shareError?.name === "AbortError") return
+      setError(shareError.message || "Failed to share ZIP file.")
     }
   }
 
@@ -185,6 +236,12 @@ export function BulkGenerateContent({ embedded = false }) {
     const timer = setInterval(fetchBulkJobs, 6000)
     return () => clearInterval(timer)
   }, [])
+
+  useEffect(() => {
+    if (!activeBulkJobId && recentJobs[0]?.id) {
+      setActiveBulkJobId(recentJobs[0].id)
+    }
+  }, [activeBulkJobId, recentJobs])
 
   useEffect(() => {
     if (!previewRef.current || !previewContent.trim()) {
@@ -264,6 +321,7 @@ export function BulkGenerateContent({ embedded = false }) {
 
     try {
       setIsSubmitting(true)
+      setUploadStatus(editingJobId ? "Uploading updated bulk settings..." : `Uploading ${file.name}...`)
       const formData = new FormData()
       formData.append("file", file)
       formData.append("qrType", qrType)
@@ -283,8 +341,14 @@ export function BulkGenerateContent({ embedded = false }) {
         body: formData,
       })
 
-      setSuccess(editingJobId ? `Bulk job updated: ${data?.job?.id || editingJobId}` : `Bulk job queued: ${data?.job?.id || "created"}`)
+      const nextJobId = data?.job?.id || editingJobId || ""
+      setActiveBulkJobId(nextJobId)
+      setSuccess(editingJobId ? `Bulk job updated: ${nextJobId}` : `Bulk QR generation started: ${nextJobId || "created"}`)
+      setUploadStatus(editingJobId ? "Bulk job updated and generation restarted." : "CSV uploaded and bulk QR generation started.")
       setFile(null)
+      if (csvInputRef.current) {
+        csvInputRef.current.value = ""
+      }
       fetchBulkJobs()
       if (editingJobId) {
         const analysisData = await apiRequest(`/qr/jobs/${editingJobId}/analysis`, {
@@ -294,9 +358,20 @@ export function BulkGenerateContent({ embedded = false }) {
       }
     } catch (submitError) {
       setError(submitError.message || `Failed to ${editingJobId ? "update" : "create"} bulk job`)
+      setUploadStatus("Upload failed. You can select the CSV again and retry.")
+      if (csvInputRef.current) {
+        csvInputRef.current.value = ""
+      }
+      setFile(null)
     } finally {
       setIsSubmitting(false)
     }
+  }
+
+  function handleCsvChange(event) {
+    const nextFile = event.target.files?.[0] || null
+    setFile(nextFile)
+    setUploadStatus(nextFile ? `Selected CSV: ${nextFile.name}` : "")
   }
 
   function downloadSampleCsv() {
@@ -322,15 +397,22 @@ export function BulkGenerateContent({ embedded = false }) {
     URL.revokeObjectURL(url)
   }
 
+  const activeBulkJob =
+    recentJobs.find((job) => job.id === activeBulkJobId) ||
+    recentJobs[0] ||
+    null
+  const activeBulkProgress = getBulkJobProgress(activeBulkJob)
+  const isActiveBulkZipReady = Boolean(activeBulkJob?.artifact?.filePath)
+
   const content = (
     <main className="mx-auto max-w-[90rem] px-4 py-10 md:px-5">
         <h1 className="text-3xl font-bold">Bulk QR Generator</h1>
 
-        <div className="mt-8 grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.25fr)_minmax(360px,0.95fr)_minmax(360px,1.1fr)]">
+        <div className="mt-8 grid grid-cols-1 gap-6 xl:grid-cols-3">
           <form id="bulk-qr-form" onSubmit={handleSubmit} className="space-y-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm xl:max-h-[78vh] xl:overflow-y-auto xl:pr-3">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Bulk Data</p>
-              <h2 className="mt-2 text-xl font-semibold text-slate-900">{editingJobId ? "Update Bulk Job" : "Create Bulk Job"}</h2>
+              <h2 className="mt-2 text-xl font-semibold text-slate-900">{editingJobId ? "Update Bulk QR" : "Generate Bulk QR"}</h2>
               <p className="mt-1 text-sm text-slate-500">
                 Choose the bulk QR type, lock in the preview sample, and attach the CSV that drives the generated batch.
               </p>
@@ -343,18 +425,9 @@ export function BulkGenerateContent({ embedded = false }) {
                   <option key={type} value={type}>{type}</option>
                 ))}
               </select>
-            </div>
-
-            <div>
-              <label className="block mb-1 text-sm">Preview Content</label>
-              <textarea
-                rows={3}
-                value={previewContent}
-                onChange={(e) => setPreviewContent(e.target.value)}
-                className="w-full border p-2"
-                readOnly={Boolean(editingJobId)}
-              />
-              {editingJobId && <p className="mt-2 text-xs text-slate-500">Preview content is locked for updates. You can adjust expiry and styling, then save a fresh run for this same bulk job.</p>}
+              <p className="mt-2 text-xs text-slate-500">
+                Selecting a QR type updates the sample columns and the live preview automatically.
+              </p>
             </div>
 
             <div>
@@ -363,11 +436,15 @@ export function BulkGenerateContent({ embedded = false }) {
                 ref={csvInputRef}
                 type="file"
                 accept=".csv"
-                onChange={(e) => setFile(e.target.files?.[0] || null)}
+                onClick={(e) => {
+                  e.currentTarget.value = ""
+                }}
+                onChange={handleCsvChange}
                 className="w-full border p-2"
                 disabled={Boolean(editingJobId)}
               />
               {editingJobId && <p className="mt-2 text-xs text-slate-500">Updating keeps the existing CSV for this job.</p>}
+              {!!uploadStatus && <p className="mt-2 text-xs font-medium text-slate-600">{uploadStatus}</p>}
               <button type="button" className="mt-2 border px-3 py-2" onClick={downloadSampleCsv}>Download Sample CSV</button>
               <p className="mt-2 text-xs text-gray-600">
                 CSV must include a <code>filename</code> column. Each row uses that value as the downloaded QR file name.
@@ -511,7 +588,7 @@ export function BulkGenerateContent({ embedded = false }) {
             {!!success && <p className="text-sm text-green-700">{success}</p>}
 
             <button form="bulk-qr-form" type="submit" disabled={isSubmitting} className="px-4 py-2 bg-black text-white rounded disabled:opacity-60">
-              {isSubmitting ? (editingJobId ? "Updating..." : "Queuing...") : (editingJobId ? "Update Bulk Job" : "Queue Bulk Job")}
+              {isSubmitting ? (editingJobId ? "Updating..." : "Generating...") : (editingJobId ? "Update Bulk QR" : "Generate Bulk QR")}
             </button>
           </section>
 
@@ -535,64 +612,77 @@ export function BulkGenerateContent({ embedded = false }) {
                 ))}
               </select>
             </div>
+            <p className="text-xs text-slate-500">
+              Live preview uses the selected QR type’s sample content so you can style the batch before upload.
+            </p>
             {!!previewContent.trim() && (
               <button type="button" onClick={handleDownloadPreview} className="inline-block mt-4 px-4 py-2 bg-black text-white rounded">
                 Download QR
               </button>
             )}
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Bulk generation</p>
+                  <h3 className="mt-2 text-lg font-semibold text-slate-900">
+                    {activeBulkJob ? "Live bulk QR status" : "No bulk job running yet"}
+                  </h3>
+                </div>
+                {activeBulkJob ? (
+                  <div className="rounded-full bg-white px-3 py-1 text-sm font-semibold text-slate-700 shadow-sm">
+                    {activeBulkProgress.percent}%
+                  </div>
+                ) : null}
+              </div>
+              {loadingJobs && !activeBulkJob ? (
+                <p className="mt-3 text-sm text-slate-500">Loading bulk generation status...</p>
+              ) : activeBulkJob ? (
+                <>
+                  <p className="mt-3 text-sm text-slate-600">
+                    Status: <span className="font-semibold text-slate-900">{String(activeBulkJob.status || "queued").toUpperCase()}</span>
+                  </p>
+                  <p className="mt-1 text-sm text-slate-600">
+                    {activeBulkProgress.processed} of {activeBulkProgress.total} QR codes processed
+                  </p>
+                  <div className="mt-4 h-3 overflow-hidden rounded-full bg-slate-200">
+                    <div
+                      className="h-full rounded-full bg-slate-900 transition-all"
+                      style={{ width: `${activeBulkProgress.percent}%` }}
+                    />
+                  </div>
+                  <p className="mt-3 text-xs text-slate-500">Job ID: {activeBulkJob.id}</p>
+                  {isActiveBulkZipReady ? (
+                    <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      <button
+                        type="button"
+                        onClick={() => handleArtifactDownload(activeBulkJob)}
+                        className="rounded-xl bg-black px-4 py-3 text-sm font-semibold text-white"
+                      >
+                        Download ZIP
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleArtifactShare(activeBulkJob)}
+                        className="rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-900"
+                      >
+                        Share ZIP
+                      </button>
+                    </div>
+                  ) : (
+                    <p className="mt-4 rounded-xl border border-dashed border-slate-300 bg-white px-4 py-3 text-sm text-slate-600">
+                      ZIP download and share options will appear here automatically when generation completes.
+                    </p>
+                  )}
+                </>
+              ) : (
+                <p className="mt-3 text-sm text-slate-500">
+                  Click Generate Bulk QR to track progress here and get Download ZIP and Share ZIP actions in this panel.
+                </p>
+              )}
+            </div>
           </section>
         </div>
 
-        <section className="border rounded-lg p-6 bg-white mt-8">
-          <h2 className="text-xl font-semibold">Recent Bulk Jobs</h2>
-          {loadingJobs && <p className="text-sm text-gray-600 mt-3">Loading jobs...</p>}
-          {!loadingJobs && recentJobs.length === 0 && (
-            <p className="text-sm text-gray-600 mt-3">No jobs yet.</p>
-          )}
-          {recentJobs.length > 0 && (
-            <div className="mt-4 overflow-x-auto">
-              <table className="w-full text-sm border-collapse">
-                <thead>
-                  <tr className="text-left border-b">
-                    <th className="py-2 pr-3">Job</th>
-                    <th className="py-2 pr-3">Type</th>
-                    <th className="py-2 pr-3">Status</th>
-                    <th className="py-2 pr-3">Count</th>
-                    <th className="py-2 pr-3">Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {recentJobs.map((job) => {
-                    const fileUrl = toArtifactUrl(job?.artifact?.filePath)
-                    return (
-                      <tr key={job.id} className="border-b">
-                        <td className="py-2 pr-3">{job.id}</td>
-                        <td className="py-2 pr-3">{job.qrType}</td>
-                        <td className="py-2 pr-3">{job.status}</td>
-                        <td className="py-2 pr-3">
-                          {job.successCount}/{job.totalCount}
-                        </td>
-                        <td className="py-2 pr-3">
-                          {job.status === "completed" && fileUrl ? (
-                            <button
-                              type="button"
-                              onClick={() => handleArtifactDownload(job)}
-                              className="inline-block px-3 py-1 bg-black text-white rounded"
-                            >
-                              Download ZIP
-                            </button>
-                          ) : (
-                            <span className="text-gray-500">Not ready</span>
-                          )}
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </section>
         {analysisLoading && <p className="mt-6 text-sm text-slate-500">Loading analysis...</p>}
         {!analysisLoading && jobAnalysis && (
           <section className="mt-8 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
