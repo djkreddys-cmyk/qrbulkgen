@@ -348,9 +348,9 @@ bulkRouter.post("/bulk/upload", requireAuth, upload.single("file"), async (req, 
       await enqueueBulkQrJob(job.id, { rows: csvRows });
     } catch (enqueueError) {
       await query(
-        `UPDATE qr_jobs
+        `UPDATE qr_jobs AS j
          SET status = 'failed', error_message = $2, updated_at = NOW(), completed_at = NOW()
-         WHERE id = $1`,
+         WHERE j.id = $1`,
         [job.id, `Failed to enqueue job: ${enqueueError.message}`],
       );
       throw createHttpError(500, "QUEUE_ERROR", "Failed to enqueue bulk generation job");
@@ -391,11 +391,11 @@ bulkRouter.put("/jobs/:id/bulk", requireAuth, upload.single("file"), async (req,
     }
 
     const existingResult = await query(
-      `SELECT id, source_file_name, source_file_path, bulk_qr_type, tracking_mode
-       FROM qr_jobs
-       WHERE id = $1
-         AND user_id = $2
-         AND job_type = 'bulk'
+      `SELECT j.id, j.source_file_name, j.source_file_path, j.bulk_qr_type, j.tracking_mode
+       FROM qr_jobs AS j
+       WHERE j.id = $1
+         AND j.user_id = $2
+         AND j.job_type = 'bulk'
        LIMIT 1`,
       [jobId, req.user.id],
     );
@@ -447,7 +447,7 @@ bulkRouter.put("/jobs/:id/bulk", requireAuth, upload.single("file"), async (req,
     await query(`DELETE FROM job_artifacts WHERE job_id = $1`, [jobId]);
 
     const updated = await query(
-      `UPDATE qr_jobs
+      `UPDATE qr_jobs AS j
        SET status = 'queued',
            source_file_name = $2,
            source_file_path = $3,
@@ -468,8 +468,8 @@ bulkRouter.put("/jobs/:id/bulk", requireAuth, upload.single("file"), async (req,
            started_at = NULL,
            completed_at = NULL,
            updated_at = NOW()
-       WHERE id = $1
-       RETURNING id, status, total_count, bulk_qr_type, tracking_mode, created_at, updated_at`,
+       WHERE j.id = $1
+       RETURNING j.id, j.status, j.total_count, j.bulk_qr_type, j.tracking_mode, j.created_at, j.updated_at`,
       [
         jobId,
         file ? file.originalname : existing.source_file_name,
@@ -493,9 +493,9 @@ bulkRouter.put("/jobs/:id/bulk", requireAuth, upload.single("file"), async (req,
       await enqueueBulkQrJob(job.id, { rows: csvRows });
     } catch (enqueueError) {
       await query(
-        `UPDATE qr_jobs
+        `UPDATE qr_jobs AS j
          SET status = 'failed', error_message = $2, updated_at = NOW(), completed_at = NOW()
-         WHERE id = $1`,
+         WHERE j.id = $1`,
         [job.id, `Failed to enqueue job: ${enqueueError.message}`],
       );
       throw createHttpError(500, "QUEUE_ERROR", "Failed to enqueue bulk generation job");
@@ -729,18 +729,18 @@ bulkRouter.delete("/jobs/:id", requireAuth, async (req, res, next) => {
 
     const deleted = forceDelete
       ? await query(
-          `DELETE FROM qr_jobs
-           WHERE id = $1 AND user_id = $2
-           RETURNING id`,
+          `DELETE FROM qr_jobs AS j
+           WHERE j.id = $1 AND j.user_id = $2
+           RETURNING j.id`,
           [jobId, req.user.id],
         )
       : await query(
-          `UPDATE qr_jobs
+          `UPDATE qr_jobs AS j
            SET archived_at = NOW(), updated_at = NOW()
-           WHERE id = $1
-             AND user_id = $2
-             AND archived_at IS NULL
-           RETURNING id, archived_at`,
+           WHERE j.id = $1
+             AND j.user_id = $2
+             AND j.archived_at IS NULL
+           RETURNING j.id, j.archived_at`,
           [jobId, req.user.id],
         );
 
