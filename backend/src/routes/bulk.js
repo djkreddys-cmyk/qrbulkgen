@@ -1461,14 +1461,79 @@ bulkRouter.get("/jobs/:id/analysis-report.csv", requireAuth, async (req, res, ne
       [job.managed_link_id, job.id],
     );
 
+    let responseData = "";
+
+    if (typeLabel === "Rating") {
+      const ratingExportResult = await query(
+        `WITH links AS (
+           SELECT content AS url
+           FROM managed_qr_links
+           WHERE id = $1
+           UNION
+           SELECT m.content AS url
+           FROM qr_job_items i
+           INNER JOIN managed_qr_links m ON m.id = i.managed_link_id
+           WHERE i.job_id = $2
+         )
+         SELECT rs.rating, COUNT(*)::int AS count
+         FROM rating_submissions rs
+         INNER JOIN links
+           ON links.url = rs.source_url
+           OR regexp_replace(lower(split_part(links.url, '?exp=', 1)), '^https?://(www\\.)?', '') =
+              regexp_replace(lower(split_part(rs.source_url, '?exp=', 1)), '^https?://(www\\.)?', '')
+         GROUP BY rs.rating
+         ORDER BY rs.rating ASC`,
+        [job.managed_link_id, job.id],
+      );
+
+      responseData = ratingExportResult.rows
+        .map((row) => `${row.rating}: ${row.count}`)
+        .join(" | ");
+    } else if (typeLabel === "Feedback") {
+      const feedbackExportResult = await query(
+        `WITH links AS (
+           SELECT content AS url
+           FROM managed_qr_links
+           WHERE id = $1
+           UNION
+           SELECT m.content AS url
+           FROM qr_job_items i
+           INNER JOIN managed_qr_links m ON m.id = i.managed_link_id
+           WHERE i.job_id = $2
+         )
+         SELECT fs.questions, fs.answers, fs.created_at
+         FROM feedback_submissions fs
+         INNER JOIN links
+           ON links.url = fs.source_url
+           OR regexp_replace(lower(split_part(links.url, '?exp=', 1)), '^https?://(www\\.)?', '') =
+              regexp_replace(lower(split_part(fs.source_url, '?exp=', 1)), '^https?://(www\\.)?', '')
+         ORDER BY fs.created_at DESC
+         LIMIT 5`,
+        [job.managed_link_id, job.id],
+      );
+
+      responseData = feedbackExportResult.rows
+        .map((row) => {
+          const questions = Array.isArray(row.questions) ? row.questions : [];
+          const answers = Array.isArray(row.answers) ? row.answers : [];
+          return questions
+            .map((question, index) => {
+              const label = String(question || "").trim();
+              const answer = String(answers[index] || "").trim();
+              if (!label && !answer) return "";
+              return `${label || `Q${index + 1}`}: ${answer || "-"}`;
+            })
+            .filter(Boolean)
+            .join(" | ");
+        })
+        .filter(Boolean)
+        .join(" || ");
+    }
+
     const columns = [
-      { key: "jobId", label: "Job ID" },
       { key: "qrType", label: "QR Type" },
-      { key: "trackingMode", label: "Tracking Mode" },
       { key: "scanDate", label: "Scan Date" },
-      { key: "scanTime", label: "Scan Time" },
-      { key: "scanDateTime", label: "Scan Date Time" },
-      { key: "scanOutput", label: "Scan Output" },
+      { key: "responseData", label: "Responses Data" },
       { key: "targetKind", label: "Scan Output Type" },
       { key: "targetTitle", label: "Title" },
       { key: "location", label: "Location" },
@@ -1479,22 +1544,15 @@ bulkRouter.get("/jobs/:id/analysis-report.csv", requireAuth, async (req, res, ne
       { key: "latitude", label: "Latitude" },
       { key: "longitude", label: "Longitude" },
       { key: "ipAddress", label: "IP Address" },
-      { key: "visitorKey", label: "Visitor Key" },
-      { key: "linkId", label: "Managed Link ID" },
-      { key: "userAgent", label: "User Agent" },
     ];
 
     const rows = scanRowsResult.rows.map((row) => {
       const scannedAt = row.created_at ? new Date(row.created_at) : null;
       const validDate = scannedAt && !Number.isNaN(scannedAt.getTime()) ? scannedAt : null;
       return {
-        jobId: job.id,
         qrType: typeLabel,
-        trackingMode,
         scanDate: validDate ? validDate.toISOString().slice(0, 10) : "",
-        scanTime: validDate ? validDate.toISOString().slice(11, 19) : "",
-        scanDateTime: validDate ? validDate.toISOString() : "",
-        scanOutput: row.scan_output || "",
+        responseData: responseData || row.target_title || "",
         targetKind: row.target_kind || "",
         targetTitle: row.target_title || "",
         location: row.location || "",
@@ -1505,9 +1563,6 @@ bulkRouter.get("/jobs/:id/analysis-report.csv", requireAuth, async (req, res, ne
         latitude: row.latitude || "",
         longitude: row.longitude || "",
         ipAddress: row.ip_address || "",
-        visitorKey: row.visitor_key || "",
-        linkId: row.link_id || "",
-        userAgent: row.user_agent || "",
       };
     });
 
