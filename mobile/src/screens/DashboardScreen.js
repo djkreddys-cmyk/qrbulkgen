@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Alert, Image, ScrollView, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { Alert, Image, ScrollView, Share, Text, TextInput, TouchableOpacity, View } from "react-native";
 
 import { useAuth } from "../context/AuthContext";
 import { apiRequest, createAuthHeaders, API_BASE_URL } from "../lib/api";
+import { shareDataUrlFile } from "../lib/files";
 
 function buildQuery(filters) {
   const params = new URLSearchParams();
@@ -218,6 +219,17 @@ function getJobTitle(job) {
   return job.jobType === "single" ? job.qrType || "Single QR" : `${job.qrType || "Bulk"} Bulk`;
 }
 
+function getShareUrl(job) {
+  if (job?.trackingMode === "tracked" && job?.managedLink?.id) {
+    const origin = API_BASE_URL.replace(/\/api\/?$/, "");
+    return `${origin}/q/${job.managedLink.id}`;
+  }
+
+  const directContent = String(job?.editPayload?.content || "").trim();
+  if (directContent) return directContent;
+  return "";
+}
+
 export function DashboardScreen() {
   const { token, navigate, setSingleDraft, setBulkDraft } = useAuth();
   const [filters, setFilters] = useState({ startDate: "", endDate: "", qrType: "all", status: "active" });
@@ -279,10 +291,6 @@ export function DashboardScreen() {
         method: "DELETE",
         headers: createAuthHeaders(token),
       });
-
-      if (!forceDelete) {
-        setFilters((current) => ({ ...current, status: "archived" }));
-      }
 
       setExpandedJobId((current) => (current === job.id ? "" : current));
       setJobAnalysis((current) => {
@@ -390,6 +398,33 @@ export function DashboardScreen() {
 
     setBulkDraft({ editJobId: job.id });
     navigate("bulk-jobs");
+  }
+
+  async function handleShareJob(job) {
+    try {
+      const artifactPath = String(job?.artifact?.filePath || "");
+      if (artifactPath.startsWith("data:")) {
+        await shareDataUrlFile({
+          dataUrl: artifactPath,
+          fileName: job?.artifact?.fileName || `${(job?.qrType || "qr").toLowerCase()}-qr.png`,
+        });
+        return;
+      }
+
+      const shareUrl = getShareUrl(job);
+      if (!shareUrl) {
+        throw new Error("No shareable destination is available for this QR job.");
+      }
+
+      await Share.share({
+        title: getJobTitle(job),
+        message: `Check this QR from QRBulkGen: ${shareUrl}`,
+        url: shareUrl,
+      });
+    } catch (requestError) {
+      if (requestError?.message === "User did not share") return;
+      setError(requestError.message || "Unable to share QR right now.");
+    }
   }
 
   return (
@@ -575,13 +610,9 @@ export function DashboardScreen() {
                     </View>
                     <View style={{ flex: 1, gap: 10 }}>
                       <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
-                        <MetricPill label="Status" value={job.status} />
-                        <MetricPill label="Mode" value={job.jobType === "single" ? "Single QR" : `${job.qrType} Bulk`} tone="accent" />
                         <PerformanceBadge label={job.trackingMode === "direct" ? "Direct" : "Tracked"} tone={job.trackingMode === "direct" ? "neutral" : "accent"} />
                         {job.archivedAt ? <PerformanceBadge label="Archived" tone="warning" /> : null}
-                        {job.status === "completed" && job.successCount > 0 ? <PerformanceBadge label="Ready to share" tone="success" /> : null}
                         {job.failureCount > 0 ? <PerformanceBadge label="Needs review" tone="danger" /> : null}
-                        {job.status === "completed" && job.successCount > 0 && !job.failureCount ? <PerformanceBadge label="Clean output" tone="success" /> : null}
                         {analysis && thisJobSuccessRate >= typeAverageSuccessRate && (analysis.engagement?.totalScans || 0) > 0 ? (
                           <PerformanceBadge label="Top Performer" tone="accent" />
                         ) : null}
@@ -614,22 +645,40 @@ export function DashboardScreen() {
                         {job.jobType === "single" ? "Edit QR" : "Edit Bulk"}
                       </Text>
                     </TouchableOpacity>
-                    <TouchableOpacity
-                      onPress={() => handleToggleAnalysis(job.id)}
-                      style={{
-                        alignSelf: "flex-start",
-                        borderWidth: 1,
-                        borderColor: "#93c5fd",
-                        borderRadius: 999,
-                        paddingHorizontal: 12,
-                        paddingVertical: 8,
-                        backgroundColor: "#eff6ff",
-                      }}
-                    >
-                      <Text style={{ color: "#1d4ed8", fontWeight: "700" }}>
-                        {expanded ? "Hide Analysis" : busyAnalysisJobId === job.id ? "Loading..." : "Analysis"}
-                      </Text>
-                    </TouchableOpacity>
+                    {job.trackingMode !== "direct" ? (
+                      <TouchableOpacity
+                        onPress={() => handleToggleAnalysis(job.id)}
+                        style={{
+                          alignSelf: "flex-start",
+                          borderWidth: 1,
+                          borderColor: "#93c5fd",
+                          borderRadius: 999,
+                          paddingHorizontal: 12,
+                          paddingVertical: 8,
+                          backgroundColor: "#eff6ff",
+                        }}
+                      >
+                        <Text style={{ color: "#1d4ed8", fontWeight: "700" }}>
+                          {expanded ? "Hide Analysis" : busyAnalysisJobId === job.id ? "Loading..." : "Analysis"}
+                        </Text>
+                      </TouchableOpacity>
+                    ) : null}
+                    {job.status === "completed" && job.successCount > 0 ? (
+                      <TouchableOpacity
+                        onPress={() => handleShareJob(job)}
+                        style={{
+                          alignSelf: "flex-start",
+                          borderWidth: 1,
+                          borderColor: "#a7f3d0",
+                          borderRadius: 999,
+                          paddingHorizontal: 12,
+                          paddingVertical: 8,
+                          backgroundColor: "#ecfdf5",
+                        }}
+                      >
+                        <Text style={{ color: "#047857", fontWeight: "700" }}>Share</Text>
+                      </TouchableOpacity>
+                    ) : null}
                     <TouchableOpacity
                       onPress={() => handleDeleteJob(job)}
                       disabled={jobBusy}
@@ -688,7 +737,7 @@ export function DashboardScreen() {
                         <Text style={{ color: "#0f172a", lineHeight: 20 }}>{analysis.insight}</Text>
                       </View>
 
-                      {(currentTab === "overview" || currentTab === "scans") && (
+                      {job.trackingMode !== "tracked" && (currentTab === "overview" || currentTab === "scans") && (
                         <View style={{ borderWidth: 1, borderColor: "#dbe3f0", borderRadius: 16, padding: 12, backgroundColor: "#ffffff", gap: 8 }}>
                           <Text style={{ color: "#0f172a", fontWeight: "700" }}>Generation Report</Text>
                           <Text style={{ color: "#64748b" }}>Output quality and completion performance for this QR job.</Text>
@@ -747,7 +796,7 @@ export function DashboardScreen() {
                         </View>
                       )}
 
-                      {analysis.typePerformance && (currentTab === "overview" || currentTab === "scans") && (
+                      {job.trackingMode !== "tracked" && analysis.typePerformance && (currentTab === "overview" || currentTab === "scans") && (
                         <View style={{ borderWidth: 1, borderColor: "#dbe3f0", borderRadius: 16, padding: 12, backgroundColor: "#ffffff", gap: 8 }}>
                           <Text style={{ color: "#0f172a", fontWeight: "700" }}>{job.qrType} overall performance</Text>
                           <Text style={{ color: "#64748b" }}>Compare this job against all created QRs of the same type.</Text>
