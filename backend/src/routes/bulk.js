@@ -1461,75 +1461,6 @@ bulkRouter.get("/jobs/:id/analysis-report.csv", requireAuth, async (req, res, ne
       [job.managed_link_id, job.id],
     );
 
-    let responseData = "";
-
-    if (typeLabel === "Rating") {
-      const ratingExportResult = await query(
-        `WITH links AS (
-           SELECT content AS url
-           FROM managed_qr_links
-           WHERE id = $1
-           UNION
-           SELECT m.content AS url
-           FROM qr_job_items i
-           INNER JOIN managed_qr_links m ON m.id = i.managed_link_id
-           WHERE i.job_id = $2
-         )
-         SELECT rs.rating, COUNT(*)::int AS count
-         FROM rating_submissions rs
-         INNER JOIN links
-           ON links.url = rs.source_url
-           OR regexp_replace(lower(split_part(links.url, '?exp=', 1)), '^https?://(www\\.)?', '') =
-              regexp_replace(lower(split_part(rs.source_url, '?exp=', 1)), '^https?://(www\\.)?', '')
-         GROUP BY rs.rating
-         ORDER BY rs.rating ASC`,
-        [job.managed_link_id, job.id],
-      );
-
-      responseData = ratingExportResult.rows
-        .map((row) => `Rating ${row.rating} (${row.count})`)
-        .join(" | ");
-    } else if (typeLabel === "Feedback") {
-      const feedbackExportResult = await query(
-        `WITH links AS (
-           SELECT content AS url
-           FROM managed_qr_links
-           WHERE id = $1
-           UNION
-           SELECT m.content AS url
-           FROM qr_job_items i
-           INNER JOIN managed_qr_links m ON m.id = i.managed_link_id
-           WHERE i.job_id = $2
-         )
-         SELECT fs.questions, fs.answers, fs.created_at
-         FROM feedback_submissions fs
-         INNER JOIN links
-           ON links.url = fs.source_url
-           OR regexp_replace(lower(split_part(links.url, '?exp=', 1)), '^https?://(www\\.)?', '') =
-              regexp_replace(lower(split_part(fs.source_url, '?exp=', 1)), '^https?://(www\\.)?', '')
-         ORDER BY fs.created_at DESC
-         LIMIT 5`,
-        [job.managed_link_id, job.id],
-      );
-
-      responseData = feedbackExportResult.rows
-        .map((row) => {
-          const questions = Array.isArray(row.questions) ? row.questions : [];
-          const answers = Array.isArray(row.answers) ? row.answers : [];
-          return questions
-            .map((question, index) => {
-              const label = String(question || "").trim();
-              const answer = String(answers[index] || "").trim();
-              if (!label && !answer) return "";
-              return `${label || `Q${index + 1}`}: ${answer || "-"}`;
-            })
-            .filter(Boolean)
-            .join(" | ");
-        })
-        .filter(Boolean)
-        .join(" || ");
-    }
-
     const columns = [
       { key: "qrType", label: "QR Type" },
       { key: "scanDate", label: "Scan Date" },
@@ -1546,13 +1477,13 @@ bulkRouter.get("/jobs/:id/analysis-report.csv", requireAuth, async (req, res, ne
       { key: "ipAddress", label: "IP Address" },
     ];
 
-    const rows = scanRowsResult.rows.map((row) => {
+    let rows = scanRowsResult.rows.map((row) => {
       const scannedAt = row.created_at ? new Date(row.created_at) : null;
       const validDate = scannedAt && !Number.isNaN(scannedAt.getTime()) ? scannedAt : null;
       return {
         qrType: typeLabel,
         scanDate: validDate ? validDate.toISOString().slice(0, 10) : "",
-        responseData: responseData || row.target_title || "",
+        responseData: row.target_title || "",
         targetKind: row.target_kind || "",
         targetTitle: row.target_title || "",
         location: row.location || "",
@@ -1565,6 +1496,167 @@ bulkRouter.get("/jobs/:id/analysis-report.csv", requireAuth, async (req, res, ne
         ipAddress: row.ip_address || "",
       };
     });
+
+    if (typeLabel === "Rating") {
+      const ratingExportResult = await query(
+        `WITH links AS (
+           SELECT id, content AS url
+           FROM managed_qr_links
+           WHERE id = $1
+           UNION
+           SELECT m.id, m.content AS url
+           FROM qr_job_items i
+           INNER JOIN managed_qr_links m ON m.id = i.managed_link_id
+           WHERE i.job_id = $2
+         )
+         SELECT
+           rs.created_at,
+           rs.rating,
+           rs.title,
+           rs.ip_address,
+           matched.location,
+           matched.location_source,
+           matched.city,
+           matched.region,
+           matched.country,
+           matched.latitude,
+           matched.longitude
+         FROM rating_submissions rs
+         INNER JOIN links
+           ON links.url = rs.source_url
+           OR regexp_replace(lower(split_part(links.url, '?exp=', 1)), '^https?://(www\\.)?', '') =
+              regexp_replace(lower(split_part(rs.source_url, '?exp=', 1)), '^https?://(www\\.)?', '')
+         LEFT JOIN LATERAL (
+           SELECT
+             COALESCE(ae.metadata->>'location', '') AS location,
+             COALESCE(ae.metadata->>'locationSource', '') AS location_source,
+             COALESCE(ae.metadata->>'city', '') AS city,
+             COALESCE(ae.metadata->>'region', '') AS region,
+             COALESCE(ae.metadata->>'country', '') AS country,
+             COALESCE(ae.metadata->>'latitude', '') AS latitude,
+             COALESCE(ae.metadata->>'longitude', '') AS longitude
+           FROM analytics_events ae
+           WHERE ae.event_type = 'qr.public.scan'
+             AND COALESCE(ae.metadata->>'ipAddress', '') = COALESCE(rs.ip_address, '')
+             AND (
+               ae.metadata->>'linkId' = links.id::text
+               OR ae.metadata->>'targetUrl' = links.url
+               OR regexp_replace(lower(split_part(COALESCE(ae.metadata->>'targetUrl', ''), '?exp=', 1)), '^https?://(www\\.)?', '') =
+                  regexp_replace(lower(split_part(links.url, '?exp=', 1)), '^https?://(www\\.)?', '')
+             )
+           ORDER BY ABS(EXTRACT(EPOCH FROM (ae.created_at - rs.created_at))) ASC
+           LIMIT 1
+         ) matched ON true
+         ORDER BY rs.created_at DESC`,
+        [job.managed_link_id, job.id],
+      );
+
+      rows = ratingExportResult.rows.map((row) => {
+        const createdAt = row.created_at ? new Date(row.created_at) : null;
+        const validDate = createdAt && !Number.isNaN(createdAt.getTime()) ? createdAt : null;
+        return {
+          qrType: typeLabel,
+          scanDate: validDate ? validDate.toISOString().slice(0, 10) : "",
+          responseData: `Rating ${row.rating || ""}`.trim(),
+          targetKind: "rating",
+          targetTitle: row.title || job.managed_title || "",
+          location: row.location || "",
+          locationSource: row.location_source || "",
+          city: row.city || "",
+          region: row.region || "",
+          country: row.country || "",
+          latitude: row.latitude || "",
+          longitude: row.longitude || "",
+          ipAddress: row.ip_address || "",
+        };
+      });
+    } else if (typeLabel === "Feedback") {
+      const feedbackExportResult = await query(
+        `WITH links AS (
+           SELECT id, content AS url
+           FROM managed_qr_links
+           WHERE id = $1
+           UNION
+           SELECT m.id, m.content AS url
+           FROM qr_job_items i
+           INNER JOIN managed_qr_links m ON m.id = i.managed_link_id
+           WHERE i.job_id = $2
+         )
+         SELECT
+           fs.created_at,
+           fs.title,
+           fs.questions,
+           fs.answers,
+           fs.ip_address,
+           matched.location,
+           matched.location_source,
+           matched.city,
+           matched.region,
+           matched.country,
+           matched.latitude,
+           matched.longitude
+         FROM feedback_submissions fs
+         INNER JOIN links
+           ON links.url = fs.source_url
+           OR regexp_replace(lower(split_part(links.url, '?exp=', 1)), '^https?://(www\\.)?', '') =
+              regexp_replace(lower(split_part(fs.source_url, '?exp=', 1)), '^https?://(www\\.)?', '')
+         LEFT JOIN LATERAL (
+           SELECT
+             COALESCE(ae.metadata->>'location', '') AS location,
+             COALESCE(ae.metadata->>'locationSource', '') AS location_source,
+             COALESCE(ae.metadata->>'city', '') AS city,
+             COALESCE(ae.metadata->>'region', '') AS region,
+             COALESCE(ae.metadata->>'country', '') AS country,
+             COALESCE(ae.metadata->>'latitude', '') AS latitude,
+             COALESCE(ae.metadata->>'longitude', '') AS longitude
+           FROM analytics_events ae
+           WHERE ae.event_type = 'qr.public.scan'
+             AND COALESCE(ae.metadata->>'ipAddress', '') = COALESCE(fs.ip_address, '')
+             AND (
+               ae.metadata->>'linkId' = links.id::text
+               OR ae.metadata->>'targetUrl' = links.url
+               OR regexp_replace(lower(split_part(COALESCE(ae.metadata->>'targetUrl', ''), '?exp=', 1)), '^https?://(www\\.)?', '') =
+                  regexp_replace(lower(split_part(links.url, '?exp=', 1)), '^https?://(www\\.)?', '')
+             )
+           ORDER BY ABS(EXTRACT(EPOCH FROM (ae.created_at - fs.created_at))) ASC
+           LIMIT 1
+         ) matched ON true
+         ORDER BY fs.created_at DESC`,
+        [job.managed_link_id, job.id],
+      );
+
+      rows = feedbackExportResult.rows.map((row) => {
+        const createdAt = row.created_at ? new Date(row.created_at) : null;
+        const validDate = createdAt && !Number.isNaN(createdAt.getTime()) ? createdAt : null;
+        const questions = Array.isArray(row.questions) ? row.questions : [];
+        const answers = Array.isArray(row.answers) ? row.answers : [];
+        const responseData = questions
+          .map((question, index) => {
+            const label = String(question || "").trim();
+            const answer = String(answers[index] || "").trim();
+            if (!label && !answer) return "";
+            return `${label || `Q${index + 1}`}: ${answer || "-"}`;
+          })
+          .filter(Boolean)
+          .join(" | ");
+
+        return {
+          qrType: typeLabel,
+          scanDate: validDate ? validDate.toISOString().slice(0, 10) : "",
+          responseData,
+          targetKind: "feedback",
+          targetTitle: row.title || job.managed_title || "",
+          location: row.location || "",
+          locationSource: row.location_source || "",
+          city: row.city || "",
+          region: row.region || "",
+          country: row.country || "",
+          latitude: row.latitude || "",
+          longitude: row.longitude || "",
+          ipAddress: row.ip_address || "",
+        };
+      });
+    }
 
     const csv = buildCsv(columns, rows);
     const safeType = String(typeLabel || "qr").replace(/[^a-z0-9]+/gi, "-").toLowerCase();

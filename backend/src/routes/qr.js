@@ -220,9 +220,9 @@ async function upsertSingleJob({
     `SELECT j.id, j.managed_link_id, m.qr_type AS managed_qr_type, m.title AS managed_title, m.content AS managed_content, m.target_payload
      FROM qr_jobs j
      LEFT JOIN managed_qr_links m ON m.id = j.managed_link_id
-     WHERE id = $1
-       AND user_id = $2
-       AND job_type = 'single'
+     WHERE j.id = $1
+       AND j.user_id = $2
+       AND j.job_type = 'single'
      LIMIT 1`,
     [jobId, userId],
   );
