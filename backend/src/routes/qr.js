@@ -235,7 +235,12 @@ async function upsertSingleJob({
 
   const lockedQrType = String(existing.managed_qr_type || qrType || "Text").trim() || "Text";
   const existingTargetPayload = existing.target_payload || { qrType: lockedQrType, fields: {} };
-  let nextTargetPayload = existingTargetPayload;
+  let nextTargetPayload = {
+    ...existingTargetPayload,
+    qrType: lockedQrType,
+    trackingMode,
+    expiresAt: toExpiryIso(body.expiresAt) || existingTargetPayload.expiresAt || "",
+  };
   let nextContent = String(existing.managed_content || payload.content || "").trim();
   let nextManagedTitle = String(existing.managed_title || managedTitle || lockedQrType).trim() || lockedQrType;
 
@@ -251,6 +256,7 @@ async function upsertSingleJob({
     nextTargetPayload = {
       ...existingTargetPayload,
       qrType: lockedQrType,
+      trackingMode,
       expiresAt: toExpiryIso(body.expiresAt) || existingTargetPayload.expiresAt || "",
       fields: {
         ...existingTargetPayload.fields,

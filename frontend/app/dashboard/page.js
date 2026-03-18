@@ -979,20 +979,6 @@ export default function Dashboard() {
                                       Excel export includes scan date, scan time, destination/output, IP, visitor key, and any stored location metadata.
                                     </p>
                                   ) : null}
-                                  {(currentTab === "scans" || currentTab === "overview") && (
-                                    <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                                      <div className="flex items-center justify-between gap-3">
-                                        <div>
-                                          <p className="font-medium text-slate-900">Scan trend</p>
-                                          <p className="mt-1 text-sm text-slate-500">Recent scan activity for this QR job.</p>
-                                        </div>
-                                        <MetricPill label="Points" value={scanTrendPoints.length} tone="accent" />
-                                      </div>
-                                      <div className="mt-4">
-                                        <Sparkline points={scanTrendPoints} />
-                                      </div>
-                                    </div>
-                                  )}
                                   <div className="mt-4 space-y-3">
                                     <ProgressBar
                                       label="Unique visitor share"
@@ -1042,16 +1028,52 @@ export default function Dashboard() {
                                 </div>
                                 )}
 
-                                {currentTab === "overview" && (
-                                <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                                  <p className="font-medium text-slate-900">Actionable Insights</p>
-                                  <ul className="mt-3 list-disc space-y-2 pl-5 text-sm text-slate-600">
-                                    {!hasTrackedEngagement ? <li>Tracking is unavailable for this QR right now.</li> : null}
-                                    {extraInsights.map((insight, index) => (
-                                      <li key={`${job.id}-insight-${index}`}>{insight}</li>
-                                    ))}
-                                  </ul>
-                                </div>
+                                {(currentTab === "overview" || currentTab === "scans") && (
+                                  <div className="grid gap-4 xl:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
+                                    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                                      <div className="flex items-center justify-between gap-3">
+                                        <div>
+                                          <p className="font-medium text-slate-900">Scan trend</p>
+                                          <p className="mt-1 text-sm text-slate-500">
+                                            {lifetimeScans > currentScans
+                                              ? "Latest-version trend is shown here. Overall history remains in the usage totals above."
+                                              : "Recent scan activity for this QR job."}
+                                          </p>
+                                        </div>
+                                        <MetricPill label="Points" value={scanTrendPoints.length} tone="accent" />
+                                      </div>
+                                      <div className="mt-4">
+                                        <Sparkline points={scanTrendPoints} />
+                                      </div>
+                                    </div>
+
+                                    {currentTab === "overview" ? (
+                                      <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                                        <p className="font-medium text-slate-900">Actionable Insights</p>
+                                        <ul className="mt-3 list-disc space-y-2 pl-5 text-sm text-slate-600">
+                                          {!hasTrackedEngagement ? <li>Tracking is unavailable for this QR right now.</li> : null}
+                                          {extraInsights.map((insight, index) => (
+                                            <li key={`${job.id}-insight-${index}`}>{insight}</li>
+                                          ))}
+                                        </ul>
+                                      </div>
+                                    ) : (
+                                      <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                                        <p className="font-medium text-slate-900">History Note</p>
+                                        <div className="mt-3 space-y-2 text-sm text-slate-600">
+                                          <p>
+                                            <span className="font-medium text-slate-900">Overall history:</span> {lifetimeScans} scan{lifetimeScans === 1 ? "" : "s"} and {lifetimeSubmissions} submission{lifetimeSubmissions === 1 ? "" : "s"}.
+                                          </p>
+                                          <p>
+                                            <span className="font-medium text-slate-900">Latest version:</span> {currentScans} scan{currentScans === 1 ? "" : "s"} and {currentSubmissions} submission{currentSubmissions === 1 ? "" : "s"}.
+                                          </p>
+                                          <p>
+                                            The totals above keep your previous scans, while the latest-version card isolates activity after the most recent update.
+                                          </p>
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
                                 )}
 
                                 {job.trackingMode !== "tracked" && analysis.typePerformance && (currentTab === "overview" || currentTab === "scans") && (
@@ -1087,6 +1109,7 @@ export default function Dashboard() {
                                 {analysis.rating && (currentTab === "overview" || currentTab === "responses") && (
                                   <div className="rounded-2xl border border-slate-200 bg-white p-4">
                                     <p className="font-medium text-slate-900">Rating response breakdown</p>
+                                    <p className="mt-1 text-sm text-slate-500">Counts and percentage share for each rating option.</p>
                                     <div className="mt-3 space-y-2">
                                       {analysis.rating.buckets.map((bucket) => (
                                         <div key={bucket.label}>
@@ -1107,6 +1130,32 @@ export default function Dashboard() {
                                           </div>
                                         </div>
                                       ))}
+                                    </div>
+                                    <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                                      <p className="font-medium text-slate-900">Rating percentage share</p>
+                                      <div className="mt-3 space-y-3">
+                                        {analysis.rating.buckets.map((bucket) => {
+                                          const totalRatings = Math.max(
+                                            analysis.rating.buckets.reduce((sum, entry) => sum + (entry.count || 0), 0),
+                                            1,
+                                          )
+                                          const percent = Math.round(((bucket.count || 0) / totalRatings) * 100)
+                                          return (
+                                            <div key={`${bucket.label}-percent`}>
+                                              <div className="flex items-center justify-between text-sm">
+                                                <span className="text-slate-700">Rating {bucket.label}</span>
+                                                <span className="text-slate-500">{percent}%</span>
+                                              </div>
+                                              <div className="mt-1 h-2.5 overflow-hidden rounded-full bg-slate-100">
+                                                <div
+                                                  className="h-full rounded-full bg-sky-500"
+                                                  style={{ width: `${Math.max(percent, bucket.count ? 6 : 0)}%` }}
+                                                />
+                                              </div>
+                                            </div>
+                                          )
+                                        })}
+                                      </div>
                                     </div>
                                   </div>
                                 )}
