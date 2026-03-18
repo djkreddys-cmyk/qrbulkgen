@@ -878,10 +878,10 @@ export default function Dashboard() {
           </div>
         </section>
 
-        {isLoading && <p className="text-slate-600">Loading dashboard...</p>}
-        {!isLoading && error && <p className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-rose-700">{error}</p>}
+        {activeWorkspace === "qr" && isLoading && <p className="text-slate-600">Loading dashboard...</p>}
+        {activeWorkspace === "qr" && !isLoading && error && <p className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-rose-700">{error}</p>}
 
-        {!isLoading && (
+        {activeWorkspace === "qr" && !isLoading && (
           <>
             <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm md:p-6">
               {!filteredJobs.length && (
@@ -1500,7 +1500,10 @@ export default function Dashboard() {
           </>
         )}
 
-        {activeWorkspace === "short-links" && (
+        {activeWorkspace === "short-links" && isLoading && <p className="text-slate-600">Loading short links...</p>}
+        {activeWorkspace === "short-links" && !isLoading && error && <p className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-rose-700">{error}</p>}
+
+        {activeWorkspace === "short-links" && !isLoading && (
             <section id="short-links-dashboard" className="overflow-hidden rounded-[1.75rem] border border-slate-200 bg-white shadow-sm">
               <div className="border-b border-slate-200 bg-white px-4 pt-4 pb-3">
                 <div className="flex flex-col gap-3 xl:flex-row xl:items-end">
