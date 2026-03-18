@@ -814,6 +814,16 @@ export default function Dashboard() {
                               const uniqueScans = analysis.engagement?.uniqueScans || 0
                               const repeatedScans = analysis.engagement?.repeatedScans || 0
                               const totalSubmissions = analysis.engagement?.totalSubmissions || 0
+                              const lifetime = analysis.lifetimeEngagement || analysis.engagement || {}
+                              const current = analysis.currentEngagement || analysis.engagement || {}
+                              const lifetimeScans = lifetime.totalScans || 0
+                              const lifetimeUnique = lifetime.uniqueScans || 0
+                              const lifetimeRepeated = lifetime.repeatedScans || 0
+                              const lifetimeSubmissions = lifetime.totalSubmissions || 0
+                              const currentScans = current.totalScans || 0
+                              const currentUnique = current.uniqueScans || 0
+                              const currentRepeated = current.repeatedScans || 0
+                              const currentSubmissions = current.totalSubmissions || 0
                               const hasTrackedEngagement = Boolean(analysis.engagement?.trackingEnabled)
                               const currentTab = getAnalysisTab(job.id)
                               const scanTrendPoints = analysis.scanTrend || []
@@ -919,7 +929,7 @@ export default function Dashboard() {
                                       <p className="font-medium text-slate-900">Usage Report</p>
                                       <p className="mt-1 text-sm text-slate-500">
                                         {hasTrackedEngagement
-                                          ? "Scan volume, returning visitors, submissions, and expiry health for this QR."
+                                          ? "See both total history and the latest updated-version activity for this QR."
                                           : "Tracking is unavailable for this QR right now."}
                                       </p>
                                     </div>
@@ -941,11 +951,28 @@ export default function Dashboard() {
                                       />
                                     </div>
                                   </div>
-                                  <div className="mt-4 grid gap-3 md:grid-cols-4">
-                                    <AnalysisStat label="Scans" value={totalScans} />
-                                    <AnalysisStat label="Unique" value={uniqueScans} tone="accent" />
-                                    <AnalysisStat label="Repeated" value={repeatedScans} />
-                                    <AnalysisStat label="Submissions" value={totalSubmissions} tone="success" />
+                                  <div className="mt-4 grid gap-4 lg:grid-cols-2">
+                                    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Overall History</p>
+                                      <div className="mt-3 grid gap-3 md:grid-cols-2">
+                                        <AnalysisStat label="Scans" value={lifetimeScans} />
+                                        <AnalysisStat label="Unique" value={lifetimeUnique} tone="accent" />
+                                        <AnalysisStat label="Repeated" value={lifetimeRepeated} />
+                                        <AnalysisStat label="Submissions" value={lifetimeSubmissions} tone="success" />
+                                      </div>
+                                    </div>
+                                    <div className="rounded-2xl border border-sky-200 bg-sky-50 p-4">
+                                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-700">Latest Updated Version</p>
+                                      <p className="mt-1 text-xs text-slate-500">
+                                        {current.versionStartedAt ? `Counts from ${formatDateTime(current.versionStartedAt)}` : "Counts for the latest saved version."}
+                                      </p>
+                                      <div className="mt-3 grid gap-3 md:grid-cols-2">
+                                        <AnalysisStat label="Scans" value={currentScans} />
+                                        <AnalysisStat label="Unique" value={currentUnique} tone="accent" />
+                                        <AnalysisStat label="Repeated" value={currentRepeated} />
+                                        <AnalysisStat label="Submissions" value={currentSubmissions} tone="success" />
+                                      </div>
+                                    </div>
                                   </div>
                                   {hasTrackedEngagement ? (
                                     <p className="mt-3 text-xs text-slate-500">
@@ -969,47 +996,47 @@ export default function Dashboard() {
                                   <div className="mt-4 space-y-3">
                                     <ProgressBar
                                       label="Unique visitor share"
-                                      value={uniqueScans}
-                                      total={Math.max(totalScans, 1)}
+                                      value={currentUnique}
+                                      total={Math.max(currentScans, 1)}
                                       colorClass="bg-sky-500"
-                                      helper={totalScans ? `${Math.round((uniqueScans / totalScans) * 100)}%` : "0%"}
+                                      helper={currentScans ? `${Math.round((currentUnique / currentScans) * 100)}%` : "0%"}
                                     />
                                     <ProgressBar
                                       label="Repeat visitor share"
-                                      value={repeatedScans}
-                                      total={Math.max(totalScans, 1)}
+                                      value={currentRepeated}
+                                      total={Math.max(currentScans, 1)}
                                       colorClass="bg-violet-500"
-                                      helper={totalScans ? `${Math.round((repeatedScans / totalScans) * 100)}%` : "0%"}
+                                      helper={currentScans ? `${Math.round((currentRepeated / currentScans) * 100)}%` : "0%"}
                                     />
                                   </div>
                                   <div className="mt-3 grid gap-2 text-sm text-slate-600 md:grid-cols-2">
                                     <p>
                                       <span className="font-medium text-slate-900">Last scan:</span>{" "}
-                                      {formatDateTime(analysis.engagement?.lastScanAt)}
+                                      {formatDateTime(current.lastScanAt)}
                                     </p>
                                     <p>
                                       <span className="font-medium text-slate-900">Last submission:</span>{" "}
-                                      {formatDateTime(analysis.engagement?.lastSubmissionAt)}
+                                      {formatDateTime(current.lastSubmissionAt)}
                                     </p>
                                     <p>
                                       <span className="font-medium text-slate-900">Tracking mode:</span>{" "}
-                                      {analysis.engagement?.trackingMode === "managed-redirect" ? "Managed redirect" : "Direct / device handled"}
+                                      {current.trackingMode === "managed-redirect" ? "Managed redirect" : "Direct / device handled"}
                                     </p>
                                     <p>
                                       <span className="font-medium text-slate-900">Expiry date:</span>{" "}
-                                      {analysis.engagement?.expiryDate ? formatDateTime(analysis.engagement.expiryDate) : "Not set"}
+                                      {current.expiryDate ? formatDateTime(current.expiryDate) : "Not set"}
                                     </p>
                                     <p>
                                       <span className="font-medium text-slate-900">Engagement type:</span>{" "}
-                                      {analysis.engagement?.targetKind || job.qrType || "Direct QR"}
+                                      {current.targetKind || job.qrType || "Direct QR"}
                                     </p>
                                     <p>
                                       <span className="font-medium text-slate-900">Expiring soon:</span>{" "}
-                                      {analysis.engagement?.expiringSoonLinks || 0}
+                                      {current.expiringSoonLinks || 0}
                                     </p>
                                     <p>
                                       <span className="font-medium text-slate-900">Expired links:</span>{" "}
-                                      {analysis.engagement?.expiredLinks || 0}
+                                      {current.expiredLinks || 0}
                                     </p>
                                   </div>
                                 </div>

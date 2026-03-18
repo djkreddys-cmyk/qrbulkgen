@@ -1117,6 +1117,44 @@ bulkRouter.get("/jobs/:id/analysis", requireAuth, async (req, res, next) => {
     const typeLabel = getQrTypeLabel(job);
     const versionStartedAt = job.completed_at || job.created_at || null;
 
+    const lifetimeLinkStatsResult = await query(
+      `WITH links AS (
+         SELECT id, content AS url, qr_type, title, expires_at
+         FROM managed_qr_links
+         WHERE id = $1
+         UNION
+         SELECT m.id, m.content AS url, m.qr_type, m.title, m.expires_at
+         FROM qr_job_items i
+         INNER JOIN managed_qr_links m ON m.id = i.managed_link_id
+         WHERE i.job_id = $2
+       )
+       SELECT
+         COUNT(ae.id)::int AS total_scans,
+         COUNT(DISTINCT ae.metadata->>'visitorKey')::int AS unique_scans,
+         MAX(ae.created_at) AS last_scan_at,
+         COUNT(DISTINCT links.id)::int AS managed_links,
+         COUNT(*) FILTER (WHERE links.expires_at IS NOT NULL AND links.expires_at < NOW())::int AS expired_links,
+         COUNT(*) FILTER (
+           WHERE links.expires_at IS NOT NULL
+             AND links.expires_at >= NOW()
+             AND links.expires_at <= NOW() + INTERVAL '14 days'
+         )::int AS expiring_soon_links,
+         MIN(links.expires_at) FILTER (WHERE links.expires_at >= NOW()) AS next_expiry_at,
+         MAX(links.expires_at) AS last_expiry_at,
+         MIN(links.url) AS sample_url,
+         MIN(links.qr_type) AS target_kind
+       FROM links
+       LEFT JOIN analytics_events ae
+         ON ae.event_type = 'qr.public.scan'
+        AND (
+          ae.metadata->>'linkId' = links.id::text
+          OR ae.metadata->>'targetUrl' = links.url
+          OR regexp_replace(lower(split_part(COALESCE(ae.metadata->>'targetUrl', ''), '?exp=', 1)), '^https?://(www\\.)?', '') =
+             regexp_replace(lower(split_part(links.url, '?exp=', 1)), '^https?://(www\\.)?', '')
+        )`,
+      [job.managed_link_id, job.id],
+    );
+
     const typePerformanceResult = await query(
       `SELECT
          COUNT(*)::int AS jobs_count,
@@ -1212,15 +1250,50 @@ bulkRouter.get("/jobs/:id/analysis", requireAuth, async (req, res, next) => {
     );
 
     const linkStats = linkStatsResult.rows[0] || {};
+    const lifetimeLinkStats = lifetimeLinkStatsResult.rows[0] || {};
     let totalScans = linkStats.total_scans || 0;
     let uniqueScans = linkStats.unique_scans || 0;
     let repeatedScans = Math.max(totalScans - uniqueScans, 0);
-    const targetKind = String(linkStats.target_kind || job.managed_qr_type || typeLabel || "").trim();
+    let lifetimeTotalScans = lifetimeLinkStats.total_scans || 0;
+    let lifetimeUniqueScans = lifetimeLinkStats.unique_scans || 0;
+    let lifetimeRepeatedScans = Math.max(lifetimeTotalScans - lifetimeUniqueScans, 0);
+    const targetKind = String(linkStats.target_kind || lifetimeLinkStats.target_kind || job.managed_qr_type || typeLabel || "").trim();
 
     let totalSubmissions = 0;
     let lastSubmissionAt = null;
+    let lifetimeTotalSubmissions = 0;
+    let lifetimeLastSubmissionAt = null;
 
     if (targetKind === "Rating") {
+      const lifetimeRatingRows = await query(
+        `WITH links AS (
+           SELECT content AS url, title
+           FROM managed_qr_links
+           WHERE id = $1
+           UNION
+           SELECT m.content AS url, m.title
+           FROM qr_job_items i
+           INNER JOIN managed_qr_links m ON m.id = i.managed_link_id
+           WHERE i.job_id = $2
+         )
+         SELECT
+           COALESCE(MAX(NULLIF(rs.title, '')), MAX(links.title), 'Untitled rating form') AS title,
+           MAX(rs.style) AS style,
+           MAX(rs.scale)::int AS scale,
+           rs.rating,
+           COUNT(*)::int AS count,
+           MAX(rs.created_at) AS last_submission_at,
+           SUM(COUNT(*)) OVER ()::int AS total_submissions
+         FROM rating_submissions rs
+         INNER JOIN links
+           ON links.url = rs.source_url
+           OR regexp_replace(lower(split_part(links.url, '?exp=', 1)), '^https?://(www\\.)?', '') =
+              regexp_replace(lower(split_part(rs.source_url, '?exp=', 1)), '^https?://(www\\.)?', '')
+         GROUP BY rs.rating
+         ORDER BY rs.rating ASC`,
+        [job.managed_link_id, job.id],
+      );
+
       const ratingRows = await query(
         `WITH links AS (
            SELECT content AS url, title
@@ -1267,9 +1340,37 @@ bulkRouter.get("/jobs/:id/analysis", requireAuth, async (req, res, next) => {
           })),
         };
       }
+      if (lifetimeRatingRows.rows.length) {
+        lifetimeTotalSubmissions = lifetimeRatingRows.rows[0].total_submissions || 0;
+        lifetimeLastSubmissionAt = lifetimeRatingRows.rows.reduce((latest, row) => {
+          if (!latest) return row.last_submission_at;
+          return new Date(row.last_submission_at) > new Date(latest) ? row.last_submission_at : latest;
+        }, null);
+      }
     }
 
     if (targetKind === "Feedback") {
+      const lifetimeFeedbackRows = await query(
+        `WITH links AS (
+           SELECT content AS url, title
+           FROM managed_qr_links
+           WHERE id = $1
+           UNION
+           SELECT m.content AS url, m.title
+           FROM qr_job_items i
+           INNER JOIN managed_qr_links m ON m.id = i.managed_link_id
+           WHERE i.job_id = $2
+         )
+         SELECT fs.title, fs.questions, fs.answers, fs.created_at
+         FROM feedback_submissions fs
+         INNER JOIN links
+           ON links.url = fs.source_url
+           OR regexp_replace(lower(split_part(links.url, '?exp=', 1)), '^https?://(www\\.)?', '') =
+              regexp_replace(lower(split_part(fs.source_url, '?exp=', 1)), '^https?://(www\\.)?', '')
+         ORDER BY fs.created_at DESC`,
+        [job.managed_link_id, job.id],
+      );
+
       const feedbackRows = await query(
         `WITH links AS (
            SELECT content AS url, title
@@ -1294,6 +1395,8 @@ bulkRouter.get("/jobs/:id/analysis", requireAuth, async (req, res, next) => {
 
       totalSubmissions = feedbackRows.rows.length;
       lastSubmissionAt = feedbackRows.rows[0]?.created_at || null;
+      lifetimeTotalSubmissions = lifetimeFeedbackRows.rows.length;
+      lifetimeLastSubmissionAt = lifetimeFeedbackRows.rows[0]?.created_at || null;
 
       const groupedQuestions = {};
       feedbackRows.rows.forEach((row) => {
@@ -1327,6 +1430,11 @@ bulkRouter.get("/jobs/:id/analysis", requireAuth, async (req, res, next) => {
       totalScans = Math.min(totalScans, totalSubmissions);
       uniqueScans = Math.min(uniqueScans, totalSubmissions);
       repeatedScans = Math.max(totalScans - uniqueScans, 0);
+    }
+    if ((targetKind === "Rating" || targetKind === "Feedback") && lifetimeTotalSubmissions > 0) {
+      lifetimeTotalScans = Math.min(lifetimeTotalScans, lifetimeTotalSubmissions);
+      lifetimeUniqueScans = Math.min(lifetimeUniqueScans, lifetimeTotalSubmissions);
+      lifetimeRepeatedScans = Math.max(lifetimeTotalScans - lifetimeUniqueScans, 0);
     }
 
     const trackingMode = String(job.tracking_mode || "tracked").toLowerCase() === "tracked" ? "tracked" : "direct";
@@ -1384,6 +1492,28 @@ bulkRouter.get("/jobs/:id/analysis", requireAuth, async (req, res, next) => {
             }
           : null,
         engagement,
+        lifetimeEngagement: {
+          targetUrl: lifetimeLinkStats.sample_url || engagement.targetUrl || "",
+          expiryDate: lifetimeLinkStats.last_expiry_at || engagement.expiryDate || job.managed_expires_at || "",
+          nextExpiryAt: lifetimeLinkStats.next_expiry_at || engagement.nextExpiryAt || null,
+          isExpired: (lifetimeLinkStats.expired_links || 0) > 0 && (lifetimeLinkStats.expiring_soon_links || 0) === 0,
+          totalScans: lifetimeTotalScans,
+          uniqueScans: lifetimeUniqueScans,
+          repeatedScans: lifetimeRepeatedScans,
+          lastScanAt: lifetimeLinkStats.last_scan_at || null,
+          totalSubmissions: lifetimeTotalSubmissions,
+          lastSubmissionAt: lifetimeLastSubmissionAt,
+          targetKind: String(lifetimeLinkStats.target_kind || targetKind || "").trim() || null,
+          managedLinks: lifetimeLinkStats.managed_links || 0,
+          expiredLinks: lifetimeLinkStats.expired_links || 0,
+          expiringSoonLinks: lifetimeLinkStats.expiring_soon_links || 0,
+          trackingEnabled,
+          trackingMode,
+        },
+        currentEngagement: {
+          ...engagement,
+          versionStartedAt,
+        },
         scanTrend: scanTrendResult.rows.map((row) => ({
           label: row.label,
           count: row.count,

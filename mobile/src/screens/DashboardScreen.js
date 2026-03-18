@@ -556,7 +556,9 @@ export function DashboardScreen() {
               const currentTab = getAnalysisTab(job.id);
               const thumbnailSource = getThumbnailSource(job);
               const jobBusy = busyJobId === job.id;
-              const hasTrackedEngagement = Boolean(analysis?.engagement?.trackingEnabled);
+  const hasTrackedEngagement = Boolean(analysis?.engagement?.trackingEnabled);
+  const lifetime = analysis?.lifetimeEngagement || analysis?.engagement || {};
+  const current = analysis?.currentEngagement || analysis?.engagement || {};
               const typeAverageSuccessRate = analysis?.typePerformance
                 ? (analysis.typePerformance.successCount || 0) / Math.max(analysis.typePerformance.requestedCount || 1, 1)
                 : 0;
@@ -756,17 +758,34 @@ export function DashboardScreen() {
                           <Text style={{ color: "#0f172a", fontWeight: "700" }}>Usage Report</Text>
                           <Text style={{ color: "#64748b" }}>
                             {hasTrackedEngagement
-                              ? "Scan volume, returning visitors, submissions, and expiry health for this QR."
+                              ? "See both total history and the latest updated-version activity for this QR."
                               : "Tracking is unavailable for this QR right now."}
                           </Text>
                           <View style={{ alignSelf: "flex-start" }}>
                             <PerformanceBadge label={hasTrackedEngagement ? "Tracking active" : "Tracking unavailable"} tone={hasTrackedEngagement ? "success" : "default"} />
                           </View>
-                          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}>
-                            <AnalysisStat label="Scans" value={analysis.engagement?.totalScans || 0} />
-                            <AnalysisStat label="Unique" value={analysis.engagement?.uniqueScans || 0} tone="#1d4ed8" />
-                            <AnalysisStat label="Repeated" value={analysis.engagement?.repeatedScans || 0} />
-                            <AnalysisStat label="Submissions" value={analysis.engagement?.totalSubmissions || 0} tone="#047857" />
+                          <View style={{ gap: 10 }}>
+                            <View style={{ borderWidth: 1, borderColor: "#dbe3f0", borderRadius: 16, padding: 12, backgroundColor: "#f8fafc", gap: 8 }}>
+                              <Text style={{ color: "#64748b", fontSize: 12, fontWeight: "700" }}>OVERALL HISTORY</Text>
+                              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}>
+                                <AnalysisStat label="Scans" value={lifetime.totalScans || 0} />
+                                <AnalysisStat label="Unique" value={lifetime.uniqueScans || 0} tone="#1d4ed8" />
+                                <AnalysisStat label="Repeated" value={lifetime.repeatedScans || 0} />
+                                <AnalysisStat label="Submissions" value={lifetime.totalSubmissions || 0} tone="#047857" />
+                              </View>
+                            </View>
+                            <View style={{ borderWidth: 1, borderColor: "#bfdbfe", borderRadius: 16, padding: 12, backgroundColor: "#eff6ff", gap: 8 }}>
+                              <Text style={{ color: "#1d4ed8", fontSize: 12, fontWeight: "700" }}>LATEST UPDATED VERSION</Text>
+                              <Text style={{ color: "#64748b" }}>
+                                {current.versionStartedAt ? `Counts from ${formatDateTime(current.versionStartedAt)}` : "Counts for the latest saved version."}
+                              </Text>
+                              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}>
+                                <AnalysisStat label="Scans" value={current.totalScans || 0} />
+                                <AnalysisStat label="Unique" value={current.uniqueScans || 0} tone="#1d4ed8" />
+                                <AnalysisStat label="Repeated" value={current.repeatedScans || 0} />
+                                <AnalysisStat label="Submissions" value={current.totalSubmissions || 0} tone="#047857" />
+                              </View>
+                            </View>
                           </View>
                           {(currentTab === "overview" || currentTab === "scans") && (
                             <View style={{ borderWidth: 1, borderColor: "#dbe3f0", borderRadius: 16, padding: 12, backgroundColor: "#f8fafc", gap: 8 }}>
@@ -775,13 +794,13 @@ export function DashboardScreen() {
                               <MiniSparkline points={analysis.scanTrend || []} />
                             </View>
                           )}
-                          <ProgressBar label="Unique visitor share" value={analysis.engagement?.uniqueScans || 0} total={Math.max(analysis.engagement?.totalScans || 1, 1)} color="#0ea5e9" />
-                          <ProgressBar label="Repeat visitor share" value={analysis.engagement?.repeatedScans || 0} total={Math.max(analysis.engagement?.totalScans || 1, 1)} color="#8b5cf6" />
-                          <Text style={{ color: "#475569" }}><Text style={{ fontWeight: "700", color: "#0f172a" }}>Last scan: </Text>{formatDateTime(analysis.engagement?.lastScanAt)}</Text>
-                          <Text style={{ color: "#475569" }}><Text style={{ fontWeight: "700", color: "#0f172a" }}>Last submission: </Text>{formatDateTime(analysis.engagement?.lastSubmissionAt)}</Text>
-                          <Text style={{ color: "#475569" }}><Text style={{ fontWeight: "700", color: "#0f172a" }}>Expiry date: </Text>{analysis.engagement?.expiryDate ? formatDateTime(analysis.engagement.expiryDate) : "Not set"}</Text>
-                          <Text style={{ color: "#475569" }}><Text style={{ fontWeight: "700", color: "#0f172a" }}>Tracking mode: </Text>{analysis.engagement?.trackingMode === "managed-redirect" ? "Managed redirect" : "Direct / device handled"}</Text>
-                          <Text style={{ color: "#475569" }}><Text style={{ fontWeight: "700", color: "#0f172a" }}>Engagement type: </Text>{analysis.engagement?.targetKind || job.qrType || "Direct QR"}</Text>
+                          <ProgressBar label="Unique visitor share" value={current.uniqueScans || 0} total={Math.max(current.totalScans || 1, 1)} color="#0ea5e9" />
+                          <ProgressBar label="Repeat visitor share" value={current.repeatedScans || 0} total={Math.max(current.totalScans || 1, 1)} color="#8b5cf6" />
+                          <Text style={{ color: "#475569" }}><Text style={{ fontWeight: "700", color: "#0f172a" }}>Last scan: </Text>{formatDateTime(current.lastScanAt)}</Text>
+                          <Text style={{ color: "#475569" }}><Text style={{ fontWeight: "700", color: "#0f172a" }}>Last submission: </Text>{formatDateTime(current.lastSubmissionAt)}</Text>
+                          <Text style={{ color: "#475569" }}><Text style={{ fontWeight: "700", color: "#0f172a" }}>Expiry date: </Text>{current.expiryDate ? formatDateTime(current.expiryDate) : "Not set"}</Text>
+                          <Text style={{ color: "#475569" }}><Text style={{ fontWeight: "700", color: "#0f172a" }}>Tracking mode: </Text>{current.trackingMode === "managed-redirect" ? "Managed redirect" : "Direct / device handled"}</Text>
+                          <Text style={{ color: "#475569" }}><Text style={{ fontWeight: "700", color: "#0f172a" }}>Engagement type: </Text>{current.targetKind || job.qrType || "Direct QR"}</Text>
                         </View>
                       )}
 
