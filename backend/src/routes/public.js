@@ -67,6 +67,76 @@ function getRequestBaseUrl(req) {
   return loadEnv().backendUrl.replace(/\/$/, "");
 }
 
+function isPublicIp(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return false;
+  if (raw === "::1" || raw === "127.0.0.1") return false;
+  if (/^10\./.test(raw)) return false;
+  if (/^192\.168\./.test(raw)) return false;
+  if (/^172\.(1[6-9]|2\d|3[0-1])\./.test(raw)) return false;
+  if (/^fc/i.test(raw) || /^fd/i.test(raw)) return false;
+  return true;
+}
+
+function buildApproximateLocationLabel(location = {}) {
+  const parts = [location.city, location.region, location.country]
+    .map((part) => String(part || "").trim())
+    .filter(Boolean);
+  return parts.join(", ");
+}
+
+async function lookupApproximateLocation(ipAddress) {
+  const ip = String(ipAddress || "").trim();
+  if (!isPublicIp(ip)) {
+    return null;
+  }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 1800);
+
+  try {
+    const response = await fetch(`https://ipwho.is/${encodeURIComponent(ip)}`, {
+      signal: controller.signal,
+      headers: {
+        Accept: "application/json",
+      },
+    });
+    if (!response.ok) {
+      return null;
+    }
+
+    const data = await response.json().catch(() => null);
+    if (!data || data.success === false) {
+      return null;
+    }
+
+    const city = String(data.city || "").trim();
+    const region = String(data.region || data.region_name || "").trim();
+    const country = String(data.country || "").trim();
+    const latitude = data.latitude == null ? "" : String(data.latitude).trim();
+    const longitude = data.longitude == null ? "" : String(data.longitude).trim();
+    const label = buildApproximateLocationLabel({ city, region, country });
+
+    if (!label && !latitude && !longitude) {
+      return null;
+    }
+
+    return {
+      source: "ip",
+      city,
+      region,
+      country,
+      latitude,
+      longitude,
+      label,
+    };
+  } catch (_error) {
+    return null;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 function buildPublicAssetUrl(req, relativePath) {
   const base = getRequestBaseUrl(req);
   return `${base}/uploads/${relativePath.replace(/\\/g, "/")}`;
@@ -434,6 +504,8 @@ publicRouter.post("/track-view", async (req, res, next) => {
     const targetKind = String(req.body.targetKind || "").trim().slice(0, 64);
     const expired = Boolean(req.body.expired);
     const linkId = String(req.body.linkId || "").trim();
+    const ipAddress = getRequestIp(req).slice(0, 255);
+    const approximateLocation = await lookupApproximateLocation(ipAddress);
 
     if (!sourceUrl && !linkId) {
       throw createHttpError(400, "VALIDATION_ERROR", "sourceUrl or linkId is required");
@@ -458,7 +530,14 @@ publicRouter.post("/track-view", async (req, res, next) => {
         linkId: linkId || null,
         visitorKey: buildVisitorKey(req, linkId),
         userAgent: String(req.headers["user-agent"] || "").slice(0, 255),
-        ipAddress: getRequestIp(req).slice(0, 255),
+        ipAddress,
+        location: approximateLocation?.label || null,
+        locationSource: approximateLocation?.source || null,
+        city: approximateLocation?.city || null,
+        region: approximateLocation?.region || null,
+        country: approximateLocation?.country || null,
+        latitude: approximateLocation?.latitude || null,
+        longitude: approximateLocation?.longitude || null,
       },
     });
 

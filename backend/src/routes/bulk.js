@@ -1443,7 +1443,13 @@ bulkRouter.get("/jobs/:id/analysis-report.csv", requireAuth, async (req, res, ne
          COALESCE(ae.metadata->>'linkId', links.id::text, '') AS link_id,
          COALESCE(ae.metadata->>'userAgent', '') AS user_agent,
          COALESCE(ae.metadata->>'ipAddress', '') AS ip_address,
-         COALESCE(ae.metadata->>'location', '') AS location
+         COALESCE(ae.metadata->>'location', '') AS location,
+         COALESCE(ae.metadata->>'locationSource', '') AS location_source,
+         COALESCE(ae.metadata->>'city', '') AS city,
+         COALESCE(ae.metadata->>'region', '') AS region,
+         COALESCE(ae.metadata->>'country', '') AS country,
+         COALESCE(ae.metadata->>'latitude', '') AS latitude,
+         COALESCE(ae.metadata->>'longitude', '') AS longitude
        FROM analytics_events ae
        INNER JOIN links
          ON ae.metadata->>'linkId' = links.id::text
@@ -1466,6 +1472,12 @@ bulkRouter.get("/jobs/:id/analysis-report.csv", requireAuth, async (req, res, ne
       { key: "targetKind", label: "Scan Output Type" },
       { key: "targetTitle", label: "Title" },
       { key: "location", label: "Location" },
+      { key: "locationSource", label: "Location Source" },
+      { key: "city", label: "City" },
+      { key: "region", label: "Region" },
+      { key: "country", label: "Country" },
+      { key: "latitude", label: "Latitude" },
+      { key: "longitude", label: "Longitude" },
       { key: "ipAddress", label: "IP Address" },
       { key: "visitorKey", label: "Visitor Key" },
       { key: "linkId", label: "Managed Link ID" },
@@ -1486,6 +1498,12 @@ bulkRouter.get("/jobs/:id/analysis-report.csv", requireAuth, async (req, res, ne
         targetKind: row.target_kind || "",
         targetTitle: row.target_title || "",
         location: row.location || "",
+        locationSource: row.location_source || "",
+        city: row.city || "",
+        region: row.region || "",
+        country: row.country || "",
+        latitude: row.latitude || "",
+        longitude: row.longitude || "",
         ipAddress: row.ip_address || "",
         visitorKey: row.visitor_key || "",
         linkId: row.link_id || "",
