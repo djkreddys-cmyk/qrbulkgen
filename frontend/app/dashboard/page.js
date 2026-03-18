@@ -802,15 +802,15 @@ export default function Dashboard() {
         </div>
         {activeWorkspace === "qr" ? (
           <>
-        <section id="qr-dashboard" className="flex flex-col gap-5 rounded-[2rem] border border-slate-200 bg-gradient-to-br from-white to-slate-100 p-8 shadow-sm lg:flex-row lg:items-end lg:justify-between">
+            <section id="qr-dashboard" className="flex flex-col gap-5 rounded-[2rem] border border-slate-200 bg-gradient-to-br from-white to-slate-100 p-8 shadow-sm lg:flex-row lg:items-end lg:justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-500">Control Center</p>
             <h1 className="mt-3 text-4xl font-semibold tracking-tight text-slate-950">Analytics Dashboard</h1>
             {user && <p className="mt-3 max-w-4xl text-slate-600">Welcome back, {user.name || user.email}. Open analysis on any created QR to inspect generation quality, scan behavior, response depth, and expiry health in one focused dashboard.</p>}
           </div>
-        </section>
+            </section>
 
-        <section className="overflow-hidden rounded-[1.75rem] border border-slate-200 bg-white shadow-sm">
+            <section className="overflow-hidden rounded-[1.75rem] border border-slate-200 bg-white shadow-sm">
           <div className="sticky top-20 z-20 border-b border-slate-200 bg-white/95 px-4 pt-4 pb-3 backdrop-blur">
             <div className="flex flex-col gap-3 xl:flex-row xl:items-end">
             <label className="text-[12px] font-semibold uppercase tracking-[0.14em] text-slate-500 xl:min-w-[11rem]">
@@ -1498,9 +1498,9 @@ export default function Dashboard() {
               )}
             </section>
           </>
-            ) : null}
+        ) : null}
 
-            {activeWorkspace === "short-links" ? (
+        {activeWorkspace === "short-links" ? (
             <section id="short-links-dashboard" className="overflow-hidden rounded-[1.75rem] border border-slate-200 bg-white shadow-sm">
               <div className="border-b border-slate-200 bg-white px-4 pt-4 pb-3">
                 <div className="flex flex-col gap-3 xl:flex-row xl:items-end">
