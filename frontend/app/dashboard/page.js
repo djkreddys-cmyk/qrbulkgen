@@ -801,6 +801,7 @@ export default function Dashboard() {
           </button>
         </div>
         {activeWorkspace === "qr" ? (
+          <>
         <section id="qr-dashboard" className="flex flex-col gap-5 rounded-[2rem] border border-slate-200 bg-gradient-to-br from-white to-slate-100 p-8 shadow-sm lg:flex-row lg:items-end lg:justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-500">Control Center</p>
@@ -1496,6 +1497,7 @@ export default function Dashboard() {
                 </div>
               )}
             </section>
+          </>
             ) : null}
 
             {activeWorkspace === "short-links" ? (
