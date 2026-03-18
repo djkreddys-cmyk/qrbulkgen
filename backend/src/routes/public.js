@@ -91,50 +91,94 @@ async function lookupApproximateLocation(ipAddress) {
     return null;
   }
 
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 1800);
-
-  try {
-    const response = await fetch(`https://ipwho.is/${encodeURIComponent(ip)}`, {
-      signal: controller.signal,
-      headers: {
-        Accept: "application/json",
+  const providers = [
+    {
+      source: "ipwhois",
+      url: `https://ipwho.is/${encodeURIComponent(ip)}`,
+      parse(data) {
+        if (!data || data.success === false) return null;
+        return {
+          city: String(data.city || "").trim(),
+          region: String(data.region || data.region_name || "").trim(),
+          country: String(data.country || "").trim(),
+          latitude: data.latitude == null ? "" : String(data.latitude).trim(),
+          longitude: data.longitude == null ? "" : String(data.longitude).trim(),
+        };
       },
-    });
-    if (!response.ok) {
-      return null;
+    },
+    {
+      source: "ipapi",
+      url: `https://ipapi.co/${encodeURIComponent(ip)}/json/`,
+      parse(data) {
+        if (!data || data.error) return null;
+        return {
+          city: String(data.city || "").trim(),
+          region: String(data.region || data.region_code || "").trim(),
+          country: String(data.country_name || data.country || "").trim(),
+          latitude: data.latitude == null ? "" : String(data.latitude).trim(),
+          longitude: data.longitude == null ? "" : String(data.longitude).trim(),
+        };
+      },
+    },
+    {
+      source: "ip-api",
+      url: `http://ip-api.com/json/${encodeURIComponent(ip)}?fields=status,country,regionName,city,lat,lon`,
+      parse(data) {
+        if (!data || data.status !== "success") return null;
+        return {
+          city: String(data.city || "").trim(),
+          region: String(data.regionName || "").trim(),
+          country: String(data.country || "").trim(),
+          latitude: data.lat == null ? "" : String(data.lat).trim(),
+          longitude: data.lon == null ? "" : String(data.lon).trim(),
+        };
+      },
+    },
+  ];
+
+  for (const provider of providers) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 1800);
+
+    try {
+      const response = await fetch(provider.url, {
+        signal: controller.signal,
+        headers: {
+          Accept: "application/json",
+        },
+      });
+      if (!response.ok) {
+        continue;
+      }
+
+      const data = await response.json().catch(() => null);
+      const parsed = provider.parse(data);
+      if (!parsed) {
+        continue;
+      }
+
+      const label = buildApproximateLocationLabel(parsed);
+      if (!label && !parsed.latitude && !parsed.longitude) {
+        continue;
+      }
+
+      return {
+        source: provider.source,
+        city: parsed.city || "",
+        region: parsed.region || "",
+        country: parsed.country || "",
+        latitude: parsed.latitude || "",
+        longitude: parsed.longitude || "",
+        label,
+      };
+    } catch (_error) {
+      // try the next provider
+    } finally {
+      clearTimeout(timeout);
     }
-
-    const data = await response.json().catch(() => null);
-    if (!data || data.success === false) {
-      return null;
-    }
-
-    const city = String(data.city || "").trim();
-    const region = String(data.region || data.region_name || "").trim();
-    const country = String(data.country || "").trim();
-    const latitude = data.latitude == null ? "" : String(data.latitude).trim();
-    const longitude = data.longitude == null ? "" : String(data.longitude).trim();
-    const label = buildApproximateLocationLabel({ city, region, country });
-
-    if (!label && !latitude && !longitude) {
-      return null;
-    }
-
-    return {
-      source: "ip",
-      city,
-      region,
-      country,
-      latitude,
-      longitude,
-      label,
-    };
-  } catch (_error) {
-    return null;
-  } finally {
-    clearTimeout(timeout);
   }
+
+  return null;
 }
 
 function normalizePreciseLocationPayload(value) {
