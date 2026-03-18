@@ -490,14 +490,19 @@ export function BulkGenerateContent({ embedded = false }) {
                 Adjust expiry, error correction, colors, corners, logo, and archive-ready ZIP naming before you queue the run.
               </p>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 items-end gap-3 md:grid-cols-2">
               <div>
                 <label className="block mb-1 text-sm">Last Scan Date / Expiry Override</label>
-                <input value={expiryOverride} onChange={(e) => setExpiryOverride(e.target.value)} placeholder="DD-MM-YYYY" className="w-full border p-2" />
+                <input
+                  value={expiryOverride}
+                  onChange={(e) => setExpiryOverride(e.target.value)}
+                  placeholder="DD-MM-YYYY"
+                  className="h-10 w-full border px-3"
+                />
               </div>
               <div>
                 <label className="block mb-1 text-sm">Error Correction</label>
-                <select value={errorCorrectionLevel} onChange={(e) => setErrorCorrectionLevel(e.target.value)} className="w-full border p-2">
+                <select value={errorCorrectionLevel} onChange={(e) => setErrorCorrectionLevel(e.target.value)} className="h-10 w-full border px-3">
                   <option value="L">L</option>
                   <option value="M">M</option>
                   <option value="Q">Q</option>
@@ -599,9 +604,9 @@ export function BulkGenerateContent({ embedded = false }) {
               <p className="text-sm text-slate-500">Loading bulk generation status...</p>
             ) : null}
             {activeBulkJob && !isActiveBulkZipReady ? (
-              <p className="text-sm font-medium text-slate-700">
-                Generating bulk QR: {activeBulkProgress.percent}% ({activeBulkProgress.processed} of {activeBulkProgress.total})
-              </p>
+              <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-700">
+                Bulk QR generation {activeBulkProgress.percent}% complete, {activeBulkProgress.processed} of {activeBulkProgress.total} processed.
+              </div>
             ) : null}
             {isActiveBulkZipReady ? (
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
