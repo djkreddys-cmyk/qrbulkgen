@@ -877,10 +877,10 @@ export default function Dashboard() {
           </div>
         </section>
 
-        {isLoading && <p className="text-slate-600">Loading dashboard...</p>}
-        {!isLoading && error && <p className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-rose-700">{error}</p>}
+        {activeWorkspace === "qr" && isLoading && <p className="text-slate-600">Loading dashboard...</p>}
+        {activeWorkspace === "qr" && !isLoading && error && <p className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-rose-700">{error}</p>}
 
-        {!isLoading && (
+        {activeWorkspace === "qr" && !isLoading && (
             <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm md:p-6">
               {!filteredJobs.length && (
                 <EmptyState
