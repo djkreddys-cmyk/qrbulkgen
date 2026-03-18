@@ -382,74 +382,37 @@ export default function ShortLinksPage() {
   return (
     <div className="min-h-screen bg-slate-50">
       <Navbar />
-      <main className="mx-auto max-w-[112rem] px-5 py-8 md:px-8 xl:px-10">
-        <div className="grid gap-6 xl:grid-cols-[15rem_minmax(0,1fr)]">
-          <aside className="hidden xl:block">
-            <div className="sticky top-24 space-y-4">
-              <div className="rounded-[1.75rem] border border-slate-200 bg-white p-4 shadow-sm">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">Workspace</p>
-                <div className="mt-4 grid gap-2">
-                  <Link href="/dashboard" className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-white">
-                    QR Dashboard
-                  </Link>
-                  <Link href="/short-links" className="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm font-semibold text-sky-700 shadow-sm">
-                    Short Links
-                  </Link>
-                </div>
-              </div>
-              <div className="rounded-[1.75rem] border border-slate-200 bg-white p-4 shadow-sm">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">Page Navigation</p>
-                <nav className="mt-4 space-y-2 text-sm">
-                  <a href="#short-links-overview" className="block rounded-2xl px-4 py-3 font-semibold text-slate-700 transition hover:bg-slate-50">Overview</a>
-                  <a href="#short-links-create" className="block rounded-2xl px-4 py-3 font-semibold text-slate-700 transition hover:bg-slate-50">Create Link</a>
-                  <a href="#short-links-library" className="block rounded-2xl px-4 py-3 font-semibold text-slate-700 transition hover:bg-slate-50">Saved Links</a>
-                </nav>
-              </div>
-            </div>
-          </aside>
+      <main className="mx-auto max-w-[88rem] px-5 py-8 md:px-6 xl:px-8">
+        <section className="rounded-[2rem] border border-slate-200 bg-white p-8 shadow-sm">
+          <div className="flex flex-wrap items-center gap-3">
+            <Link href="/generate" className="rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-white">
+              Generate
+            </Link>
+            <span className="rounded-full border border-sky-200 bg-sky-50 px-4 py-2 text-sm font-semibold text-sky-700">
+              Short URL
+            </span>
+          </div>
+          <p className="mt-5 text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">Short URL</p>
+          <h1 className="mt-3 text-4xl font-semibold tracking-tight text-slate-950">Create shareable short URLs</h1>
+          <p className="mt-3 max-w-4xl text-slate-600">
+            Create clean short URLs, set custom slugs, and choose expiry here. Link analytics and analysis reports now live on the dashboard.
+          </p>
+        </section>
 
-          <div className="space-y-6">
-            <section id="short-links-overview" className="rounded-[2rem] border border-slate-200 bg-white p-8 shadow-sm">
-              <div className="flex flex-wrap items-center gap-3">
-                <Link href="/dashboard" className="rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-white">
-                  QR Dashboard
-                </Link>
-                <span className="rounded-full border border-sky-200 bg-sky-50 px-4 py-2 text-sm font-semibold text-sky-700">
-                  Short Links
-                </span>
-              </div>
-              <p className="mt-5 text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">Short Links</p>
-              <h1 className="mt-3 text-4xl font-semibold tracking-tight text-slate-950">Create shareable short links</h1>
-              <p className="mt-3 max-w-4xl text-slate-600">
-                Create clean short links like <span className="font-semibold text-slate-900">qrbulkgen.com/a7K9xQ</span>, manage custom slugs, set expiry dates, and review analytics inside each related short link.
+        <section className="mt-6 rounded-[1.75rem] border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+            <div>
+              <h2 className="text-xl font-semibold text-slate-950">New short URL</h2>
+              <p className="mt-1 text-sm text-slate-500">
+                Create a new redirect, keep the slug clean, and start tracking visits immediately.
               </p>
-              <div className="mt-6 flex flex-wrap gap-3 xl:hidden">
-                <a href="#short-links-overview" className="rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-white">
-                  Overview
-                </a>
-                <a href="#short-links-create" className="rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-white">
-                  Create Link
-                </a>
-                <a href="#short-links-library" className="rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-white">
-                  Saved Links
-                </a>
-              </div>
-            </section>
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600 xl:shrink-0">
+              Open the dashboard to review saved short URLs and analysis.
+            </div>
+          </div>
 
-            <section id="short-links-create" className="rounded-[1.75rem] border border-slate-200 bg-white p-6 shadow-sm">
-              <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-                <div>
-                  <h2 className="text-xl font-semibold text-slate-950">New short link</h2>
-                  <p className="mt-1 text-sm text-slate-500">
-                    Create a new redirect, keep the slug clean, and start tracking visits immediately.
-                  </p>
-                </div>
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600 xl:shrink-0">
-                  Freshly created links appear first in the saved list below.
-                </div>
-              </div>
-
-              <form className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_minmax(0,0.95fr)_minmax(0,0.85fr)_auto]" onSubmit={handleCreate}>
+          <form className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_minmax(0,0.95fr)_minmax(0,0.85fr)_auto]" onSubmit={handleCreate}>
                 <div>
                   <label className="mb-1 block text-sm font-medium text-slate-700">Title</label>
                   <input value={title} onChange={(event) => setTitle(event.target.value)} className="w-full rounded-xl border border-slate-200 px-4 py-3" placeholder="Campaign landing page" />
@@ -474,296 +437,17 @@ export default function ShortLinksPage() {
                 </div>
               </form>
 
-              {message ? <p className="mt-4 text-sm text-emerald-700">{message}</p> : null}
-              {error ? <p className="mt-4 text-sm text-rose-600">{error}</p> : null}
-            </section>
+          {createdLink ? (
+            <div className="mt-5 rounded-2xl border border-sky-200 bg-sky-50 p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-700">Latest short URL</p>
+              <p className="mt-2 text-lg font-semibold text-slate-950">{createdLink.url}</p>
+              <p className="mt-1 text-sm text-slate-600">Target: {createdLink.targetUrl}</p>
+            </div>
+          ) : null}
 
-            <section id="short-links-library" className="overflow-hidden rounded-[1.75rem] border border-slate-200 bg-white shadow-sm">
-              <div className="sticky top-20 z-20 border-b border-slate-200 bg-white/95 px-4 pt-4 pb-3 backdrop-blur">
-                <div className="flex flex-col gap-3 xl:flex-row xl:items-end">
-                  <label className="text-[12px] font-semibold uppercase tracking-[0.14em] text-slate-500 xl:min-w-[11rem]">
-                    Status
-                    <select
-                      value={filters.status}
-                      onChange={(e) => setFilters((prev) => ({ ...prev, status: e.target.value }))}
-                      className="mt-2 h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 text-[15px] text-slate-900 shadow-sm outline-none transition focus:border-sky-300 focus:bg-white focus:ring-2 focus:ring-sky-100"
-                    >
-                      <option value="active">Active</option>
-                      <option value="all">All</option>
-                      <option value="archived">Archived</option>
-                      <option value="expired">Expired</option>
-                      <option value="expiring">Expiring Soon</option>
-                    </select>
-                  </label>
-                  <label className="text-[12px] font-semibold uppercase tracking-[0.14em] text-slate-500 xl:min-w-[11rem]">
-                    Activity
-                    <select
-                      value={filters.activity}
-                      onChange={(e) => setFilters((prev) => ({ ...prev, activity: e.target.value }))}
-                      className="mt-2 h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 text-[15px] text-slate-900 shadow-sm outline-none transition focus:border-sky-300 focus:bg-white focus:ring-2 focus:ring-sky-100"
-                    >
-                      <option value="all">All activity</option>
-                      <option value="clicked">With clicks</option>
-                      <option value="unclicked">Without clicks</option>
-                    </select>
-                  </label>
-                  <label className="text-[12px] font-semibold uppercase tracking-[0.14em] text-slate-500 xl:min-w-[10rem]">
-                    Start Date
-                    <input
-                      type="date"
-                      value={filters.startDate}
-                      onChange={(e) => setFilters((prev) => ({ ...prev, startDate: e.target.value }))}
-                      className="mt-2 h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 text-[15px] text-slate-900 shadow-sm outline-none transition focus:border-sky-300 focus:bg-white focus:ring-2 focus:ring-sky-100"
-                    />
-                  </label>
-                  <label className="text-[12px] font-semibold uppercase tracking-[0.14em] text-slate-500 xl:min-w-[10rem]">
-                    End Date
-                    <input
-                      type="date"
-                      value={filters.endDate}
-                      onChange={(e) => setFilters((prev) => ({ ...prev, endDate: e.target.value }))}
-                      className="mt-2 h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 text-[15px] text-slate-900 shadow-sm outline-none transition focus:border-sky-300 focus:bg-white focus:ring-2 focus:ring-sky-100"
-                    />
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() => setFilters({ status: "active", activity: "all", startDate: "", endDate: "" })}
-                    className="h-12 rounded-2xl border border-slate-200 bg-white px-5 text-sm font-semibold text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow"
-                  >
-                    Clear Filters
-                  </button>
-                </div>
-              </div>
-              <div className="px-4 py-4 text-xs text-slate-500">
-                Active short links stay visible by default. Switch to <span className="font-semibold text-slate-700">Archived</span> or <span className="font-semibold text-slate-700">All</span> to review older links and permanently delete archived ones.
-              </div>
-
-              <div className="rounded-3xl bg-white p-5 shadow-sm md:p-6">
-                {createdLink ? (
-                  <div className="mb-5 rounded-2xl border border-sky-200 bg-sky-50 p-4">
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-700">Latest short link</p>
-                    <p className="mt-2 text-lg font-semibold text-slate-950">{createdLink.url}</p>
-                    <p className="mt-1 text-sm text-slate-600">Target: {createdLink.targetUrl}</p>
-                  </div>
-                ) : null}
-
-                {isLoading ? <p className="text-slate-600">Loading short links...</p> : null}
-                {!isLoading && !filteredLinks.length ? (
-                  <div className="rounded-[1.75rem] border border-dashed border-slate-300 bg-slate-50/80 px-6 py-8 text-center">
-                    <p className="text-base font-semibold text-slate-900">No short links found</p>
-                    <p className="mx-auto mt-2 max-w-2xl text-sm leading-6 text-slate-500">
-                      Try changing the status, activity, or date filters. Newly created short links will appear here automatically.
-                    </p>
-                  </div>
-                ) : null}
-
-                {!!filteredLinks.length && (
-                  <div className="grid gap-5">
-                    <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-                      <div className="flex items-center gap-3">
-                        <label className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm">
-                          <input
-                            type="checkbox"
-                            checked={allFilteredSelected}
-                            onChange={toggleSelectAllFiltered}
-                            className="h-4 w-4 rounded border-slate-300 accent-slate-950 focus:ring-sky-200"
-                          />
-                          <span>Select all</span>
-                        </label>
-                        <p className="text-sm text-slate-600">
-                          <span className="font-semibold text-slate-900">{selectedLinkIds.length}</span> link{selectedLinkIds.length === 1 ? "" : "s"} selected
-                        </p>
-                      </div>
-                      {!!selectedLinkIds.length && (
-                        <div className="flex flex-wrap items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={handleBulkArchive}
-                            disabled={!activeSelectedCount || busyLinkId === "bulk-archive"}
-                            className="rounded-xl border border-amber-200 bg-white px-3 py-2 text-sm font-semibold text-amber-700 shadow-sm transition hover:border-amber-300 hover:bg-amber-50 disabled:cursor-not-allowed disabled:opacity-50"
-                          >
-                            Archive selected{activeSelectedCount ? ` (${activeSelectedCount})` : ""}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={handleBulkDelete}
-                            disabled={!archivedSelectedCount || busyLinkId === "bulk-delete"}
-                            className="rounded-xl border border-rose-200 bg-white px-3 py-2 text-sm font-semibold text-rose-700 shadow-sm transition hover:border-rose-300 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50"
-                          >
-                            Delete selected{archivedSelectedCount ? ` (${archivedSelectedCount})` : ""}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setSelectedLinkIds([])}
-                            className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-300"
-                          >
-                            Clear selection
-                          </button>
-                        </div>
-                      )}
-                    </div>
-
-                    {filteredLinks.map((link) => (
-                      <article key={link.id} className="group relative overflow-hidden rounded-[1.9rem] border border-slate-200 bg-white p-5 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-lg hover:shadow-slate-200/60 md:p-6">
-                        <div className={`absolute inset-y-0 left-0 w-1.5 ${link.archivedAt ? "bg-amber-500" : isExpiredLink(link) ? "bg-rose-500" : Number(link.clickCount || 0) > 0 ? "bg-sky-500" : "bg-slate-300"}`} />
-                        <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-                          <div className="flex items-start gap-4">
-                            <label className="mt-1.5 flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 shadow-sm transition group-hover:border-slate-300">
-                              <input
-                                type="checkbox"
-                                checked={selectedLinkIds.includes(link.id)}
-                                onChange={() => toggleSelectedLink(link.id)}
-                                className="h-4 w-4 rounded border-slate-300 accent-slate-950 focus:ring-sky-200"
-                              />
-                            </label>
-                            <div className="space-y-3">
-                              <div className="flex flex-wrap items-center gap-2">
-                                <span className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] ${link.archivedAt ? "bg-amber-50 text-amber-700" : "bg-slate-100 text-slate-600"}`}>
-                                  {link.archivedAt ? "Archived" : "Active"}
-                                </span>
-                                <span className="rounded-full bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-700">
-                                  Clicks: {link.clickCount}
-                                </span>
-                                {isExpiredLink(link) ? (
-                                  <span className="rounded-full bg-rose-50 px-3 py-1 text-xs font-semibold text-rose-700">Expired</span>
-                                ) : isExpiringSoonLink(link) ? (
-                                  <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">Expiring soon</span>
-                                ) : null}
-                              </div>
-                              <div>
-                                <h3 className="text-lg font-semibold text-slate-950">{link.title || link.slug}</h3>
-                                <p className="mt-1 font-mono text-xs text-slate-500">{link.id}</p>
-                              </div>
-                              <p className="break-all text-sm font-medium text-slate-900">{link.url}</p>
-                              <p className="break-all text-sm text-slate-600">Target: {link.targetUrl}</p>
-                              <div className="grid gap-x-6 gap-y-1.5 border-t border-slate-100 pt-2 text-sm text-slate-600 sm:grid-cols-2">
-                                <p><span className="font-medium text-slate-900">Created:</span> {formatDate(link.createdAt)}</p>
-                                <p><span className="font-medium text-slate-900">Last visit:</span> {formatDate(link.lastVisitedAt)}</p>
-                                <p><span className="font-medium text-slate-900">Expiry:</span> {formatDate(link.expiresAt)}</p>
-                                <p><span className="font-medium text-slate-900">Slug:</span> {link.slug}</p>
-                              </div>
-                            </div>
-                          </div>
-                          <div className="flex flex-wrap items-center gap-2 lg:max-w-[30rem] lg:flex-nowrap lg:justify-end">
-                            <button type="button" onClick={() => copyLink(link.url)} className="rounded-2xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow">
-                              Copy
-                            </button>
-                            <button type="button" onClick={() => handleToggleAnalysis(link.id)} className="rounded-2xl border border-sky-200 bg-white px-3.5 py-2.5 text-sm font-semibold text-sky-700 shadow-sm transition hover:-translate-y-0.5 hover:border-sky-300 hover:shadow">
-                              {analysisLinkId === link.id ? "Hide Analysis" : "Analysis"}
-                            </button>
-                            <a href={link.url} target="_blank" rel="noreferrer" className="rounded-2xl border border-sky-200 bg-white px-3.5 py-2.5 text-sm font-semibold text-sky-700 shadow-sm transition hover:-translate-y-0.5 hover:border-sky-300 hover:shadow">
-                              Open
-                            </a>
-                            <button
-                              type="button"
-                              onClick={() => handleDelete(link)}
-                              disabled={busyLinkId === link.id}
-                              className={`rounded-2xl bg-white px-3.5 py-2.5 text-sm font-semibold shadow-sm transition hover:-translate-y-0.5 hover:shadow disabled:cursor-not-allowed disabled:opacity-50 ${link.archivedAt ? "border border-rose-200 text-rose-700 hover:border-rose-300" : "border border-amber-200 text-amber-700 hover:border-amber-300"}`}
-                            >
-                              {link.archivedAt ? "Delete Permanently" : "Archive"}
-                            </button>
-                          </div>
-                        </div>
-
-                        {analysisLinkId === link.id ? (
-                          <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-5">
-                            {analysisLoadingId === link.id ? (
-                              <p className="text-sm text-slate-500">Loading analysis...</p>
-                            ) : analysisById[link.id] ? (
-                              <div className="space-y-5">
-                                <div className="flex flex-wrap items-start justify-between gap-4">
-                                  <div>
-                                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Short Link Analytics</p>
-                                    <h4 className="mt-2 text-xl font-semibold text-slate-950">{link.title || link.slug}</h4>
-                                    <p className="mt-1 text-sm text-slate-500">Analysis is now tied directly to this related short link instead of a separate top summary block.</p>
-                                  </div>
-                                  <div className="rounded-2xl border border-sky-200 bg-sky-50 p-4 text-sm text-slate-700">
-                                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-700">Quick Insight</p>
-                                    <p className="mt-2 leading-6">{analysisById[link.id].quickInsight}</p>
-                                  </div>
-                                </div>
-
-                                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                                  <AnalyticsCard label="Total Visits" value={analysisById[link.id].totalVisits} tone="accent" />
-                                  <AnalyticsCard label="Unique Visits" value={analysisById[link.id].uniqueVisits} tone="success" />
-                                  <AnalyticsCard label="Repeat Visits" value={analysisById[link.id].repeatVisits} />
-                                  <AnalyticsCard
-                                    label="Expiry State"
-                                    value={analysisById[link.id].isExpired ? "Expired" : analysisById[link.id].expiresAt ? "Scheduled" : "Open"}
-                                    tone={analysisById[link.id].isExpired ? "danger" : "default"}
-                                  />
-                                </div>
-
-                                <div className="grid gap-4 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
-                                  <div className="rounded-2xl border border-slate-200 bg-white p-5">
-                                    <h4 className="text-base font-semibold text-slate-950">Visit breakdown</h4>
-                                    <div className="mt-4 space-y-4">
-                                      <ProgressRow
-                                        label="Unique visitors"
-                                        value={analysisById[link.id].uniqueVisits}
-                                        total={Math.max(analysisById[link.id].totalVisits, 1)}
-                                        colorClass="bg-sky-500"
-                                      />
-                                      <ProgressRow
-                                        label="Repeat visits"
-                                        value={analysisById[link.id].repeatVisits}
-                                        total={Math.max(analysisById[link.id].totalVisits, 1)}
-                                        colorClass="bg-emerald-500"
-                                      />
-                                    </div>
-                                  </div>
-
-                                  <div className="rounded-2xl border border-slate-200 bg-white p-5">
-                                    <h4 className="text-base font-semibold text-slate-950">7-day trend</h4>
-                                    <div className="mt-4">
-                                      <Sparkline points={analysisById[link.id].trend || []} />
-                                    </div>
-                                  </div>
-                                </div>
-
-                                <div className="grid gap-4 lg:grid-cols-2">
-                                  <div className="rounded-2xl border border-slate-200 bg-white p-5">
-                                    <h4 className="text-base font-semibold text-slate-950">Link details</h4>
-                                    <div className="mt-4 space-y-2 text-sm text-slate-600">
-                                      <p><span className="font-semibold text-slate-900">Short URL:</span> {link.url}</p>
-                                      <p><span className="font-semibold text-slate-900">Target:</span> {analysisById[link.id].targetUrl}</p>
-                                      <p><span className="font-semibold text-slate-900">Created:</span> {formatDate(analysisById[link.id].createdAt)}</p>
-                                      <p><span className="font-semibold text-slate-900">Last visit:</span> {formatDate(analysisById[link.id].lastVisitedAt)}</p>
-                                      <p><span className="font-semibold text-slate-900">Expiry:</span> {formatDate(analysisById[link.id].expiresAt)}</p>
-                                    </div>
-                                  </div>
-
-                                  <div className="rounded-2xl border border-slate-200 bg-white p-5">
-                                    <h4 className="text-base font-semibold text-slate-950">Recent visitors</h4>
-                                    {(analysisById[link.id].latestVisitors || []).length ? (
-                                      <div className="mt-4 space-y-3">
-                                        {analysisById[link.id].latestVisitors.map((visitor, index) => (
-                                          <div key={`${visitor.visitedAt}-${index}`} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-600">
-                                            <p className="font-medium text-slate-900">{formatDate(visitor.visitedAt)}</p>
-                                            <p className="mt-1 break-all">{visitor.userAgent || "Unknown browser"}</p>
-                                            <p className="mt-1 text-xs text-slate-500">{visitor.ipAddress || "IP unavailable"}</p>
-                                          </div>
-                                        ))}
-                                      </div>
-                                    ) : (
-                                      <p className="mt-4 text-sm leading-6 text-slate-500">
-                                        No visitor log has been recorded yet for this short link.
-                                      </p>
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
-                            ) : null}
-                          </div>
-                        ) : null}
-                      </article>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </section>
-          </div>
-        </div>
+          {message ? <p className="mt-4 text-sm text-emerald-700">{message}</p> : null}
+          {error ? <p className="mt-4 text-sm text-rose-600">{error}</p> : null}
+        </section>
       </main>
     </div>
   )

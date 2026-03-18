@@ -1,5 +1,6 @@
 "use client"
 
+import Link from "next/link"
 import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 
@@ -122,6 +123,20 @@ function formatCompactDate(value) {
   return parsed.toLocaleDateString()
 }
 
+function isExpiredLink(link) {
+  if (!link?.expiresAt) return false
+  const parsed = new Date(link.expiresAt)
+  return !Number.isNaN(parsed.getTime()) && parsed.getTime() < Date.now()
+}
+
+function isExpiringSoonLink(link) {
+  if (!link?.expiresAt) return false
+  const parsed = new Date(link.expiresAt)
+  if (Number.isNaN(parsed.getTime())) return false
+  const diff = parsed.getTime() - Date.now()
+  return diff >= 0 && diff <= 1000 * 60 * 60 * 24 * 7
+}
+
 function Sparkline({ points }) {
   if (!points.length) {
     return <p className="text-xs text-slate-400">No scan trend yet.</p>
@@ -190,6 +205,13 @@ export default function Dashboard() {
   const [selectedJobIds, setSelectedJobIds] = useState([])
   const [shareJob, setShareJob] = useState(null)
   const [exportingReportJobId, setExportingReportJobId] = useState("")
+  const [shortLinks, setShortLinks] = useState([])
+  const [shortLinkFilters, setShortLinkFilters] = useState({ status: "active", activity: "all", startDate: "", endDate: "" })
+  const [busyShortLinkId, setBusyShortLinkId] = useState("")
+  const [selectedShortLinkIds, setSelectedShortLinkIds] = useState([])
+  const [analysisLinkId, setAnalysisLinkId] = useState("")
+  const [analysisLoadingLinkId, setAnalysisLoadingLinkId] = useState("")
+  const [shortLinkAnalysisById, setShortLinkAnalysisById] = useState({})
 
   const queryString = useMemo(() => buildQuery(filters), [filters])
 
@@ -202,12 +224,14 @@ export default function Dashboard() {
 
     try {
       const headers = { Authorization: `Bearer ${token}` }
-      const [meData, jobsData] = await Promise.all([
+      const [meData, jobsData, shortLinksData] = await Promise.all([
         apiRequest("/auth/me", { headers }),
         apiRequest(`/qr/jobs?limit=36${activeQuery ? `&${activeQuery.slice(1)}` : ""}`, { headers }),
+        apiRequest("/short-links?includeArchived=true", { headers }),
       ])
       setUser(meData.user)
       setJobs(jobsData.jobs || [])
+      setShortLinks(shortLinksData.links || [])
       setError("")
     } catch (requestError) {
       if (requestError?.status === 401) {
@@ -227,6 +251,10 @@ export default function Dashboard() {
   useEffect(() => {
     setSelectedJobIds((prev) => prev.filter((id) => jobs.some((job) => job.id === id)))
   }, [jobs])
+
+  useEffect(() => {
+    setSelectedShortLinkIds((prev) => prev.filter((id) => shortLinks.some((link) => link.id === id)))
+  }, [shortLinks])
 
   async function handleDeleteJob(job) {
     const token = getAuthToken()
@@ -450,6 +478,56 @@ export default function Dashboard() {
     setSelectedJobIds((prev) => Array.from(new Set([...prev, ...filteredJobs.map((job) => job.id)])))
   }
 
+  const filteredShortLinks = useMemo(() => {
+    return shortLinks.filter((link) => {
+      const archived = Boolean(link.archivedAt)
+      const expired = isExpiredLink(link)
+      const createdAt = link.createdAt ? new Date(link.createdAt) : null
+
+      if (shortLinkFilters.status === "active" && archived) return false
+      if (shortLinkFilters.status === "archived" && !archived) return false
+      if (shortLinkFilters.status === "expired" && !expired) return false
+      if (shortLinkFilters.status === "expiring" && !isExpiringSoonLink(link)) return false
+
+      if (shortLinkFilters.activity === "clicked" && Number(link.clickCount || 0) <= 0) return false
+      if (shortLinkFilters.activity === "unclicked" && Number(link.clickCount || 0) > 0) return false
+
+      if (shortLinkFilters.startDate && createdAt && !Number.isNaN(createdAt.getTime())) {
+        const start = new Date(`${shortLinkFilters.startDate}T00:00:00`)
+        if (createdAt < start) return false
+      }
+
+      if (shortLinkFilters.endDate && createdAt && !Number.isNaN(createdAt.getTime())) {
+        const end = new Date(`${shortLinkFilters.endDate}T23:59:59.999`)
+        if (createdAt > end) return false
+      }
+
+      return true
+    })
+  }, [shortLinks, shortLinkFilters])
+
+  const selectedShortLinks = useMemo(
+    () => shortLinks.filter((link) => selectedShortLinkIds.includes(link.id)),
+    [shortLinks, selectedShortLinkIds],
+  )
+  const activeSelectedShortLinkCount = selectedShortLinks.filter((link) => !link.archivedAt).length
+  const archivedSelectedShortLinkCount = selectedShortLinks.filter((link) => link.archivedAt).length
+  const allFilteredShortLinksSelected =
+    filteredShortLinks.length > 0 && filteredShortLinks.every((link) => selectedShortLinkIds.includes(link.id))
+
+  function toggleSelectedShortLink(linkId) {
+    setSelectedShortLinkIds((prev) => (prev.includes(linkId) ? prev.filter((id) => id !== linkId) : [...prev, linkId]))
+  }
+
+  function toggleSelectAllFilteredShortLinks() {
+    if (allFilteredShortLinksSelected) {
+      setSelectedShortLinkIds((prev) => prev.filter((id) => !filteredShortLinks.some((link) => link.id === id)))
+      return
+    }
+
+    setSelectedShortLinkIds((prev) => Array.from(new Set([...prev, ...filteredShortLinks.map((link) => link.id)])))
+  }
+
   function getShareUrl(job) {
     if (job?.trackingMode === "tracked" && job?.managedLink?.id && typeof window !== "undefined") {
       return `${window.location.origin}/q/${job.managedLink.id}`
@@ -538,12 +616,175 @@ export default function Dashboard() {
     }
   }
 
+  async function copyShortLink(url) {
+    try {
+      await navigator.clipboard.writeText(url)
+      setError("")
+    } catch {
+      setError("Unable to copy short URL.")
+    }
+  }
+
+  async function handleDeleteShortLink(link) {
+    const token = getAuthToken()
+    if (!token) {
+      router.replace("/login")
+      return
+    }
+
+    const force = Boolean(link.archivedAt)
+    const confirmed = window.confirm(
+      force ? "Permanently delete this short URL?" : "Archive this short URL? You can still review it later.",
+    )
+    if (!confirmed) return
+
+    try {
+      setBusyShortLinkId(link.id)
+      await apiRequest(`/short-links/${link.id}${force ? "?force=true" : ""}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      setSelectedShortLinkIds((prev) => prev.filter((id) => id !== link.id))
+      await loadData(queryString)
+      setError("")
+    } catch (requestError) {
+      setError(requestError.message)
+    } finally {
+      setBusyShortLinkId("")
+    }
+  }
+
+  async function handleToggleShortLinkAnalysis(linkId) {
+    const token = getAuthToken()
+    if (!token) {
+      router.replace("/login")
+      return
+    }
+
+    if (analysisLinkId === linkId) {
+      setAnalysisLinkId("")
+      return
+    }
+
+    setAnalysisLinkId(linkId)
+
+    if (shortLinkAnalysisById[linkId]) {
+      return
+    }
+
+    try {
+      setAnalysisLoadingLinkId(linkId)
+      const data = await apiRequest(`/short-links/${linkId}/analysis`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      setShortLinkAnalysisById((prev) => ({
+        ...prev,
+        [linkId]: data.analysis,
+      }))
+    } catch (requestError) {
+      setError(requestError.message)
+    } finally {
+      setAnalysisLoadingLinkId("")
+    }
+  }
+
+  async function handleBulkArchiveShortLinks() {
+    const token = getAuthToken()
+    if (!token) return
+
+    const activeSelected = selectedShortLinks.filter((link) => !link.archivedAt)
+    if (!activeSelected.length) {
+      setError("Select at least one active short URL to archive.")
+      return
+    }
+
+    const confirmed = window.confirm(`Archive ${activeSelected.length} selected short URL${activeSelected.length === 1 ? "" : "s"}?`)
+    if (!confirmed) return
+
+    try {
+      setBusyShortLinkId("bulk-archive")
+      await Promise.all(
+        activeSelected.map((link) =>
+          apiRequest(`/short-links/${link.id}`, {
+            method: "DELETE",
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+        ),
+      )
+      setSelectedShortLinkIds((prev) => prev.filter((id) => !activeSelected.some((link) => link.id === id)))
+      await loadData(queryString)
+      setError("")
+    } catch (requestError) {
+      setError(requestError.message)
+    } finally {
+      setBusyShortLinkId("")
+    }
+  }
+
+  async function handleBulkDeleteShortLinks() {
+    const token = getAuthToken()
+    if (!token) return
+
+    const archivedSelected = selectedShortLinks.filter((link) => link.archivedAt)
+    if (!archivedSelected.length) {
+      setError("Select at least one archived short URL to delete.")
+      return
+    }
+
+    const confirmed = window.confirm(`Delete ${archivedSelected.length} archived short URL${archivedSelected.length === 1 ? "" : "s"} permanently?`)
+    if (!confirmed) return
+
+    try {
+      setBusyShortLinkId("bulk-delete")
+      await Promise.all(
+        archivedSelected.map((link) =>
+          apiRequest(`/short-links/${link.id}?force=true`, {
+            method: "DELETE",
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+        ),
+      )
+      setSelectedShortLinkIds((prev) => prev.filter((id) => !archivedSelected.some((link) => link.id === id)))
+      await loadData(queryString)
+      setError("")
+    } catch (requestError) {
+      setError(requestError.message)
+    } finally {
+      setBusyShortLinkId("")
+    }
+  }
+
   return (
     <div className="min-h-screen bg-slate-50">
       <Navbar />
 
-      <main className="mx-auto max-w-[96rem] space-y-6 px-3 py-6 md:px-5">
-        <section className="flex flex-col gap-5 rounded-[2rem] border border-slate-200 bg-gradient-to-br from-white to-slate-100 p-8 shadow-sm lg:flex-row lg:items-end lg:justify-between">
+      <main className="mx-auto max-w-[112rem] px-4 py-6 md:px-6 xl:px-8">
+        <div className="grid gap-6 xl:grid-cols-[15rem_minmax(0,1fr)]">
+          <aside className="hidden xl:block">
+            <div className="sticky top-24 space-y-4">
+              <div className="rounded-[1.75rem] border border-slate-200 bg-white p-4 shadow-sm">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">Workspace</p>
+                <div className="mt-4 grid gap-2">
+                  <Link href="/dashboard" className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-white">
+                    QR Dashboard
+                  </Link>
+                  <a href="#short-links-dashboard" className="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm font-semibold text-sky-700 shadow-sm">
+                    Short Links
+                  </a>
+                </div>
+              </div>
+              <div className="rounded-[1.75rem] border border-slate-200 bg-white p-4 shadow-sm">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">Page Navigation</p>
+                <nav className="mt-4 space-y-2 text-sm">
+                  <a href="#qr-dashboard" className="block rounded-2xl px-4 py-3 font-semibold text-slate-700 transition hover:bg-slate-50">QR Dashboard</a>
+                  <a href="#short-links-dashboard" className="block rounded-2xl px-4 py-3 font-semibold text-slate-700 transition hover:bg-slate-50">Short Links</a>
+                </nav>
+              </div>
+            </div>
+          </aside>
+
+          <div className="space-y-6">
+        <section id="qr-dashboard" className="flex flex-col gap-5 rounded-[2rem] border border-slate-200 bg-gradient-to-br from-white to-slate-100 p-8 shadow-sm lg:flex-row lg:items-end lg:justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-500">Control Center</p>
             <h1 className="mt-3 text-4xl font-semibold tracking-tight text-slate-950">Analytics Dashboard</h1>
@@ -1239,6 +1480,246 @@ export default function Dashboard() {
               )}
             </section>
 
+            <section id="short-links-dashboard" className="overflow-hidden rounded-[1.75rem] border border-slate-200 bg-white shadow-sm">
+              <div className="border-b border-slate-200 bg-white px-4 pt-4 pb-3">
+                <div className="flex flex-col gap-3 xl:flex-row xl:items-end">
+                  <label className="text-[12px] font-semibold uppercase tracking-[0.14em] text-slate-500 xl:min-w-[11rem]">
+                    Status
+                    <select
+                      value={shortLinkFilters.status}
+                      onChange={(e) => setShortLinkFilters((prev) => ({ ...prev, status: e.target.value }))}
+                      className="mt-2 h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 text-[15px] text-slate-900 shadow-sm outline-none transition focus:border-sky-300 focus:bg-white focus:ring-2 focus:ring-sky-100"
+                    >
+                      <option value="active">Active</option>
+                      <option value="all">All</option>
+                      <option value="archived">Archived</option>
+                      <option value="expired">Expired</option>
+                      <option value="expiring">Expiring Soon</option>
+                    </select>
+                  </label>
+                  <label className="text-[12px] font-semibold uppercase tracking-[0.14em] text-slate-500 xl:min-w-[11rem]">
+                    Activity
+                    <select
+                      value={shortLinkFilters.activity}
+                      onChange={(e) => setShortLinkFilters((prev) => ({ ...prev, activity: e.target.value }))}
+                      className="mt-2 h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 text-[15px] text-slate-900 shadow-sm outline-none transition focus:border-sky-300 focus:bg-white focus:ring-2 focus:ring-sky-100"
+                    >
+                      <option value="all">All activity</option>
+                      <option value="clicked">With clicks</option>
+                      <option value="unclicked">Without clicks</option>
+                    </select>
+                  </label>
+                  <label className="text-[12px] font-semibold uppercase tracking-[0.14em] text-slate-500 xl:min-w-[10rem]">
+                    Start Date
+                    <input
+                      type="date"
+                      value={shortLinkFilters.startDate}
+                      onChange={(e) => setShortLinkFilters((prev) => ({ ...prev, startDate: e.target.value }))}
+                      className="mt-2 h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 text-[15px] text-slate-900 shadow-sm outline-none transition focus:border-sky-300 focus:bg-white focus:ring-2 focus:ring-sky-100"
+                    />
+                  </label>
+                  <label className="text-[12px] font-semibold uppercase tracking-[0.14em] text-slate-500 xl:min-w-[10rem]">
+                    End Date
+                    <input
+                      type="date"
+                      value={shortLinkFilters.endDate}
+                      onChange={(e) => setShortLinkFilters((prev) => ({ ...prev, endDate: e.target.value }))}
+                      className="mt-2 h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 text-[15px] text-slate-900 shadow-sm outline-none transition focus:border-sky-300 focus:bg-white focus:ring-2 focus:ring-sky-100"
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setShortLinkFilters({ status: "active", activity: "all", startDate: "", endDate: "" })}
+                    className="h-12 rounded-2xl border border-slate-200 bg-white px-5 text-sm font-semibold text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow"
+                  >
+                    Clear Filters
+                  </button>
+                </div>
+              </div>
+              <div className="px-4 py-4 text-xs text-slate-500">
+                Short URL analytics and saved-link management are now available on the dashboard. Create new short URLs from the Generate screen and review them here.
+              </div>
+
+              <div className="rounded-3xl bg-white p-5 shadow-sm md:p-6">
+                {!filteredShortLinks.length ? (
+                  <EmptyState
+                    title="No short URLs found"
+                    body="Create a short URL from the Generate screen, then come back here to review visits, expiry, and analytics."
+                  />
+                ) : (
+                  <div className="grid gap-5">
+                    <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                      <div className="flex items-center gap-3">
+                        <label className="flex items-center gap-2 text-sm text-slate-600">
+                          <input
+                            type="checkbox"
+                            checked={allFilteredShortLinksSelected}
+                            onChange={toggleSelectAllFilteredShortLinks}
+                            className="h-4 w-4 rounded border-slate-300 text-slate-950 focus:ring-sky-200"
+                          />
+                          <span>Select all</span>
+                        </label>
+                        <p className="text-sm text-slate-600">
+                          <span className="font-semibold text-slate-900">{selectedShortLinkIds.length}</span> link{selectedShortLinkIds.length === 1 ? "" : "s"} selected
+                        </p>
+                      </div>
+                      {!!selectedShortLinkIds.length && (
+                        <div className="flex flex-wrap items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={handleBulkArchiveShortLinks}
+                            disabled={!activeSelectedShortLinkCount || busyShortLinkId === "bulk-archive"}
+                            className="rounded-xl border border-amber-200 bg-white px-3 py-2 text-sm font-semibold text-amber-700 shadow-sm transition hover:border-amber-300 hover:bg-amber-50 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            Archive selected{activeSelectedShortLinkCount ? ` (${activeSelectedShortLinkCount})` : ""}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleBulkDeleteShortLinks}
+                            disabled={!archivedSelectedShortLinkCount || busyShortLinkId === "bulk-delete"}
+                            className="rounded-xl border border-rose-200 bg-white px-3 py-2 text-sm font-semibold text-rose-700 shadow-sm transition hover:border-rose-300 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            Delete selected{archivedSelectedShortLinkCount ? ` (${archivedSelectedShortLinkCount})` : ""}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedShortLinkIds([])}
+                            className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-300"
+                          >
+                            Clear selection
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    {filteredShortLinks.map((link) => (
+                      <article key={link.id} className="group relative overflow-hidden rounded-[1.9rem] border border-slate-200 bg-white p-5 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-lg hover:shadow-slate-200/60 md:p-6">
+                        <div className={`absolute inset-y-0 left-0 w-1.5 ${link.archivedAt ? "bg-amber-500" : isExpiredLink(link) ? "bg-rose-500" : Number(link.clickCount || 0) > 0 ? "bg-sky-500" : "bg-slate-300"}`} />
+                        <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+                          <div className="flex items-start gap-4">
+                            <label className="mt-2 flex h-5 w-5 shrink-0 cursor-pointer items-center justify-center">
+                              <input
+                                type="checkbox"
+                                checked={selectedShortLinkIds.includes(link.id)}
+                                onChange={() => toggleSelectedShortLink(link.id)}
+                                className="h-4 w-4 rounded border-slate-300 text-slate-950 focus:ring-sky-200"
+                              />
+                            </label>
+                            <div className="space-y-3">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] ${link.archivedAt ? "bg-amber-50 text-amber-700" : "bg-slate-100 text-slate-600"}`}>
+                                  {link.archivedAt ? "Archived" : "Active"}
+                                </span>
+                                <span className="rounded-full bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-700">
+                                  Clicks: {link.clickCount}
+                                </span>
+                                {isExpiredLink(link) ? (
+                                  <span className="rounded-full bg-rose-50 px-3 py-1 text-xs font-semibold text-rose-700">Expired</span>
+                                ) : isExpiringSoonLink(link) ? (
+                                  <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">Expiring soon</span>
+                                ) : null}
+                              </div>
+                              <div>
+                                <h3 className="text-lg font-semibold text-slate-950">{link.title || link.slug}</h3>
+                                <p className="mt-1 font-mono text-xs text-slate-500">{link.id}</p>
+                              </div>
+                              <p className="break-all text-sm font-medium text-slate-900">{link.url}</p>
+                              <p className="break-all text-sm text-slate-600">Target: {link.targetUrl}</p>
+                              <div className="grid gap-x-6 gap-y-1.5 border-t border-slate-100 pt-2 text-sm text-slate-600 sm:grid-cols-2">
+                                <p><span className="font-medium text-slate-900">Created:</span> {formatDateTime(link.createdAt)}</p>
+                                <p><span className="font-medium text-slate-900">Last visit:</span> {formatDateTime(link.lastVisitedAt)}</p>
+                                <p><span className="font-medium text-slate-900">Expiry:</span> {formatDateTime(link.expiresAt)}</p>
+                                <p><span className="font-medium text-slate-900">Slug:</span> {link.slug}</p>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex flex-wrap items-center gap-2 lg:max-w-[30rem] lg:flex-nowrap lg:justify-end">
+                            <button type="button" onClick={() => copyShortLink(link.url)} className="rounded-2xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow">
+                              Copy
+                            </button>
+                            <button type="button" onClick={() => handleToggleShortLinkAnalysis(link.id)} className="rounded-2xl border border-sky-200 bg-white px-3.5 py-2.5 text-sm font-semibold text-sky-700 shadow-sm transition hover:-translate-y-0.5 hover:border-sky-300 hover:shadow">
+                              {analysisLinkId === link.id ? "Hide Analysis" : "Analysis"}
+                            </button>
+                            <a href={link.url} target="_blank" rel="noreferrer" className="rounded-2xl border border-sky-200 bg-white px-3.5 py-2.5 text-sm font-semibold text-sky-700 shadow-sm transition hover:-translate-y-0.5 hover:border-sky-300 hover:shadow">
+                              Open
+                            </a>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteShortLink(link)}
+                              disabled={busyShortLinkId === link.id}
+                              className={`rounded-2xl bg-white px-3.5 py-2.5 text-sm font-semibold shadow-sm transition hover:-translate-y-0.5 hover:shadow disabled:cursor-not-allowed disabled:opacity-50 ${link.archivedAt ? "border border-rose-200 text-rose-700 hover:border-rose-300" : "border border-amber-200 text-amber-700 hover:border-amber-300"}`}
+                            >
+                              {link.archivedAt ? "Delete Permanently" : "Archive"}
+                            </button>
+                          </div>
+                        </div>
+
+                        {analysisLinkId === link.id ? (
+                          <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-5">
+                            {analysisLoadingLinkId === link.id ? (
+                              <p className="text-sm text-slate-500">Loading analysis...</p>
+                            ) : shortLinkAnalysisById[link.id] ? (
+                              <div className="space-y-5">
+                                <div className="flex flex-wrap items-start justify-between gap-4">
+                                  <div>
+                                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Short Link Analytics</p>
+                                    <h4 className="mt-2 text-xl font-semibold text-slate-950">{link.title || link.slug}</h4>
+                                    <p className="mt-1 text-sm text-slate-500">Analysis has been moved to the dashboard so QR and short URL reporting stay in one workspace.</p>
+                                  </div>
+                                  <div className="rounded-2xl border border-sky-200 bg-sky-50 p-4 text-sm text-slate-700">
+                                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-700">Quick Insight</p>
+                                    <p className="mt-2 leading-6">{shortLinkAnalysisById[link.id].quickInsight}</p>
+                                  </div>
+                                </div>
+
+                                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                                  <AnalysisStat label="Total Visits" value={shortLinkAnalysisById[link.id].totalVisits} tone="accent" />
+                                  <AnalysisStat label="Unique Visits" value={shortLinkAnalysisById[link.id].uniqueVisits} tone="success" />
+                                  <AnalysisStat label="Repeat Visits" value={shortLinkAnalysisById[link.id].repeatVisits} />
+                                  <AnalysisStat
+                                    label="Expiry State"
+                                    value={shortLinkAnalysisById[link.id].isExpired ? "Expired" : shortLinkAnalysisById[link.id].expiresAt ? "Scheduled" : "Open"}
+                                    tone={shortLinkAnalysisById[link.id].isExpired ? "danger" : "default"}
+                                  />
+                                </div>
+
+                                <div className="grid gap-4 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
+                                  <div className="rounded-2xl border border-slate-200 bg-white p-5">
+                                    <h4 className="text-base font-semibold text-slate-950">Visit breakdown</h4>
+                                    <div className="mt-4 space-y-4">
+                                      <ProgressBar
+                                        label="Unique visitors"
+                                        value={shortLinkAnalysisById[link.id].uniqueVisits}
+                                        total={Math.max(shortLinkAnalysisById[link.id].totalVisits, 1)}
+                                        colorClass="bg-sky-500"
+                                      />
+                                      <ProgressBar
+                                        label="Repeat visits"
+                                        value={shortLinkAnalysisById[link.id].repeatVisits}
+                                        total={Math.max(shortLinkAnalysisById[link.id].totalVisits, 1)}
+                                        colorClass="bg-emerald-500"
+                                      />
+                                    </div>
+                                  </div>
+
+                                  <div className="rounded-2xl border border-slate-200 bg-white p-5">
+                                    <h4 className="text-base font-semibold text-slate-950">7-day trend</h4>
+                                    <div className="mt-4">
+                                      <Sparkline points={shortLinkAnalysisById[link.id].trend || []} />
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            ) : null}
+                          </div>
+                        ) : null}
+                      </article>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </section>
+
           </>
         )}
         {shareJob ? (
@@ -1270,6 +1751,8 @@ export default function Dashboard() {
             </div>
           </div>
         ) : null}
+          </div>
+        </div>
       </main>
     </div>
   )
