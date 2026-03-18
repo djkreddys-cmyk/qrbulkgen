@@ -140,7 +140,7 @@ async function upsertSingleJob({
       });
       const trackedContent = appendManagedLinkIdToUrl(managedLink.content, managedLink.id);
       if (trackedContent !== managedLink.content) {
-        await query(`UPDATE managed_qr_links SET content = $2, updated_at = NOW() WHERE id = $1`, [
+        await query(`UPDATE managed_qr_links AS m SET content = $2, updated_at = NOW() WHERE m.id = $1`, [
           managedLink.id,
           trackedContent,
         ]);
@@ -184,7 +184,7 @@ async function upsertSingleJob({
     const job = jobResult.rows[0];
 
     if (managedLink?.id) {
-      await query(`UPDATE managed_qr_links SET job_id = $2, updated_at = NOW() WHERE id = $1`, [
+      await query(`UPDATE managed_qr_links AS m SET job_id = $2, updated_at = NOW() WHERE m.id = $1`, [
         managedLink.id,
         job.id,
       ]);
@@ -276,14 +276,14 @@ async function upsertSingleJob({
   let qrEncodedContent = payload.content;
   if (trackingMode === "tracked" && existing.managed_link_id) {
     await query(
-      `UPDATE managed_qr_links
+      `UPDATE managed_qr_links AS m
        SET qr_type = $2,
            title = $3,
            content = $4,
            target_payload = $5::jsonb,
            expires_at = $6::timestamptz,
            updated_at = NOW()
-       WHERE id = $1`,
+       WHERE m.id = $1`,
       [
         existing.managed_link_id,
         lockedQrType,
@@ -294,9 +294,9 @@ async function upsertSingleJob({
       ],
     );
     const linkResult = await query(
-      `SELECT id, qr_type, title, content, expires_at, created_at
-       FROM managed_qr_links
-       WHERE id = $1
+      `SELECT m.id, m.qr_type, m.title, m.content, m.expires_at, m.created_at
+       FROM managed_qr_links AS m
+       WHERE m.id = $1
        LIMIT 1`,
       [existing.managed_link_id],
     );
@@ -333,7 +333,7 @@ async function upsertSingleJob({
   const payloadSizeBytes = Buffer.byteLength(dataUrl, "utf8");
 
   await query(
-    `UPDATE qr_jobs
+    `UPDATE qr_jobs AS j
      SET status = 'completed',
          total_count = 1,
          success_count = 1,
@@ -352,7 +352,7 @@ async function upsertSingleJob({
          started_at = NOW(),
          completed_at = NOW(),
          updated_at = NOW()
-    WHERE id = $1`,
+    WHERE j.id = $1`,
     [
       jobId,
       qrEncodedContent,
@@ -382,9 +382,9 @@ async function upsertSingleJob({
   );
 
   const updatedJobResult = await query(
-    `SELECT id, status, created_at, updated_at
-     FROM qr_jobs
-     WHERE id = $1
+    `SELECT j.id, j.status, j.created_at, j.updated_at
+     FROM qr_jobs AS j
+     WHERE j.id = $1
      LIMIT 1`,
     [jobId],
   );
