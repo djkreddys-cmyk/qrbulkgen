@@ -800,8 +800,8 @@ export default function Dashboard() {
             Short Links
           </button>
         </div>
-        <div className={activeWorkspace === "qr" ? "space-y-6" : "hidden"}>
-            <section id="qr-dashboard" className="flex flex-col gap-5 rounded-[2rem] border border-slate-200 bg-gradient-to-br from-white to-slate-100 p-8 shadow-sm lg:flex-row lg:items-end lg:justify-between">
+        <>
+            <section id="qr-dashboard" className={`flex flex-col gap-5 rounded-[2rem] border border-slate-200 bg-gradient-to-br from-white to-slate-100 p-8 shadow-sm lg:flex-row lg:items-end lg:justify-between${activeWorkspace !== "qr" ? " hidden" : ""}`}>
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-500">Control Center</p>
             <h1 className="mt-3 text-4xl font-semibold tracking-tight text-slate-950">Analytics Dashboard</h1>
@@ -809,7 +809,7 @@ export default function Dashboard() {
           </div>
             </section>
 
-            <section className="overflow-hidden rounded-[1.75rem] border border-slate-200 bg-white shadow-sm">
+            <section className={`overflow-hidden rounded-[1.75rem] border border-slate-200 bg-white shadow-sm${activeWorkspace !== "qr" ? " hidden" : ""}`}>
           <div className="sticky top-20 z-20 border-b border-slate-200 bg-white/95 px-4 pt-4 pb-3 backdrop-blur">
             <div className="flex flex-col gap-3 xl:flex-row xl:items-end">
             <label className="text-[12px] font-semibold uppercase tracking-[0.14em] text-slate-500 xl:min-w-[11rem]">
@@ -1496,7 +1496,7 @@ export default function Dashboard() {
               )}
             </section>
         )}
-        </div>
+        </>
 
         <div className={activeWorkspace === "short-links" ? "" : "hidden"}>
             <section id="short-links-dashboard" className="overflow-hidden rounded-[1.75rem] border border-slate-200 bg-white shadow-sm">
