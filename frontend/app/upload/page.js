@@ -327,7 +327,7 @@ export function BulkGenerateContent({ embedded = false }) {
         <h1 className="text-3xl font-bold">Bulk QR Generator</h1>
 
         <div className="mt-8 grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.25fr)_minmax(360px,0.95fr)_minmax(360px,1.1fr)]">
-          <form onSubmit={handleSubmit} className="space-y-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm xl:max-h-[78vh] xl:overflow-y-auto xl:pr-3">
+          <form id="bulk-qr-form" onSubmit={handleSubmit} className="space-y-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm xl:max-h-[78vh] xl:overflow-y-auto xl:pr-3">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Bulk Data</p>
               <h2 className="mt-2 text-xl font-semibold text-slate-900">{editingJobId ? "Update Bulk Job" : "Create Bulk Job"}</h2>
@@ -510,7 +510,7 @@ export function BulkGenerateContent({ embedded = false }) {
             {!!error && <p className="text-sm text-red-600">{error}</p>}
             {!!success && <p className="text-sm text-green-700">{success}</p>}
 
-            <button type="submit" disabled={isSubmitting} className="px-4 py-2 bg-black text-white rounded disabled:opacity-60">
+            <button form="bulk-qr-form" type="submit" disabled={isSubmitting} className="px-4 py-2 bg-black text-white rounded disabled:opacity-60">
               {isSubmitting ? (editingJobId ? "Updating..." : "Queuing...") : (editingJobId ? "Update Bulk Job" : "Queue Bulk Job")}
             </button>
           </section>
