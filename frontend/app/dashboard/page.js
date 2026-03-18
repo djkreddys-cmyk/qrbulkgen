@@ -1,6 +1,4 @@
 "use client"
-
-import Link from "next/link"
 import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 
@@ -205,6 +203,7 @@ export default function Dashboard() {
   const [selectedJobIds, setSelectedJobIds] = useState([])
   const [shareJob, setShareJob] = useState(null)
   const [exportingReportJobId, setExportingReportJobId] = useState("")
+  const [activeWorkspace, setActiveWorkspace] = useState("qr")
   const [shortLinks, setShortLinks] = useState([])
   const [shortLinkFilters, setShortLinkFilters] = useState({ status: "active", activity: "all", startDate: "", endDate: "" })
   const [busyShortLinkId, setBusyShortLinkId] = useState("")
@@ -765,25 +764,43 @@ export default function Dashboard() {
               <div className="rounded-[1.75rem] border border-slate-200 bg-white p-4 shadow-sm">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">Workspace</p>
                 <div className="mt-4 grid gap-2">
-                  <Link href="/dashboard" className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-white">
+                  <button
+                    type="button"
+                    onClick={() => setActiveWorkspace("qr")}
+                    className={`rounded-2xl border px-4 py-3 text-left text-sm font-semibold transition ${activeWorkspace === "qr" ? "border-slate-300 bg-slate-50 text-slate-900 shadow-sm" : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50"}`}
+                  >
                     QR Dashboard
-                  </Link>
-                  <a href="#short-links-dashboard" className="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm font-semibold text-sky-700 shadow-sm">
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveWorkspace("short-links")}
+                    className={`rounded-2xl border px-4 py-3 text-left text-sm font-semibold transition ${activeWorkspace === "short-links" ? "border-sky-200 bg-sky-50 text-sky-700 shadow-sm" : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50"}`}
+                  >
                     Short Links
-                  </a>
+                  </button>
                 </div>
-              </div>
-              <div className="rounded-[1.75rem] border border-slate-200 bg-white p-4 shadow-sm">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">Page Navigation</p>
-                <nav className="mt-4 space-y-2 text-sm">
-                  <a href="#qr-dashboard" className="block rounded-2xl px-4 py-3 font-semibold text-slate-700 transition hover:bg-slate-50">QR Dashboard</a>
-                  <a href="#short-links-dashboard" className="block rounded-2xl px-4 py-3 font-semibold text-slate-700 transition hover:bg-slate-50">Short Links</a>
-                </nav>
               </div>
             </div>
           </aside>
 
           <div className="space-y-6">
+        <div className="flex flex-wrap gap-3 xl:hidden">
+          <button
+            type="button"
+            onClick={() => setActiveWorkspace("qr")}
+            className={`rounded-2xl border px-4 py-3 text-sm font-semibold transition ${activeWorkspace === "qr" ? "border-slate-300 bg-slate-50 text-slate-900 shadow-sm" : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50"}`}
+          >
+            QR Dashboard
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveWorkspace("short-links")}
+            className={`rounded-2xl border px-4 py-3 text-sm font-semibold transition ${activeWorkspace === "short-links" ? "border-sky-200 bg-sky-50 text-sky-700 shadow-sm" : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50"}`}
+          >
+            Short Links
+          </button>
+        </div>
+        {activeWorkspace === "qr" ? (
         <section id="qr-dashboard" className="flex flex-col gap-5 rounded-[2rem] border border-slate-200 bg-gradient-to-br from-white to-slate-100 p-8 shadow-sm lg:flex-row lg:items-end lg:justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-500">Control Center</p>
@@ -1479,7 +1496,9 @@ export default function Dashboard() {
                 </div>
               )}
             </section>
+            ) : null}
 
+            {activeWorkspace === "short-links" ? (
             <section id="short-links-dashboard" className="overflow-hidden rounded-[1.75rem] border border-slate-200 bg-white shadow-sm">
               <div className="border-b border-slate-200 bg-white px-4 pt-4 pb-3">
                 <div className="flex flex-col gap-3 xl:flex-row xl:items-end">
@@ -1719,6 +1738,7 @@ export default function Dashboard() {
                 )}
               </div>
             </section>
+            ) : null}
 
           </>
         )}
