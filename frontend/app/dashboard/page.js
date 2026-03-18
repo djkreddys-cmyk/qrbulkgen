@@ -463,7 +463,8 @@ export default function Dashboard() {
     if (channel === "whatsapp") {
       window.open(`https://wa.me/?text=${text}`, "_blank", "noreferrer")
     } else {
-      window.location.href = `mailto:?subject=${encodeURIComponent(job.qrType || "QR Code")}&body=${text}`
+      const subject = encodeURIComponent(job.qrType || "QR Code")
+      window.open(`https://mail.google.com/mail/?view=cm&fs=1&su=${subject}&body=${text}`, "_blank", "noreferrer")
     }
     setShareJob(null)
   }
@@ -688,13 +689,15 @@ export default function Dashboard() {
                               Download
                             </a>
                           )}
-                          <button
-                            type="button"
-                            onClick={() => handleToggleAnalysis(job.id)}
-                            className="rounded-2xl border border-sky-200 bg-sky-50 px-3.5 py-2.5 text-sm font-semibold text-sky-700 shadow-sm transition hover:-translate-y-0.5 hover:border-sky-300 hover:bg-white"
-                          >
-                            {analysisJobId === job.id ? "Hide Analysis" : "Analysis"}
-                          </button>
+                          {job.trackingMode !== "direct" ? (
+                            <button
+                              type="button"
+                              onClick={() => handleToggleAnalysis(job.id)}
+                              className="rounded-2xl border border-sky-200 bg-sky-50 px-3.5 py-2.5 text-sm font-semibold text-sky-700 shadow-sm transition hover:-translate-y-0.5 hover:border-sky-300 hover:bg-white"
+                            >
+                              {analysisJobId === job.id ? "Hide Analysis" : "Analysis"}
+                            </button>
+                          ) : null}
                           {job.status === "completed" && job.successCount > 0 ? (
                             <button
                               type="button"
@@ -798,7 +801,7 @@ export default function Dashboard() {
                                   <p className="mt-2 text-sm font-medium text-slate-800">{analysis.insight}</p>
                                 </div>
 
-                                {(currentTab === "overview" || currentTab === "scans") && (
+                                {job.trackingMode !== "tracked" && (currentTab === "overview" || currentTab === "scans") && (
                                 <div className="rounded-2xl border border-slate-200 bg-white p-4">
                                   <div className="flex items-start justify-between gap-4">
                                     <div>
@@ -938,7 +941,7 @@ export default function Dashboard() {
                                 </div>
                                 )}
 
-                                {analysis.typePerformance && (currentTab === "overview" || currentTab === "scans") && (
+                                {job.trackingMode !== "tracked" && analysis.typePerformance && (currentTab === "overview" || currentTab === "scans") && (
                                   <div className="rounded-2xl border border-slate-200 bg-white p-4">
                                     <div className="flex items-start justify-between gap-4">
                                       <div>
@@ -1085,10 +1088,10 @@ export default function Dashboard() {
               <div className="mt-6 grid gap-3">
                 <button
                   type="button"
-                  onClick={() => handleShareChannel(shareJob, "mail")}
+                  onClick={() => handleShareChannel(shareJob, "gmail")}
                   className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow"
                 >
-                  Share via Mail
+                  Share via Gmail
                 </button>
                 <button
                   type="button"
