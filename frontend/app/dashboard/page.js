@@ -800,7 +800,7 @@ export default function Dashboard() {
             Short Links
           </button>
         </div>
-        {activeWorkspace === "qr" ? (
+        {activeWorkspace === "qr" && (
           <>
             <section id="qr-dashboard" className="flex flex-col gap-5 rounded-[2rem] border border-slate-200 bg-gradient-to-br from-white to-slate-100 p-8 shadow-sm lg:flex-row lg:items-end lg:justify-between">
           <div>
@@ -1498,9 +1498,9 @@ export default function Dashboard() {
               )}
             </section>
           </>
-        ) : null}
+        )}
 
-        {activeWorkspace === "short-links" ? (
+        {activeWorkspace === "short-links" && (
             <section id="short-links-dashboard" className="overflow-hidden rounded-[1.75rem] border border-slate-200 bg-white shadow-sm">
               <div className="border-b border-slate-200 bg-white px-4 pt-4 pb-3">
                 <div className="flex flex-col gap-3 xl:flex-row xl:items-end">
@@ -1740,7 +1740,7 @@ export default function Dashboard() {
                 )}
               </div>
             </section>
-            ) : null}
+            )}
 
           </>
         )}
