@@ -126,6 +126,10 @@ function EmptyState({ title, body }) {
   );
 }
 
+function SectionEyebrow({ children }) {
+  return <Text style={{ fontSize: 12, fontWeight: "700", color: "#64748b", letterSpacing: 2 }}>{children}</Text>;
+}
+
 export function ShortLinksScreen({ variant = "create" }) {
   const { token } = useAuth();
   const [title, setTitle] = useState("");
@@ -320,6 +324,7 @@ export function ShortLinksScreen({ variant = "create" }) {
   return (
     <View style={{ gap: 16, paddingBottom: 36 }}>
       <Card>
+        <SectionEyebrow>CONTROL CENTER</SectionEyebrow>
         <Text style={{ fontSize: 24, fontWeight: "700", color: "#0f172a" }}>{isDashboardVariant ? "Short Links Dashboard" : "Short URL"}</Text>
         <Text style={{ color: "#64748b", lineHeight: 22 }}>
           {isDashboardVariant
@@ -374,6 +379,7 @@ export function ShortLinksScreen({ variant = "create" }) {
       </Card>
       ) : null}
 
+      {!isDashboardVariant ? (
       <Card>
         <Text style={{ fontSize: 20, fontWeight: "700", color: "#0f172a" }}>{isDashboardVariant ? "Create short URL" : "New short URL"}</Text>
         <Text style={{ color: "#64748b", lineHeight: 21 }}>
@@ -472,9 +478,11 @@ export function ShortLinksScreen({ variant = "create" }) {
           </View>
         ) : null}
       </Card>
+      ) : null}
 
       {isDashboardVariant ? (
       <Card>
+        <SectionEyebrow>ANALYTICS</SectionEyebrow>
         <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
           <View style={{ flex: 1 }}>
             <Text style={{ fontSize: 20, fontWeight: "700", color: "#0f172a" }}>Saved short links</Text>
@@ -515,8 +523,8 @@ export function ShortLinksScreen({ variant = "create" }) {
                     borderWidth: 1,
                     borderColor: "#e2e8f0",
                     borderRadius: 20,
-                    padding: 14,
-                    gap: 10,
+                    padding: Number(link.clickCount || 0) > 0 || expanded ? 14 : 12,
+                    gap: Number(link.clickCount || 0) > 0 || expanded ? 10 : 8,
                     backgroundColor: "#ffffff",
                   }}
                 >
@@ -544,7 +552,7 @@ export function ShortLinksScreen({ variant = "create" }) {
                         borderWidth: 1,
                         borderColor: "#cbd5e1",
                         borderRadius: 999,
-                        paddingHorizontal: 12,
+                        paddingHorizontal: 14,
                         paddingVertical: 8,
                         backgroundColor: "#ffffff",
                       }}
@@ -557,7 +565,7 @@ export function ShortLinksScreen({ variant = "create" }) {
                         borderWidth: 1,
                         borderColor: "#93c5fd",
                         borderRadius: 999,
-                        paddingHorizontal: 12,
+                        paddingHorizontal: 14,
                         paddingVertical: 8,
                         backgroundColor: "#eff6ff",
                       }}
@@ -570,7 +578,7 @@ export function ShortLinksScreen({ variant = "create" }) {
                         borderWidth: 1,
                         borderColor: "#93c5fd",
                         borderRadius: 999,
-                        paddingHorizontal: 12,
+                        paddingHorizontal: 14,
                         paddingVertical: 8,
                         backgroundColor: expanded ? "#dbeafe" : "#eff6ff",
                       }}

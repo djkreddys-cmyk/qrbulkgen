@@ -440,8 +440,8 @@ export function DashboardScreen() {
               borderWidth: 1,
               borderColor: workspace === "qr" ? "#cbd5e1" : "#dbe3f0",
               borderRadius: 18,
-              paddingVertical: 12,
-              paddingHorizontal: 14,
+              paddingVertical: 13,
+              paddingHorizontal: 16,
               backgroundColor: workspace === "qr" ? "#f8fafc" : "#ffffff",
             }}
           >
@@ -453,8 +453,8 @@ export function DashboardScreen() {
               borderWidth: 1,
               borderColor: workspace === "short-links" ? "#93c5fd" : "#dbe3f0",
               borderRadius: 18,
-              paddingVertical: 12,
-              paddingHorizontal: 14,
+              paddingVertical: 13,
+              paddingHorizontal: 16,
               backgroundColor: workspace === "short-links" ? "#e0f2fe" : "#ffffff",
             }}
           >

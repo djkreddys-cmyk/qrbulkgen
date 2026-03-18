@@ -188,6 +188,38 @@ function getJobTitle(job) {
   return job.jobType === "single" ? job.qrType || "Single QR" : `${job.qrType || "Bulk"} Bulk`
 }
 
+const DASHBOARD_PAGE_SIZE = 10
+
+function PaginationPills({ page, totalPages, totalItems, onChange }) {
+  if (totalPages <= 1) return null
+
+  const pages = Array.from({ length: totalPages }, (_, index) => index + 1)
+
+  return (
+    <div className="flex flex-wrap items-center justify-end gap-2">
+      {pages.map((pageNumber) => {
+        const start = (pageNumber - 1) * DASHBOARD_PAGE_SIZE + 1
+        const end = Math.min(pageNumber * DASHBOARD_PAGE_SIZE, totalItems)
+        const active = pageNumber === page
+        return (
+          <button
+            key={pageNumber}
+            type="button"
+            onClick={() => onChange(pageNumber)}
+            className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
+              active
+                ? "border-slate-900 bg-slate-900 text-white shadow-sm"
+                : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50"
+            }`}
+          >
+            {start}-{end}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
 export default function Dashboard() {
   const router = useRouter()
   const [user, setUser] = useState(null)
@@ -211,6 +243,9 @@ export default function Dashboard() {
   const [analysisLinkId, setAnalysisLinkId] = useState("")
   const [analysisLoadingLinkId, setAnalysisLoadingLinkId] = useState("")
   const [shortLinkAnalysisById, setShortLinkAnalysisById] = useState({})
+  const [exportingShortLinkReportId, setExportingShortLinkReportId] = useState("")
+  const [qrPage, setQrPage] = useState(1)
+  const [shortLinksPage, setShortLinksPage] = useState(1)
 
   const queryString = useMemo(() => buildQuery(filters), [filters])
 
@@ -254,6 +289,26 @@ export default function Dashboard() {
   useEffect(() => {
     setSelectedShortLinkIds((prev) => prev.filter((id) => shortLinks.some((link) => link.id === id)))
   }, [shortLinks])
+
+  useEffect(() => {
+    setQrPage(1)
+  }, [filters, activeWorkspace])
+
+  useEffect(() => {
+    setShortLinksPage(1)
+  }, [shortLinkFilters, activeWorkspace])
+
+  useEffect(() => {
+    if (qrPage > qrTotalPages) {
+      setQrPage(qrTotalPages)
+    }
+  }, [qrPage, qrTotalPages])
+
+  useEffect(() => {
+    if (shortLinksPage > shortLinksTotalPages) {
+      setShortLinksPage(shortLinksTotalPages)
+    }
+  }, [shortLinksPage, shortLinksTotalPages])
 
   async function handleDeleteJob(job) {
     const token = getAuthToken()
@@ -463,18 +518,24 @@ export default function Dashboard() {
     })
   }, [filters.qrType, filters.status, jobs])
 
+  const qrTotalPages = Math.max(Math.ceil(filteredJobs.length / DASHBOARD_PAGE_SIZE), 1)
+  const paginatedJobs = useMemo(() => {
+    const start = (qrPage - 1) * DASHBOARD_PAGE_SIZE
+    return filteredJobs.slice(start, start + DASHBOARD_PAGE_SIZE)
+  }, [filteredJobs, qrPage])
+
   const selectedJobs = useMemo(() => jobs.filter((job) => selectedJobIds.includes(job.id)), [jobs, selectedJobIds])
   const activeSelectedCount = selectedJobs.filter((job) => !job.archivedAt).length
   const archivedSelectedCount = selectedJobs.filter((job) => job.archivedAt).length
   const downloadableSelectedCount = selectedJobs.filter((job) => job.artifact?.filePath).length
-  const allFilteredSelected = filteredJobs.length > 0 && filteredJobs.every((job) => selectedJobIds.includes(job.id))
+  const allFilteredSelected = paginatedJobs.length > 0 && paginatedJobs.every((job) => selectedJobIds.includes(job.id))
 
   function toggleSelectAllFiltered() {
     if (allFilteredSelected) {
-      setSelectedJobIds((prev) => prev.filter((id) => !filteredJobs.some((job) => job.id === id)))
+      setSelectedJobIds((prev) => prev.filter((id) => !paginatedJobs.some((job) => job.id === id)))
       return
     }
-    setSelectedJobIds((prev) => Array.from(new Set([...prev, ...filteredJobs.map((job) => job.id)])))
+    setSelectedJobIds((prev) => Array.from(new Set([...prev, ...paginatedJobs.map((job) => job.id)])))
   }
 
   const filteredShortLinks = useMemo(() => {
@@ -505,6 +566,12 @@ export default function Dashboard() {
     })
   }, [shortLinks, shortLinkFilters])
 
+  const shortLinksTotalPages = Math.max(Math.ceil(filteredShortLinks.length / DASHBOARD_PAGE_SIZE), 1)
+  const paginatedShortLinks = useMemo(() => {
+    const start = (shortLinksPage - 1) * DASHBOARD_PAGE_SIZE
+    return filteredShortLinks.slice(start, start + DASHBOARD_PAGE_SIZE)
+  }, [filteredShortLinks, shortLinksPage])
+
   const selectedShortLinks = useMemo(
     () => shortLinks.filter((link) => selectedShortLinkIds.includes(link.id)),
     [shortLinks, selectedShortLinkIds],
@@ -512,7 +579,7 @@ export default function Dashboard() {
   const activeSelectedShortLinkCount = selectedShortLinks.filter((link) => !link.archivedAt).length
   const archivedSelectedShortLinkCount = selectedShortLinks.filter((link) => link.archivedAt).length
   const allFilteredShortLinksSelected =
-    filteredShortLinks.length > 0 && filteredShortLinks.every((link) => selectedShortLinkIds.includes(link.id))
+    paginatedShortLinks.length > 0 && paginatedShortLinks.every((link) => selectedShortLinkIds.includes(link.id))
 
   function toggleSelectedShortLink(linkId) {
     setSelectedShortLinkIds((prev) => (prev.includes(linkId) ? prev.filter((id) => id !== linkId) : [...prev, linkId]))
@@ -520,11 +587,11 @@ export default function Dashboard() {
 
   function toggleSelectAllFilteredShortLinks() {
     if (allFilteredShortLinksSelected) {
-      setSelectedShortLinkIds((prev) => prev.filter((id) => !filteredShortLinks.some((link) => link.id === id)))
+      setSelectedShortLinkIds((prev) => prev.filter((id) => !paginatedShortLinks.some((link) => link.id === id)))
       return
     }
 
-    setSelectedShortLinkIds((prev) => Array.from(new Set([...prev, ...filteredShortLinks.map((link) => link.id)])))
+    setSelectedShortLinkIds((prev) => Array.from(new Set([...prev, ...paginatedShortLinks.map((link) => link.id)])))
   }
 
   function getShareUrl(job) {
@@ -612,6 +679,43 @@ export default function Dashboard() {
       setError(downloadError.message || "Failed to download analysis report.")
     } finally {
       setExportingReportJobId("")
+    }
+  }
+
+  async function handleDownloadShortLinkAnalysisReport(link) {
+    const token = getAuthToken()
+    if (!token) {
+      router.replace("/login")
+      return
+    }
+
+    try {
+      setExportingShortLinkReportId(link.id)
+      const response = await fetch(`${API_BASE_URL}/short-links/${link.id}/analysis-report.csv`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => null)
+        throw new Error(data?.error?.message || "Failed to download short link analysis report")
+      }
+
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const downloadLink = document.createElement("a")
+      const safeTitle = String(link.title || link.slug || "short-link").replace(/[^a-z0-9]+/gi, "-").toLowerCase()
+      downloadLink.href = url
+      downloadLink.download = `${safeTitle || "short-link"}-analysis-report-${link.id}.csv`
+      document.body.appendChild(downloadLink)
+      downloadLink.click()
+      document.body.removeChild(downloadLink)
+      window.URL.revokeObjectURL(url)
+    } catch (downloadError) {
+      setError(downloadError.message || "Failed to download short link analysis report.")
+    } finally {
+      setExportingShortLinkReportId("")
     }
   }
 
@@ -899,19 +1003,21 @@ export default function Dashboard() {
                     <div className="flex items-center gap-3">
                       <label className="flex items-center gap-2 text-sm text-slate-600">
                         <input
-                          type="checkbox"
-                          checked={allFilteredSelected}
-                          onChange={toggleSelectAllFiltered}
-                          className="h-4 w-4 rounded border-slate-300 text-slate-950 focus:ring-sky-200"
-                        />
-                        <span>Select all</span>
+                            type="checkbox"
+                            checked={allFilteredSelected}
+                            onChange={toggleSelectAllFiltered}
+                            className="h-4 w-4 rounded border-slate-300 text-slate-950 focus:ring-sky-200"
+                          />
+                        <span>Select page</span>
                       </label>
                       <p className="text-sm text-slate-600">
                         <span className="font-semibold text-slate-900">{selectedJobIds.length}</span> job{selectedJobIds.length === 1 ? "" : "s"} selected
                       </p>
                     </div>
-                    {!!selectedJobIds.length && (
-                      <div className="flex flex-wrap items-center gap-2">
+                    <div className="flex flex-wrap items-center justify-end gap-2">
+                      <PaginationPills page={qrPage} totalPages={qrTotalPages} totalItems={filteredJobs.length} onChange={setQrPage} />
+                      {!!selectedJobIds.length && (
+                        <>
                         <button
                           type="button"
                           onClick={handleBulkDownload}
@@ -943,10 +1049,11 @@ export default function Dashboard() {
                         >
                           Clear selection
                         </button>
-                      </div>
-                    )}
+                        </>
+                      )}
+                    </div>
                   </div>
-                  {filteredJobs.map((job) => (
+                  {paginatedJobs.map((job) => (
                     <article key={job.id} className="group relative overflow-hidden rounded-[1.9rem] border border-slate-200 bg-white p-5 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-lg hover:shadow-slate-200/60 md:p-6">
                       <div className={`absolute inset-y-0 left-0 w-1.5 ${getStatusAccent(job.status)}`} />
                       <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
@@ -1586,14 +1693,16 @@ export default function Dashboard() {
                             onChange={toggleSelectAllFilteredShortLinks}
                             className="h-4 w-4 rounded border-slate-300 text-slate-950 focus:ring-sky-200"
                           />
-                          <span>Select all</span>
+                          <span>Select page</span>
                         </label>
                         <p className="text-sm text-slate-600">
                           <span className="font-semibold text-slate-900">{selectedShortLinkIds.length}</span> link{selectedShortLinkIds.length === 1 ? "" : "s"} selected
                         </p>
                       </div>
-                      {!!selectedShortLinkIds.length && (
-                        <div className="flex flex-wrap items-center gap-2">
+                      <div className="flex flex-wrap items-center justify-end gap-2">
+                        <PaginationPills page={shortLinksPage} totalPages={shortLinksTotalPages} totalItems={filteredShortLinks.length} onChange={setShortLinksPage} />
+                        {!!selectedShortLinkIds.length && (
+                          <>
                           <button
                             type="button"
                             onClick={handleBulkArchiveShortLinks}
@@ -1617,14 +1726,15 @@ export default function Dashboard() {
                           >
                             Clear selection
                           </button>
-                        </div>
-                      )}
+                          </>
+                        )}
+                      </div>
                     </div>
 
-                    {filteredShortLinks.map((link) => (
-                      <article key={link.id} className="group relative overflow-hidden rounded-[1.9rem] border border-slate-200 bg-white p-5 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-lg hover:shadow-slate-200/60 md:p-6">
+                    {paginatedShortLinks.map((link) => (
+                      <article key={link.id} className={`group relative overflow-hidden rounded-[1.9rem] border border-slate-200 bg-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-lg hover:shadow-slate-200/60 ${Number(link.clickCount || 0) > 0 || analysisLinkId === link.id ? "p-5 md:p-6" : "p-4 md:p-5"}`}>
                         <div className={`absolute inset-y-0 left-0 w-1.5 ${link.archivedAt ? "bg-amber-500" : isExpiredLink(link) ? "bg-rose-500" : Number(link.clickCount || 0) > 0 ? "bg-sky-500" : "bg-slate-300"}`} />
-                        <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+                        <div className={`flex flex-col lg:flex-row lg:items-start lg:justify-between ${Number(link.clickCount || 0) > 0 || analysisLinkId === link.id ? "gap-5" : "gap-4"}`}>
                           <div className="flex items-start gap-4">
                             <label className="mt-2 flex h-5 w-5 shrink-0 cursor-pointer items-center justify-center">
                               <input
@@ -1639,7 +1749,7 @@ export default function Dashboard() {
                                 <span className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] ${link.archivedAt ? "bg-amber-50 text-amber-700" : "bg-slate-100 text-slate-600"}`}>
                                   {link.archivedAt ? "Archived" : "Active"}
                                 </span>
-                                <span className="rounded-full bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-700">
+                                <span className={`rounded-full px-3 py-1 text-xs font-semibold ${Number(link.clickCount || 0) > 0 ? "bg-sky-50 text-sky-700" : "bg-slate-100 text-slate-500"}`}>
                                   Clicks: {link.clickCount}
                                 </span>
                                 {isExpiredLink(link) ? (
@@ -1662,21 +1772,21 @@ export default function Dashboard() {
                               </div>
                             </div>
                           </div>
-                          <div className="flex flex-wrap items-center gap-2 lg:max-w-[30rem] lg:flex-nowrap lg:justify-end">
-                            <button type="button" onClick={() => copyShortLink(link.url)} className="rounded-2xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow">
+                          <div className="flex flex-wrap items-center gap-2.5 lg:max-w-[34rem] lg:justify-end">
+                            <button type="button" onClick={() => copyShortLink(link.url)} className="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:bg-slate-50 hover:shadow">
                               Copy
                             </button>
-                            <button type="button" onClick={() => handleToggleShortLinkAnalysis(link.id)} className="rounded-2xl border border-sky-200 bg-white px-3.5 py-2.5 text-sm font-semibold text-sky-700 shadow-sm transition hover:-translate-y-0.5 hover:border-sky-300 hover:shadow">
+                            <button type="button" onClick={() => handleToggleShortLinkAnalysis(link.id)} className="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-2.5 text-sm font-semibold text-sky-700 shadow-sm transition hover:-translate-y-0.5 hover:border-sky-300 hover:bg-white hover:shadow">
                               {analysisLinkId === link.id ? "Hide Analysis" : "Analysis"}
                             </button>
-                            <a href={link.url} target="_blank" rel="noreferrer" className="rounded-2xl border border-sky-200 bg-white px-3.5 py-2.5 text-sm font-semibold text-sky-700 shadow-sm transition hover:-translate-y-0.5 hover:border-sky-300 hover:shadow">
+                            <a href={link.url} target="_blank" rel="noreferrer" className="rounded-2xl bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-slate-800 hover:shadow">
                               Open
                             </a>
                             <button
                               type="button"
                               onClick={() => handleDeleteShortLink(link)}
                               disabled={busyShortLinkId === link.id}
-                              className={`rounded-2xl bg-white px-3.5 py-2.5 text-sm font-semibold shadow-sm transition hover:-translate-y-0.5 hover:shadow disabled:cursor-not-allowed disabled:opacity-50 ${link.archivedAt ? "border border-rose-200 text-rose-700 hover:border-rose-300" : "border border-amber-200 text-amber-700 hover:border-amber-300"}`}
+                              className={`rounded-2xl bg-white px-4 py-2.5 text-sm font-semibold shadow-sm transition hover:-translate-y-0.5 hover:shadow disabled:cursor-not-allowed disabled:opacity-50 ${link.archivedAt ? "border border-rose-200 text-rose-700 hover:border-rose-300 hover:bg-rose-50" : "border border-amber-200 text-amber-700 hover:border-amber-300 hover:bg-amber-50"}`}
                             >
                               {link.archivedAt ? "Delete Permanently" : "Archive"}
                             </button>
@@ -1695,9 +1805,19 @@ export default function Dashboard() {
                                     <h4 className="mt-2 text-xl font-semibold text-slate-950">{link.title || link.slug}</h4>
                                     <p className="mt-1 text-sm text-slate-500">Analysis has been moved to the dashboard so QR and short URL reporting stay in one workspace.</p>
                                   </div>
-                                  <div className="rounded-2xl border border-sky-200 bg-sky-50 p-4 text-sm text-slate-700">
-                                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-700">Quick Insight</p>
-                                    <p className="mt-2 leading-6">{shortLinkAnalysisById[link.id].quickInsight}</p>
+                                  <div className="flex flex-wrap items-start justify-end gap-3">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleDownloadShortLinkAnalysisReport(link)}
+                                      disabled={exportingShortLinkReportId === link.id}
+                                      className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 disabled:cursor-not-allowed disabled:opacity-60"
+                                    >
+                                      {exportingShortLinkReportId === link.id ? "Preparing Excel..." : "Download Excel"}
+                                    </button>
+                                    <div className="max-w-sm rounded-2xl border border-sky-200 bg-sky-50 p-4 text-sm text-slate-700">
+                                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-700">Quick Insight</p>
+                                      <p className="mt-2 leading-6">{shortLinkAnalysisById[link.id].quickInsight}</p>
+                                    </div>
                                   </div>
                                 </div>
 
@@ -1738,6 +1858,9 @@ export default function Dashboard() {
                                     </div>
                                   </div>
                                 </div>
+                                <p className="text-xs text-slate-500">
+                                  Excel export includes visit date, visit time, visitor key, IP address, device details, and any stored location metadata for this short URL.
+                                </p>
                               </div>
                             ) : null}
                           </div>

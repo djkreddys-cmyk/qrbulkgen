@@ -90,6 +90,20 @@ function buildTrendLabel(value) {
   return parsed.toISOString().slice(5, 10);
 }
 
+function escapeCsvValue(value) {
+  const text = String(value ?? "");
+  if (!/[",\n]/.test(text)) return text;
+  return `"${text.replace(/"/g, '""')}"`;
+}
+
+function buildCsv(columns, rows) {
+  const header = columns.map((column) => escapeCsvValue(column.label)).join(",");
+  const lines = rows.map((row) =>
+    columns.map((column) => escapeCsvValue(row[column.key] ?? "")).join(","),
+  );
+  return `${[header, ...lines].join("\n")}\n`;
+}
+
 shortLinksRouter.post("/short-links", requireAuth, async (req, res, next) => {
   try {
     const targetUrl = String(req.body.targetUrl || "").trim();
@@ -245,6 +259,104 @@ shortLinksRouter.get("/short-links/:id/analysis", requireAuth, async (req, res, 
         })),
       },
     });
+  } catch (error) {
+    next(error);
+  }
+});
+
+shortLinksRouter.get("/short-links/:id/analysis-report.csv", requireAuth, async (req, res, next) => {
+  try {
+    const id = String(req.params.id || "").trim();
+    if (!id) {
+      throw createHttpError(400, "VALIDATION_ERROR", "Short link id is required");
+    }
+
+    const linkResult = await query(
+      `SELECT id, slug, title, target_url, expires_at, archived_at, is_active, created_at
+       FROM short_links
+       WHERE id = $1 AND user_id = $2
+       LIMIT 1`,
+      [id, req.user.id],
+    );
+
+    const link = linkResult.rows[0];
+    if (!link) {
+      throw createHttpError(404, "NOT_FOUND", "Short link not found");
+    }
+
+    const visitsResult = await query(
+      `SELECT
+         ae.created_at,
+         COALESCE(ae.metadata->>'visitorKey', '') AS visitor_key,
+         COALESCE(ae.metadata->>'userAgent', '') AS user_agent,
+         COALESCE(ae.metadata->>'ipAddress', '') AS ip_address,
+         COALESCE(ae.metadata->>'location', '') AS location,
+         COALESCE(ae.metadata->>'locationSource', '') AS location_source,
+         COALESCE(ae.metadata->>'city', '') AS city,
+         COALESCE(ae.metadata->>'region', '') AS region,
+         COALESCE(ae.metadata->>'country', '') AS country,
+         COALESCE(ae.metadata->>'latitude', '') AS latitude,
+         COALESCE(ae.metadata->>'longitude', '') AS longitude
+       FROM analytics_events ae
+       WHERE ae.event_type = 'short-link.visit'
+         AND ae.metadata->>'shortLinkId' = $1
+       ORDER BY ae.created_at DESC`,
+      [id],
+    );
+
+    const columns = [
+      { key: "title", label: "Title" },
+      { key: "shortUrl", label: "Short URL" },
+      { key: "targetUrl", label: "Target URL" },
+      { key: "visitDate", label: "Visit Date" },
+      { key: "visitTime", label: "Visit Time" },
+      { key: "visitorKey", label: "Visitor Key" },
+      { key: "userAgent", label: "User Agent" },
+      { key: "ipAddress", label: "IP Address" },
+      { key: "location", label: "Location" },
+      { key: "locationSource", label: "Location Source" },
+      { key: "city", label: "City" },
+      { key: "region", label: "Region" },
+      { key: "country", label: "Country" },
+      { key: "latitude", label: "Latitude" },
+      { key: "longitude", label: "Longitude" },
+      { key: "createdAt", label: "Short Link Created At" },
+      { key: "expiresAt", label: "Expires At" },
+      { key: "archived", label: "Archived" },
+    ];
+
+    const rows = visitsResult.rows.map((row) => {
+      const visitedAt = row.created_at ? new Date(row.created_at) : null;
+      const validDate = visitedAt && !Number.isNaN(visitedAt.getTime()) ? visitedAt : null;
+      return {
+        title: link.title || link.slug || "",
+        shortUrl: buildShortLinkUrl(link.slug),
+        targetUrl: link.target_url || "",
+        visitDate: validDate ? validDate.toISOString().slice(0, 10) : "",
+        visitTime: validDate ? validDate.toISOString().slice(11, 19) : "",
+        visitorKey: row.visitor_key || "",
+        userAgent: row.user_agent || "",
+        ipAddress: row.ip_address || "",
+        location: row.location || "",
+        locationSource: row.location_source || "",
+        city: row.city || "",
+        region: row.region || "",
+        country: row.country || "",
+        latitude: row.latitude || "",
+        longitude: row.longitude || "",
+        createdAt: link.created_at || "",
+        expiresAt: link.expires_at || "",
+        archived: link.archived_at || !link.is_active ? "Yes" : "No",
+      };
+    });
+
+    const csv = buildCsv(columns, rows);
+    const safeBase = String(link.title || link.slug || "short-link").replace(/[^a-z0-9]+/gi, "-").replace(/^-+|-+$/g, "").toLowerCase();
+    const fileName = `${safeBase || "short-link"}-analysis-report-${link.id}.csv`;
+
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
+    res.status(200).send(csv);
   } catch (error) {
     next(error);
   }
