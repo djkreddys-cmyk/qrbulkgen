@@ -276,6 +276,17 @@ async function markFailed(jobId, message) {
   );
 }
 
+async function updateJobProgress(jobId, successCount, failureCount) {
+  await db.query(
+    `UPDATE qr_jobs
+     SET success_count = $2,
+         failure_count = $3,
+         updated_at = NOW()
+     WHERE id = $1`,
+    [jobId, successCount, failureCount],
+  );
+}
+
 async function processBulkJob(jobId, queuedRows = null) {
   const result = await db.query(
     `SELECT
@@ -322,6 +333,7 @@ async function processBulkJob(jobId, queuedRows = null) {
          VALUES ($1, $2, $3, $4, 'failed', $5)`,
         [jobId, i, "", String(job.tracking_mode || "tracked").toLowerCase(), "Unable to build QR content from CSV row"],
       );
+      await updateJobProgress(jobId, successCount, failureCount);
       continue;
     }
 
@@ -333,6 +345,7 @@ async function processBulkJob(jobId, queuedRows = null) {
          VALUES ($1, $2, $3, $4, 'failed', $5)`,
         [jobId, i, content, String(job.tracking_mode || "tracked").toLowerCase(), "Missing filename column value"],
       );
+      await updateJobProgress(jobId, successCount, failureCount);
       continue;
     }
     const rowFileBase = sanitizeFileBaseName(requestedFileName, "");
@@ -343,6 +356,7 @@ async function processBulkJob(jobId, queuedRows = null) {
          VALUES ($1, $2, $3, $4, 'failed', $5)`,
         [jobId, i, content, String(job.tracking_mode || "tracked").toLowerCase(), "Filename could not be sanitized"],
       );
+      await updateJobProgress(jobId, successCount, failureCount);
       continue;
     }
     const fileName = `${rowFileBase}.${job.output_format || "png"}`;
@@ -404,6 +418,7 @@ async function processBulkJob(jobId, queuedRows = null) {
           path.relative(uploadsRoot, filePath).replace(/\\/g, "/"),
         ],
       );
+      await updateJobProgress(jobId, successCount, failureCount);
     } catch {
       failureCount += 1;
       await db.query(
@@ -411,6 +426,7 @@ async function processBulkJob(jobId, queuedRows = null) {
          VALUES ($1, $2, $3, $4, 'failed', $5, $6)`,
         [jobId, i, content, String(job.tracking_mode || "tracked").toLowerCase(), fileName, "QR generation failed for row"],
       );
+      await updateJobProgress(jobId, successCount, failureCount);
     }
   }
 

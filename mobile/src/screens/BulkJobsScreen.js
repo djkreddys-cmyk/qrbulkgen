@@ -53,7 +53,6 @@ export function BulkJobsScreen() {
   const [createFilenamePrefix, setCreateFilenamePrefix] = useState("qr");
   const [selectedFile, setSelectedFile] = useState(null);
   const [creatingJob, setCreatingJob] = useState(false);
-  const [qrTypeFilter, setQrTypeFilter] = useState("All");
   const [selectedJobId, setSelectedJobId] = useState("");
   const [selectedJob, setSelectedJob] = useState(null);
   const [items, setItems] = useState([]);
@@ -101,24 +100,17 @@ export function BulkJobsScreen() {
     };
   }, [token, selectedJobId]);
 
-  const filteredJobs = useMemo(() => {
-    if (qrTypeFilter === "All") {
-      return jobs;
-    }
-    return jobs.filter((job) => job.qrType === qrTypeFilter);
-  }, [jobs, qrTypeFilter]);
-
   useEffect(() => {
-    if (!filteredJobs.length) {
+    if (!jobs.length) {
       setSelectedJobId("");
       return;
     }
 
-    const exists = filteredJobs.some((job) => job.id === selectedJobId);
+    const exists = jobs.some((job) => job.id === selectedJobId);
     if (!exists) {
-      setSelectedJobId(filteredJobs[0].id);
+      setSelectedJobId(jobs[0].id);
     }
-  }, [filteredJobs, selectedJobId]);
+  }, [jobs, selectedJobId]);
 
   useEffect(() => {
     let mounted = true;
@@ -157,6 +149,18 @@ export function BulkJobsScreen() {
   }, [selectedJobId, token]);
 
   const recentFailures = useMemo(() => items.filter((item) => item.status === "failed").slice(0, 5), [items]);
+  const activeBulkProgress = useMemo(() => {
+    const total = Number(selectedJob?.totalCount || 0);
+    const success = Number(selectedJob?.successCount || 0);
+    const failure = Number(selectedJob?.failureCount || 0);
+    const processed = success + failure;
+    return {
+      total,
+      processed,
+      percent: total > 0 ? Math.min(100, Math.round((processed / total) * 100)) : 0,
+    };
+  }, [selectedJob]);
+  const isSelectedZipReady = Boolean(selectedJob?.artifact?.filePath?.startsWith("data:"));
 
   useEffect(() => {
     if (!editingJobId) {
@@ -537,116 +541,64 @@ export function BulkJobsScreen() {
       </Card>
 
       <Card>
-        <Text style={{ fontSize: 20, fontWeight: "700", color: "#0f172a" }}>Filter Bulk Jobs</Text>
-        <View
-          style={{
-            borderWidth: 1,
-            borderColor: "#cbd5e1",
-            borderRadius: 16,
-            overflow: "hidden",
-          }}
-        >
-          <Picker selectedValue={qrTypeFilter} onValueChange={setQrTypeFilter}>
-            <Picker.Item label="All QR Types" value="All" />
-            {QR_TYPES.map((option) => (
-              <Picker.Item key={option} label={option} value={option} />
-            ))}
-          </Picker>
-        </View>
-        <Text style={{ color: "#64748b" }}>
-          {qrTypeFilter === "All"
-            ? "Showing every bulk job in your account."
-            : `Showing ${qrTypeFilter} bulk jobs only.`}
-        </Text>
-      </Card>
-
-      <Card>
-        <Text style={{ fontSize: 20, fontWeight: "700", color: "#0f172a" }}>Recent Bulk Jobs</Text>
-        {busy ? (
-          <Text style={{ color: "#64748b" }}>Loading jobs...</Text>
-        ) : filteredJobs.length ? (
-          filteredJobs.map((job) => {
-            const active = selectedJobId === job.id;
-            return (
-              <TouchableOpacity
-                key={job.id}
-                onPress={() => setSelectedJobId(job.id)}
-                style={{
-                  borderWidth: 1,
-                  borderColor: active ? "#0f172a" : "#dbe3f0",
-                  borderRadius: 18,
-                  padding: 14,
-                  backgroundColor: active ? "#eff6ff" : "#ffffff",
-                  gap: 4,
-                }}
-              >
-                <Text style={{ fontWeight: "700", color: "#0f172a" }}>{job.qrType}</Text>
-                <Text style={{ color: "#475569" }}>{job.status.toUpperCase()}</Text>
-                <Text style={{ color: "#64748b" }}>
-                  {job.successCount}/{job.totalCount} complete
-                </Text>
-                <Text numberOfLines={1} style={{ color: "#94a3b8", fontSize: 12 }}>
-                  {job.id}
-                </Text>
-              </TouchableOpacity>
-            );
-          })
-        ) : (
-          <Text style={{ color: "#64748b" }}>
-            {qrTypeFilter === "All" ? "No bulk jobs yet." : `No ${qrTypeFilter} bulk jobs yet.`}
-          </Text>
-        )}
-      </Card>
-
-      <Card>
-        <Text style={{ fontSize: 20, fontWeight: "700", color: "#0f172a" }}>Job Details</Text>
+        <Text style={{ fontSize: 20, fontWeight: "700", color: "#0f172a" }}>Bulk Status</Text>
         {detailBusy ? (
           <Text style={{ color: "#64748b" }}>Loading selected job...</Text>
         ) : selectedJob ? (
           <>
-            <View style={{ flexDirection: "row", gap: 10 }}>
-              <StatPill label="Status" value={selectedJob.status.toUpperCase()} />
-              <StatPill label="QR Type" value={selectedJob.qrType} />
-            </View>
-            <View style={{ flexDirection: "row", gap: 10 }}>
-              <StatPill label="Requested" value={selectedJob.totalCount} />
-              <StatPill label="Success" value={selectedJob.successCount} tone="#047857" />
-              <StatPill label="Failure" value={selectedJob.failureCount} tone="#b91c1c" />
-            </View>
             <Text style={{ color: "#64748b" }}>Source file: {selectedJob.sourceFileName}</Text>
+            <Text style={{ color: "#64748b", fontSize: 12 }}>{selectedJob.id}</Text>
+            {!isSelectedZipReady ? (
+              <View
+                style={{
+                  borderWidth: 1,
+                  borderColor: "#dbe3f0",
+                  borderRadius: 16,
+                  paddingHorizontal: 14,
+                  paddingVertical: 12,
+                  backgroundColor: "#f8fafc",
+                }}
+              >
+                <Text style={{ color: "#334155", fontWeight: "600" }}>
+                  Bulk QR generation {activeBulkProgress.percent}% complete, {activeBulkProgress.processed} of {activeBulkProgress.total} processed.
+                </Text>
+              </View>
+            ) : null}
             {selectedJob.errorMessage ? (
               <Text style={{ color: "#b91c1c" }}>{selectedJob.errorMessage}</Text>
             ) : null}
-            <View style={{ flexDirection: "row", gap: 12 }}>
-              <TouchableOpacity
-                onPress={handleDownloadArtifact}
-                disabled={!selectedJob.artifact?.filePath?.startsWith("data:")}
-                style={{
-                  flex: 1,
-                  backgroundColor: selectedJob.artifact?.filePath?.startsWith("data:") ? "#e2e8f0" : "#cbd5e1",
-                  paddingVertical: 14,
-                  borderRadius: 16,
-                }}
-              >
-                <Text style={{ color: "#0f172a", textAlign: "center", fontWeight: "700" }}>
-                  {selectedJob.artifact?.filePath?.startsWith("data:") ? "Share ZIP File" : "ZIP Not Ready"}
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={handleSaveArtifact}
-                disabled={!selectedJob.artifact?.filePath?.startsWith("data:")}
-                style={{
-                  flex: 1,
-                  backgroundColor: selectedJob.artifact?.filePath?.startsWith("data:") ? "#0f172a" : "#cbd5e1",
-                  paddingVertical: 14,
-                  borderRadius: 16,
-                }}
-              >
-                <Text style={{ color: "#ffffff", textAlign: "center", fontWeight: "700" }}>
-                  {selectedJob.artifact?.filePath?.startsWith("data:") ? "Download ZIP" : "ZIP Not Ready"}
-                </Text>
-              </TouchableOpacity>
-            </View>
+            {isSelectedZipReady ? (
+              <View style={{ flexDirection: "row", gap: 12 }}>
+                <TouchableOpacity
+                  onPress={handleDownloadArtifact}
+                  disabled={!isSelectedZipReady}
+                  style={{
+                    flex: 1,
+                    backgroundColor: isSelectedZipReady ? "#e2e8f0" : "#cbd5e1",
+                    paddingVertical: 14,
+                    borderRadius: 16,
+                  }}
+                >
+                  <Text style={{ color: "#0f172a", textAlign: "center", fontWeight: "700" }}>
+                    Share ZIP
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={handleSaveArtifact}
+                  disabled={!isSelectedZipReady}
+                  style={{
+                    flex: 1,
+                    backgroundColor: isSelectedZipReady ? "#0f172a" : "#cbd5e1",
+                    paddingVertical: 14,
+                    borderRadius: 16,
+                  }}
+                >
+                  <Text style={{ color: "#ffffff", textAlign: "center", fontWeight: "700" }}>
+                    Download ZIP
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            ) : null}
 
             <View style={{ gap: 8 }}>
               <Text style={{ fontWeight: "700", color: "#0f172a" }}>Recent failed rows</Text>
@@ -667,7 +619,9 @@ export function BulkJobsScreen() {
             </View>
           </>
         ) : (
-          <Text style={{ color: "#64748b" }}>Select a job to view details.</Text>
+          <Text style={{ color: "#64748b" }}>
+            {busy ? "Loading jobs..." : "No bulk jobs yet."}
+          </Text>
         )}
       </Card>
 
