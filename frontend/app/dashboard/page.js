@@ -450,7 +450,16 @@ export default function Dashboard() {
   }
 
   function getShareUrl(job) {
-    return job?.managedLink?.url || (job?.artifact?.filePath ? toAbsoluteDownloadUrl(job.artifact.filePath) : "")
+    if (job?.trackingMode === "tracked" && job?.managedLink?.id && typeof window !== "undefined") {
+      return `${window.location.origin}/q/${job.managedLink.id}`
+    }
+
+    const directContent = String(job?.editPayload?.content || "").trim()
+    if (directContent) {
+      return directContent
+    }
+
+    return job?.artifact?.filePath ? toAbsoluteDownloadUrl(job.artifact.filePath) : ""
   }
 
   function handleShareChannel(job, channel) {
