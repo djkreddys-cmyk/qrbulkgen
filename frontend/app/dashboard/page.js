@@ -1499,6 +1499,13 @@ export default function Dashboard() {
         </>
 
         <div className={activeWorkspace === "short-links" ? "" : "hidden"}>
+            <section className="mb-6 flex flex-col gap-5 rounded-[2rem] border border-slate-200 bg-gradient-to-br from-white to-slate-100 p-8 shadow-sm lg:flex-row lg:items-end lg:justify-between">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-500">Control Center</p>
+                <h1 className="mt-3 text-4xl font-semibold tracking-tight text-slate-950">Short Links Dashboard</h1>
+                {user && <p className="mt-3 max-w-4xl text-slate-600">Welcome back, {user.name || user.email}. Open analysis on each saved short URL to review clicks, visitors, expiry status, and related link performance in one focused dashboard.</p>}
+              </div>
+            </section>
             <section id="short-links-dashboard" className="overflow-hidden rounded-[1.75rem] border border-slate-200 bg-white shadow-sm">
               <div className="border-b border-slate-200 bg-white px-4 pt-4 pb-3">
                 <div className="flex flex-col gap-3 xl:flex-row xl:items-end">

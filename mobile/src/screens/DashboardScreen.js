@@ -4,6 +4,7 @@ import { Alert, Image, ScrollView, Share, Text, TextInput, TouchableOpacity, Vie
 import { useAuth } from "../context/AuthContext";
 import { apiRequest, createAuthHeaders, API_BASE_URL } from "../lib/api";
 import { shareDataUrlFile } from "../lib/files";
+import { ShortLinksScreen } from "./ShortLinksScreen";
 
 function buildQuery(filters) {
   const params = new URLSearchParams();
@@ -232,6 +233,7 @@ function getShareUrl(job) {
 
 export function DashboardScreen() {
   const { token, navigate, setSingleDraft, setBulkDraft } = useAuth();
+  const [workspace, setWorkspace] = useState("qr");
   const [filters, setFilters] = useState({ startDate: "", endDate: "", qrType: "all", status: "active" });
   const [jobs, setJobs] = useState([]);
   const [expandedJobId, setExpandedJobId] = useState("");
@@ -429,6 +431,42 @@ export function DashboardScreen() {
 
   return (
     <ScrollView contentContainerStyle={{ gap: 16, paddingBottom: 36 }}>
+      <Card style={{ shadowColor: "#cbd5e1", shadowOpacity: 0.25, shadowRadius: 10, shadowOffset: { width: 0, height: 2 } }}>
+        <Text style={{ fontSize: 12, fontWeight: "700", color: "#64748b", letterSpacing: 2 }}>WORKSPACE</Text>
+        <View style={{ gap: 10 }}>
+          <TouchableOpacity
+            onPress={() => setWorkspace("qr")}
+            style={{
+              borderWidth: 1,
+              borderColor: workspace === "qr" ? "#cbd5e1" : "#dbe3f0",
+              borderRadius: 18,
+              paddingVertical: 12,
+              paddingHorizontal: 14,
+              backgroundColor: workspace === "qr" ? "#f8fafc" : "#ffffff",
+            }}
+          >
+            <Text style={{ color: "#0f172a", fontWeight: "700" }}>QR Dashboard</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => setWorkspace("short-links")}
+            style={{
+              borderWidth: 1,
+              borderColor: workspace === "short-links" ? "#93c5fd" : "#dbe3f0",
+              borderRadius: 18,
+              paddingVertical: 12,
+              paddingHorizontal: 14,
+              backgroundColor: workspace === "short-links" ? "#e0f2fe" : "#ffffff",
+            }}
+          >
+            <Text style={{ color: workspace === "short-links" ? "#0369a1" : "#0f172a", fontWeight: "700" }}>Short Links</Text>
+          </TouchableOpacity>
+        </View>
+      </Card>
+
+      {workspace === "short-links" ? <ShortLinksScreen variant="dashboard" /> : null}
+
+      {workspace === "qr" ? (
+      <>
       <Card>
         <Text style={{ fontSize: 24, fontWeight: "700", color: "#0f172a" }}>Analytics Dashboard</Text>
         <Text style={{ color: "#64748b", lineHeight: 22 }}>
@@ -889,6 +927,8 @@ export function DashboardScreen() {
           </View>
         )}
       </Card>
+      </>
+      ) : null}
     </ScrollView>
   );
 }

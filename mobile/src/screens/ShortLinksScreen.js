@@ -126,7 +126,7 @@ function EmptyState({ title, body }) {
   );
 }
 
-export function ShortLinksScreen() {
+export function ShortLinksScreen({ variant = "create" }) {
   const { token } = useAuth();
   const [title, setTitle] = useState("");
   const [targetUrl, setTargetUrl] = useState("");
@@ -315,12 +315,16 @@ export function ShortLinksScreen() {
     }
   }
 
+  const isDashboardVariant = variant === "dashboard";
+
   return (
     <View style={{ gap: 16, paddingBottom: 36 }}>
       <Card>
-        <Text style={{ fontSize: 24, fontWeight: "700", color: "#0f172a" }}>Short Links</Text>
+        <Text style={{ fontSize: 24, fontWeight: "700", color: "#0f172a" }}>{isDashboardVariant ? "Short Links Dashboard" : "Short URL"}</Text>
         <Text style={{ color: "#64748b", lineHeight: 22 }}>
-          Create clean short links like qrbulkgen.com/a7K9xQ, manage expiry, and review click activity from mobile.
+          {isDashboardVariant
+            ? "Open analysis on each saved short URL to review clicks, visitors, expiry status, and related link performance from mobile."
+            : "Create clean short URLs like qrbulkgen.com/a7K9xQ, manage expiry, and then review analytics from the dashboard workspace."}
         </Text>
       </Card>
 
@@ -336,6 +340,7 @@ export function ShortLinksScreen() {
         </Card>
       )}
 
+      {isDashboardVariant ? (
       <Card>
         <Text style={{ fontSize: 20, fontWeight: "700", color: "#0f172a" }}>Short link analytics</Text>
         <Text style={{ color: "#64748b", lineHeight: 21 }}>
@@ -367,11 +372,14 @@ export function ShortLinksScreen() {
           </View>
         ) : null}
       </Card>
+      ) : null}
 
       <Card>
-        <Text style={{ fontSize: 20, fontWeight: "700", color: "#0f172a" }}>New short link</Text>
+        <Text style={{ fontSize: 20, fontWeight: "700", color: "#0f172a" }}>{isDashboardVariant ? "Create short URL" : "New short URL"}</Text>
         <Text style={{ color: "#64748b", lineHeight: 21 }}>
-          Freshly created links appear first in the saved list below.
+          {isDashboardVariant
+            ? "Create a short URL here, then review saved short links and analysis below."
+            : "Open the dashboard workspace to review saved short links and analysis."}
         </Text>
         <View style={{ gap: 6 }}>
           <Text style={{ color: "#64748b", fontSize: 12, fontWeight: "700" }}>TITLE</Text>
@@ -458,13 +466,14 @@ export function ShortLinksScreen() {
         </TouchableOpacity>
         {createdLink ? (
           <View style={{ borderWidth: 1, borderColor: "#bfdbfe", borderRadius: 16, padding: 12, backgroundColor: "#eff6ff", gap: 4 }}>
-            <Text style={{ color: "#1d4ed8", fontSize: 12, fontWeight: "700" }}>LATEST SHORT LINK</Text>
+            <Text style={{ color: "#1d4ed8", fontSize: 12, fontWeight: "700" }}>LATEST SHORT URL</Text>
             <Text style={{ color: "#0f172a", fontWeight: "700" }}>{createdLink.url}</Text>
             <Text style={{ color: "#475569" }}>Target: {createdLink.targetUrl}</Text>
           </View>
         ) : null}
       </Card>
 
+      {isDashboardVariant ? (
       <Card>
         <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
           <View style={{ flex: 1 }}>
@@ -657,6 +666,7 @@ export function ShortLinksScreen() {
           </View>
         )}
       </Card>
+      ) : null}
     </View>
   );
 }
