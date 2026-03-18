@@ -596,6 +596,23 @@ publicRouter.post("/track-view", async (req, res, next) => {
       );
     }
 
+    const visitorKey = buildVisitorKey(req, linkId);
+    const duplicateScanResult = await query(
+      `SELECT id
+       FROM analytics_events
+       WHERE event_type = 'qr.public.scan'
+         AND COALESCE(metadata->>'linkId', '') = $1
+         AND COALESCE(metadata->>'visitorKey', '') = $2
+         AND created_at >= NOW() - INTERVAL '12 seconds'
+       ORDER BY created_at DESC
+       LIMIT 1`,
+      [linkId || "", visitorKey],
+    );
+
+    if (duplicateScanResult.rows[0]) {
+      return res.status(201).json({ ok: true, deduped: true });
+    }
+
     await trackEvent({
       eventType: "qr.public.scan",
       metadata: {
@@ -604,7 +621,7 @@ publicRouter.post("/track-view", async (req, res, next) => {
         targetKind: targetKind || null,
         expired,
         linkId: linkId || null,
-        visitorKey: buildVisitorKey(req, linkId),
+        visitorKey,
         userAgent: String(req.headers["user-agent"] || "").slice(0, 255),
         ipAddress,
         location: preferredLocation?.label || null,

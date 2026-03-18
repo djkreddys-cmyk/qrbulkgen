@@ -5,6 +5,7 @@ import ManagedQrClient from "./ManagedQrClient"
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:4000/api"
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+const HOSTED_TRACKED_TYPES = new Set(["Rating", "Feedback", "PDF", "Image Gallery"])
 
 export const dynamic = "force-dynamic"
 
@@ -127,7 +128,9 @@ export default async function ManagedQrPage({ params }) {
   )
 
   if (shouldDirectJump) {
-    await trackManagedView(await headers(), link)
+    if (!HOSTED_TRACKED_TYPES.has(String(link.qrType || "").trim())) {
+      await trackManagedView(await headers(), link)
+    }
     redirect(openHref)
   }
 

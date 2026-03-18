@@ -106,6 +106,14 @@ function appendManagedLinkIdToUrl(value, linkId) {
   }
 }
 
+function getTrackedEncodedContent(qrType, managedLink) {
+  if (!managedLink) return "";
+  if (TRACKED_ONLY_QR_TYPES.has(String(qrType || "").trim())) {
+    return managedLink.content || managedLink.url || "";
+  }
+  return managedLink.url || managedLink.content || "";
+}
+
 async function upsertSingleJob({
   userId,
   jobId = null,
@@ -138,7 +146,7 @@ async function upsertSingleJob({
         ]);
         managedLink.content = trackedContent;
       }
-      qrEncodedContent = managedLink.url;
+      qrEncodedContent = getTrackedEncodedContent(qrType, managedLink);
     }
     const dataUrl = await createSingleQrDataUrl({
       ...payload,
@@ -314,7 +322,7 @@ async function upsertSingleJob({
     });
   }
   if (managedLink?.id) {
-    qrEncodedContent = managedLink.url;
+    qrEncodedContent = getTrackedEncodedContent(lockedQrType, managedLink);
   }
 
   const dataUrl = await createSingleQrDataUrl({

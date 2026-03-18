@@ -231,6 +231,7 @@ async function createManagedBulkLink(job, content, row) {
   );
   return {
     id: result.rows[0].id,
+    content,
     url: `${frontendBaseUrl}/q/${result.rows[0].id}`,
   };
 }
@@ -355,8 +356,12 @@ async function processBulkJob(jobId, queuedRows = null) {
             managedLink.id,
             trackedContent,
           ]);
+          managedLink.content = trackedContent;
         }
-        qrEncodedContent = managedLink.url;
+        qrEncodedContent =
+          ["Rating", "Feedback", "PDF", "Image Gallery"].includes(String(job.bulk_qr_type || "").trim())
+            ? managedLink.content || managedLink.url
+            : managedLink.url;
       }
       if ((job.output_format || "png") === "svg") {
         const svg = await QRCode.toString(qrEncodedContent, {
