@@ -290,26 +290,6 @@ export default function Dashboard() {
     setSelectedShortLinkIds((prev) => prev.filter((id) => shortLinks.some((link) => link.id === id)))
   }, [shortLinks])
 
-  useEffect(() => {
-    setQrPage(1)
-  }, [filters, activeWorkspace])
-
-  useEffect(() => {
-    setShortLinksPage(1)
-  }, [shortLinkFilters, activeWorkspace])
-
-  useEffect(() => {
-    if (qrPage > qrTotalPages) {
-      setQrPage(qrTotalPages)
-    }
-  }, [qrPage, qrTotalPages])
-
-  useEffect(() => {
-    if (shortLinksPage > shortLinksTotalPages) {
-      setShortLinksPage(shortLinksTotalPages)
-    }
-  }, [shortLinksPage, shortLinksTotalPages])
-
   async function handleDeleteJob(job) {
     const token = getAuthToken()
     if (!token) return
@@ -571,6 +551,26 @@ export default function Dashboard() {
     const start = (shortLinksPage - 1) * DASHBOARD_PAGE_SIZE
     return filteredShortLinks.slice(start, start + DASHBOARD_PAGE_SIZE)
   }, [filteredShortLinks, shortLinksPage])
+
+  useEffect(() => {
+    setQrPage(1)
+  }, [filters, activeWorkspace])
+
+  useEffect(() => {
+    setShortLinksPage(1)
+  }, [shortLinkFilters, activeWorkspace])
+
+  useEffect(() => {
+    if (qrPage > qrTotalPages) {
+      setQrPage(qrTotalPages)
+    }
+  }, [qrPage, qrTotalPages])
+
+  useEffect(() => {
+    if (shortLinksPage > shortLinksTotalPages) {
+      setShortLinksPage(shortLinksTotalPages)
+    }
+  }, [shortLinksPage, shortLinksTotalPages])
 
   const selectedShortLinks = useMemo(
     () => shortLinks.filter((link) => selectedShortLinkIds.includes(link.id)),
