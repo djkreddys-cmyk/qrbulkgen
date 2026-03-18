@@ -30,7 +30,11 @@ function getCell(row, name) {
 
 function sanitizeFileBaseName(value, fallback) {
   const raw = String(value || "").trim();
-  const safe = raw.replace(/[^a-zA-Z0-9-_]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
+  const safe = raw
+    .replace(/[<>:"/\\|?*\u0000-\u001F]/g, "")
+    .replace(/\s+/g, " ")
+    .replace(/[. ]+$/g, "")
+    .trim();
   return (safe || fallback).slice(0, 120);
 }
 

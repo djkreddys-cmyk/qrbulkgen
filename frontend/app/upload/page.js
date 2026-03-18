@@ -10,7 +10,6 @@ import {
   BULK_QR_TYPES,
   BULK_REQUIRED_COLUMNS_BY_TYPE,
   BULK_SAMPLE_ROWS_BY_TYPE,
-  DOWNLOAD_RESOLUTIONS,
   getDefaultTrackingMode,
   supportsTrackingModeSelection,
   TRACKING_MODE_OPTIONS,
@@ -48,7 +47,6 @@ export function BulkGenerateContent({ embedded = false }) {
   const [cornerSquareStyle, setCornerSquareStyle] = useState("extra-rounded")
   const [cornerDotStyle, setCornerDotStyle] = useState("dot")
   const [logoDataUrl, setLogoDataUrl] = useState("")
-  const [downloadResolution, setDownloadResolution] = useState(1024)
   const [previewContent, setPreviewContent] = useState(previewFromSampleType("URL"))
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState("")
@@ -295,18 +293,6 @@ export function BulkGenerateContent({ embedded = false }) {
       setLogoDataUrl(String(reader.result || ""))
     }
     reader.readAsDataURL(file)
-  }
-
-  function handleDownloadPreview() {
-    if (!qrCodeRef.current || !previewContent.trim()) return
-    qrCodeRef.current.update({
-      width: downloadResolution,
-      height: downloadResolution,
-    })
-    const name = (filenamePrefix || "bulk-preview").replace(/[^a-zA-Z0-9-_]/g, "") || "bulk-preview"
-    const downloadExtension = format === "jpg" ? "jpeg" : format
-    qrCodeRef.current.download({ name, extension: downloadExtension })
-    qrCodeRef.current.update({ width: 340, height: 340 })
   }
 
   async function handleSubmit(event) {
@@ -605,81 +591,36 @@ export function BulkGenerateContent({ embedded = false }) {
                 <option value="jpg">JPG</option>
                 <option value="svg">SVG</option>
               </select>
-              <label className="block mb-1">Download Resolution</label>
-              <select value={downloadResolution} onChange={(e) => setDownloadResolution(Number(e.target.value))} className="w-full border p-2">
-                {DOWNLOAD_RESOLUTIONS.map((res) => (
-                  <option key={res} value={res}>{res} x {res}</option>
-                ))}
-              </select>
             </div>
             <p className="text-xs text-slate-500">
               Live preview uses the selected QR type’s sample content so you can style the batch before upload.
             </p>
-            {!!previewContent.trim() && (
-              <button type="button" onClick={handleDownloadPreview} className="inline-block mt-4 px-4 py-2 bg-black text-white rounded">
-                Download QR
-              </button>
-            )}
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Bulk generation</p>
-                  <h3 className="mt-2 text-lg font-semibold text-slate-900">
-                    {activeBulkJob ? "Live bulk QR status" : "No bulk job running yet"}
-                  </h3>
-                </div>
-                {activeBulkJob ? (
-                  <div className="rounded-full bg-white px-3 py-1 text-sm font-semibold text-slate-700 shadow-sm">
-                    {activeBulkProgress.percent}%
-                  </div>
-                ) : null}
+            {loadingJobs && !activeBulkJob ? (
+              <p className="text-sm text-slate-500">Loading bulk generation status...</p>
+            ) : null}
+            {activeBulkJob && !isActiveBulkZipReady ? (
+              <p className="text-sm font-medium text-slate-700">
+                Generating bulk QR: {activeBulkProgress.percent}% ({activeBulkProgress.processed} of {activeBulkProgress.total})
+              </p>
+            ) : null}
+            {isActiveBulkZipReady ? (
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <button
+                  type="button"
+                  onClick={() => handleArtifactDownload(activeBulkJob)}
+                  className="rounded-xl bg-black px-4 py-3 text-sm font-semibold text-white"
+                >
+                  Download ZIP
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleArtifactShare(activeBulkJob)}
+                  className="rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-900"
+                >
+                  Share ZIP
+                </button>
               </div>
-              {loadingJobs && !activeBulkJob ? (
-                <p className="mt-3 text-sm text-slate-500">Loading bulk generation status...</p>
-              ) : activeBulkJob ? (
-                <>
-                  <p className="mt-3 text-sm text-slate-600">
-                    Status: <span className="font-semibold text-slate-900">{String(activeBulkJob.status || "queued").toUpperCase()}</span>
-                  </p>
-                  <p className="mt-1 text-sm text-slate-600">
-                    {activeBulkProgress.processed} of {activeBulkProgress.total} QR codes processed
-                  </p>
-                  <div className="mt-4 h-3 overflow-hidden rounded-full bg-slate-200">
-                    <div
-                      className="h-full rounded-full bg-slate-900 transition-all"
-                      style={{ width: `${activeBulkProgress.percent}%` }}
-                    />
-                  </div>
-                  <p className="mt-3 text-xs text-slate-500">Job ID: {activeBulkJob.id}</p>
-                  {isActiveBulkZipReady ? (
-                    <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                      <button
-                        type="button"
-                        onClick={() => handleArtifactDownload(activeBulkJob)}
-                        className="rounded-xl bg-black px-4 py-3 text-sm font-semibold text-white"
-                      >
-                        Download ZIP
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleArtifactShare(activeBulkJob)}
-                        className="rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-900"
-                      >
-                        Share ZIP
-                      </button>
-                    </div>
-                  ) : (
-                    <p className="mt-4 rounded-xl border border-dashed border-slate-300 bg-white px-4 py-3 text-sm text-slate-600">
-                      ZIP download and share options will appear here automatically when generation completes.
-                    </p>
-                  )}
-                </>
-              ) : (
-                <p className="mt-3 text-sm text-slate-500">
-                  Click Generate Bulk QR to track progress here and get Download ZIP and Share ZIP actions in this panel.
-                </p>
-              )}
-            </div>
+            ) : null}
           </section>
         </div>
 
