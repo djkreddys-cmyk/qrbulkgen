@@ -1097,6 +1097,8 @@ bulkRouter.get("/jobs/:id/analysis", requireAuth, async (req, res, next) => {
        j.status,
        j.tracking_mode,
        j.managed_link_id,
+       j.created_at,
+       j.completed_at,
          m.qr_type AS managed_qr_type,
          m.title AS managed_title,
          m.expires_at AS managed_expires_at
@@ -1113,6 +1115,7 @@ bulkRouter.get("/jobs/:id/analysis", requireAuth, async (req, res, next) => {
     }
 
     const typeLabel = getQrTypeLabel(job);
+    const versionStartedAt = job.completed_at || job.created_at || null;
 
     const typePerformanceResult = await query(
       `SELECT
@@ -1170,13 +1173,14 @@ bulkRouter.get("/jobs/:id/analysis", requireAuth, async (req, res, next) => {
        FROM links
        LEFT JOIN analytics_events ae
          ON ae.event_type = 'qr.public.scan'
+        AND ($3::timestamptz IS NULL OR ae.created_at >= $3::timestamptz)
         AND (
           ae.metadata->>'linkId' = links.id::text
           OR ae.metadata->>'targetUrl' = links.url
           OR regexp_replace(lower(split_part(COALESCE(ae.metadata->>'targetUrl', ''), '?exp=', 1)), '^https?://(www\\.)?', '') =
              regexp_replace(lower(split_part(links.url, '?exp=', 1)), '^https?://(www\\.)?', '')
         )`,
-      [job.managed_link_id, job.id],
+      [job.managed_link_id, job.id, versionStartedAt],
     );
 
     const scanTrendResult = await query(
@@ -1200,16 +1204,17 @@ bulkRouter.get("/jobs/:id/analysis", requireAuth, async (req, res, next) => {
          OR regexp_replace(lower(split_part(COALESCE(ae.metadata->>'targetUrl', ''), '?exp=', 1)), '^https?://(www\\.)?', '') =
             regexp_replace(lower(split_part(links.url, '?exp=', 1)), '^https?://(www\\.)?', '')
        WHERE ae.event_type = 'qr.public.scan'
+         AND ($3::timestamptz IS NULL OR ae.created_at >= $3::timestamptz)
        GROUP BY DATE(ae.created_at)
        ORDER BY DATE(ae.created_at) ASC
        LIMIT 10`,
-      [job.managed_link_id, job.id],
+      [job.managed_link_id, job.id, versionStartedAt],
     );
 
     const linkStats = linkStatsResult.rows[0] || {};
-    const totalScans = linkStats.total_scans || 0;
-    const uniqueScans = linkStats.unique_scans || 0;
-    const repeatedScans = Math.max(totalScans - uniqueScans, 0);
+    let totalScans = linkStats.total_scans || 0;
+    let uniqueScans = linkStats.unique_scans || 0;
+    let repeatedScans = Math.max(totalScans - uniqueScans, 0);
     const targetKind = String(linkStats.target_kind || job.managed_qr_type || typeLabel || "").trim();
 
     let totalSubmissions = 0;
@@ -1240,9 +1245,10 @@ bulkRouter.get("/jobs/:id/analysis", requireAuth, async (req, res, next) => {
            ON links.url = rs.source_url
            OR regexp_replace(lower(split_part(links.url, '?exp=', 1)), '^https?://(www\\.)?', '') =
               regexp_replace(lower(split_part(rs.source_url, '?exp=', 1)), '^https?://(www\\.)?', '')
+         WHERE ($3::timestamptz IS NULL OR rs.created_at >= $3::timestamptz)
          GROUP BY rs.rating
          ORDER BY rs.rating ASC`,
-        [job.managed_link_id, job.id],
+        [job.managed_link_id, job.id, versionStartedAt],
       );
 
       if (ratingRows.rows.length) {
@@ -1281,8 +1287,9 @@ bulkRouter.get("/jobs/:id/analysis", requireAuth, async (req, res, next) => {
            ON links.url = fs.source_url
            OR regexp_replace(lower(split_part(links.url, '?exp=', 1)), '^https?://(www\\.)?', '') =
               regexp_replace(lower(split_part(fs.source_url, '?exp=', 1)), '^https?://(www\\.)?', '')
+         WHERE ($3::timestamptz IS NULL OR fs.created_at >= $3::timestamptz)
          ORDER BY fs.created_at DESC`,
-        [job.managed_link_id, job.id],
+        [job.managed_link_id, job.id, versionStartedAt],
       );
 
       totalSubmissions = feedbackRows.rows.length;
@@ -1314,6 +1321,12 @@ bulkRouter.get("/jobs/:id/analysis", requireAuth, async (req, res, next) => {
         title: feedbackRows.rows[0]?.title || job.managed_title || "Untitled feedback form",
         questions: Object.values(groupedQuestions),
       };
+    }
+
+    if ((targetKind === "Rating" || targetKind === "Feedback") && totalSubmissions > 0) {
+      totalScans = Math.min(totalScans, totalSubmissions);
+      uniqueScans = Math.min(uniqueScans, totalSubmissions);
+      repeatedScans = Math.max(totalScans - uniqueScans, 0);
     }
 
     const trackingMode = String(job.tracking_mode || "tracked").toLowerCase() === "tracked" ? "tracked" : "direct";
@@ -1405,6 +1418,8 @@ bulkRouter.get("/jobs/:id/analysis-report.csv", requireAuth, async (req, res, ne
          j.bulk_qr_type,
          j.managed_link_id,
          j.tracking_mode,
+         j.created_at,
+         j.completed_at,
          m.qr_type AS managed_qr_type,
          m.title AS managed_title
        FROM qr_jobs j
@@ -1422,6 +1437,7 @@ bulkRouter.get("/jobs/:id/analysis-report.csv", requireAuth, async (req, res, ne
 
     const typeLabel = getQrTypeLabel(job);
     const trackingMode = String(job.tracking_mode || "tracked").toLowerCase() === "tracked" ? "tracked" : "direct";
+    const versionStartedAt = job.completed_at || job.created_at || null;
 
     const scanRowsResult = await query(
       `WITH links AS (
@@ -1457,8 +1473,9 @@ bulkRouter.get("/jobs/:id/analysis-report.csv", requireAuth, async (req, res, ne
          OR regexp_replace(lower(split_part(COALESCE(ae.metadata->>'targetUrl', ''), '?exp=', 1)), '^https?://(www\\.)?', '') =
             regexp_replace(lower(split_part(links.url, '?exp=', 1)), '^https?://(www\\.)?', '')
        WHERE ae.event_type = 'qr.public.scan'
+         AND ($3::timestamptz IS NULL OR ae.created_at >= $3::timestamptz)
        ORDER BY ae.created_at DESC`,
-      [job.managed_link_id, job.id],
+      [job.managed_link_id, job.id, versionStartedAt],
     );
 
     const columns = [
@@ -1526,6 +1543,7 @@ bulkRouter.get("/jobs/:id/analysis-report.csv", requireAuth, async (req, res, ne
            ON links.url = rs.source_url
            OR regexp_replace(lower(split_part(links.url, '?exp=', 1)), '^https?://(www\\.)?', '') =
               regexp_replace(lower(split_part(rs.source_url, '?exp=', 1)), '^https?://(www\\.)?', '')
+         WHERE ($3::timestamptz IS NULL OR rs.created_at >= $3::timestamptz)
          LEFT JOIN LATERAL (
            SELECT
              COALESCE(ae.metadata->>'location', '') AS location,
@@ -1548,7 +1566,7 @@ bulkRouter.get("/jobs/:id/analysis-report.csv", requireAuth, async (req, res, ne
            LIMIT 1
          ) matched ON true
          ORDER BY rs.created_at DESC`,
-        [job.managed_link_id, job.id],
+        [job.managed_link_id, job.id, versionStartedAt],
       );
 
       rows = ratingExportResult.rows.map((row) => {
@@ -1600,6 +1618,7 @@ bulkRouter.get("/jobs/:id/analysis-report.csv", requireAuth, async (req, res, ne
            ON links.url = fs.source_url
            OR regexp_replace(lower(split_part(links.url, '?exp=', 1)), '^https?://(www\\.)?', '') =
               regexp_replace(lower(split_part(fs.source_url, '?exp=', 1)), '^https?://(www\\.)?', '')
+         WHERE ($3::timestamptz IS NULL OR fs.created_at >= $3::timestamptz)
          LEFT JOIN LATERAL (
            SELECT
              COALESCE(ae.metadata->>'location', '') AS location,
@@ -1622,7 +1641,7 @@ bulkRouter.get("/jobs/:id/analysis-report.csv", requireAuth, async (req, res, ne
            LIMIT 1
          ) matched ON true
          ORDER BY fs.created_at DESC`,
-        [job.managed_link_id, job.id],
+        [job.managed_link_id, job.id, versionStartedAt],
       );
 
       rows = feedbackExportResult.rows.map((row) => {
