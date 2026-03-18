@@ -500,22 +500,6 @@ export default function Dashboard() {
     }
   }
 
-  function handleShareChannel(job, channel) {
-    const shareUrl = getShareUrl(job)
-    const text = encodeURIComponent(`Check this QR from QRBulkGen: ${shareUrl}`)
-    if (!shareUrl) {
-      setError("No shareable link is available for this QR job.")
-      return
-    }
-    if (channel === "whatsapp") {
-      window.open(`https://wa.me/?text=${text}`, "_blank", "noreferrer")
-    } else {
-      const subject = encodeURIComponent(job.qrType || "QR Code")
-      window.open(`https://mail.google.com/mail/?view=cm&fs=1&su=${subject}&body=${text}`, "_blank", "noreferrer")
-    }
-    setShareJob(null)
-  }
-
   return (
     <div className="min-h-screen bg-slate-50">
       <Navbar />
@@ -1132,7 +1116,7 @@ export default function Dashboard() {
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Share QR</p>
               <h3 className="mt-2 text-2xl font-semibold text-slate-950">{getJobTitle(shareJob)}</h3>
               <p className="mt-2 text-sm leading-6 text-slate-600">
-                Use the QR image share sheet for the richest share options. Gmail compose opens with the destination link, but browsers cannot auto-attach the QR image into Gmail directly.
+                Use the QR image share sheet to send this QR through the apps available on your device.
               </p>
               <div className="mt-6 grid gap-3">
                 <button
@@ -1141,20 +1125,6 @@ export default function Dashboard() {
                   className="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm font-semibold text-sky-700 transition hover:-translate-y-0.5 hover:border-sky-300 hover:shadow"
                 >
                   Share QR Image
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleShareChannel(shareJob, "gmail")}
-                  className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow"
-                >
-                  Share via Gmail
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleShareChannel(shareJob, "whatsapp")}
-                  className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700 transition hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow"
-                >
-                  Share via WhatsApp
                 </button>
               </div>
               <div className="mt-6 flex justify-end">
