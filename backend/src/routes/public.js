@@ -137,6 +137,36 @@ async function lookupApproximateLocation(ipAddress) {
   }
 }
 
+function normalizePreciseLocationPayload(value) {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const city = String(value.city || "").trim();
+  const region = String(value.region || "").trim();
+  const country = String(value.country || "").trim();
+  const latitude = value.latitude == null ? "" : String(value.latitude).trim();
+  const longitude = value.longitude == null ? "" : String(value.longitude).trim();
+  const label =
+    String(value.label || "").trim() ||
+    buildApproximateLocationLabel({ city, region, country }) ||
+    [latitude, longitude].filter(Boolean).join(", ");
+
+  if (!label && !city && !region && !country && !latitude && !longitude) {
+    return null;
+  }
+
+  return {
+    source: String(value.source || "device").trim() || "device",
+    city,
+    region,
+    country,
+    latitude,
+    longitude,
+    label,
+  };
+}
+
 function buildPublicAssetUrl(req, relativePath) {
   const base = getRequestBaseUrl(req);
   return `${base}/uploads/${relativePath.replace(/\\/g, "/")}`;
@@ -506,6 +536,8 @@ publicRouter.post("/track-view", async (req, res, next) => {
     const linkId = String(req.body.linkId || "").trim();
     const ipAddress = getRequestIp(req).slice(0, 255);
     const approximateLocation = await lookupApproximateLocation(ipAddress);
+    const preciseLocation = normalizePreciseLocationPayload(req.body.preciseLocation);
+    const preferredLocation = preciseLocation || approximateLocation;
 
     if (!sourceUrl && !linkId) {
       throw createHttpError(400, "VALIDATION_ERROR", "sourceUrl or linkId is required");
@@ -531,13 +563,13 @@ publicRouter.post("/track-view", async (req, res, next) => {
         visitorKey: buildVisitorKey(req, linkId),
         userAgent: String(req.headers["user-agent"] || "").slice(0, 255),
         ipAddress,
-        location: approximateLocation?.label || null,
-        locationSource: approximateLocation?.source || null,
-        city: approximateLocation?.city || null,
-        region: approximateLocation?.region || null,
-        country: approximateLocation?.country || null,
-        latitude: approximateLocation?.latitude || null,
-        longitude: approximateLocation?.longitude || null,
+        location: preferredLocation?.label || null,
+        locationSource: preferredLocation?.source || null,
+        city: preferredLocation?.city || null,
+        region: preferredLocation?.region || null,
+        country: preferredLocation?.country || null,
+        latitude: preferredLocation?.latitude || null,
+        longitude: preferredLocation?.longitude || null,
       },
     });
 

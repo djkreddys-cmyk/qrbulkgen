@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Linking, Text, TouchableOpacity, View } from "react-native";
 import * as DocumentPicker from "expo-document-picker";
 import { Camera, CameraView, useCameraPermissions } from "expo-camera";
+import * as Location from "expo-location";
 
 import { useAuth } from "../context/AuthContext";
 import { apiRequest } from "../lib/api";
@@ -182,6 +183,56 @@ function getScannedDisplayValue(value) {
   return raw;
 }
 
+async function getPreciseLocationPayload() {
+  try {
+    const permission = await Location.requestForegroundPermissionsAsync();
+    if (permission.status !== "granted") {
+      return null;
+    }
+
+    const position = await Location.getCurrentPositionAsync({
+      accuracy: Location.Accuracy.Balanced,
+    });
+
+    const latitude = position?.coords?.latitude;
+    const longitude = position?.coords?.longitude;
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+      return null;
+    }
+
+    let city = "";
+    let region = "";
+    let country = "";
+    let label = `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
+
+    try {
+      const places = await Location.reverseGeocodeAsync({ latitude, longitude });
+      const place = places?.[0] || {};
+      city = String(place.city || place.subregion || place.district || "").trim();
+      region = String(place.region || "").trim();
+      country = String(place.country || "").trim();
+      const parts = [city, region, country].filter(Boolean);
+      if (parts.length) {
+        label = parts.join(", ");
+      }
+    } catch (_error) {
+      // Keep coordinate-only fallback when reverse geocode is unavailable.
+    }
+
+    return {
+      source: "device",
+      label,
+      city,
+      region,
+      country,
+      latitude,
+      longitude,
+    };
+  } catch (_error) {
+    return null;
+  }
+}
+
 export function ScannerScreen() {
   const { navigate, setSingleDraft } = useAuth();
   const [permission, requestPermission] = useCameraPermissions();
@@ -190,12 +241,32 @@ export function ScannerScreen() {
   const [lastScanAt, setLastScanAt] = useState(0);
   const [fileScanMessage, setFileScanMessage] = useState("");
 
+  async function trackManagedScan(link, resolvedTarget) {
+    const linkId = String(link?.id || "").trim();
+    if (!linkId) return;
+
+    const preciseLocation = await getPreciseLocationPayload();
+    await apiRequest("/public/track-view", {
+      method: "POST",
+      body: JSON.stringify({
+        sourceUrl: String(link?.content || resolvedTarget || "").trim(),
+        title: String(link?.title || "").trim(),
+        targetKind: String(link?.qrType || "").trim(),
+        expired: Boolean(link?.isExpired),
+        linkId,
+        preciseLocation,
+      }),
+    }).catch(() => {});
+  }
+
   async function resolveScannedValue(rawValue) {
     const managedLinkId = getManagedLinkId(rawValue);
     if (managedLinkId) {
       try {
         const data = await apiRequest(`/public/qr-links/${managedLinkId}`);
-        return resolveManagedDestination(data?.link) || String(rawValue || "");
+        const resolvedTarget = resolveManagedDestination(data?.link) || String(rawValue || "");
+        await trackManagedScan(data?.link, resolvedTarget);
+        return resolvedTarget;
       } catch (_error) {
         return String(rawValue || "");
       }
