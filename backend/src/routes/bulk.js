@@ -1302,7 +1302,7 @@ bulkRouter.get("/jobs/:id/analysis", requireAuth, async (req, res, next) => {
     }
 
     const trackingMode = String(job.tracking_mode || "tracked").toLowerCase() === "tracked" ? "tracked" : "direct";
-    const trackingEnabled = trackingMode === "tracked" && TRACKED_QR_TYPES.has(targetKind || typeLabel);
+    const trackingEnabled = trackingMode === "tracked";
     const engagement = {
       targetUrl: linkStats.sample_url || "",
       expiryDate: linkStats.last_expiry_at || job.managed_expires_at || "",
