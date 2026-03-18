@@ -462,6 +462,44 @@ export default function Dashboard() {
     return job?.artifact?.filePath ? toAbsoluteDownloadUrl(job.artifact.filePath) : ""
   }
 
+  async function handleShareQrImage(job) {
+    const artifactUrl = job?.artifact?.filePath ? toAbsoluteDownloadUrl(job.artifact.filePath) : ""
+    if (!artifactUrl) {
+      setError("No QR image is available for sharing.")
+      return
+    }
+    if (!navigator?.share) {
+      setError("Sharing is not supported in this browser. Use Download instead.")
+      return
+    }
+
+    try {
+      const response = await fetch(artifactUrl)
+      const blob = await response.blob()
+      const file = new File([blob], job?.artifact?.fileName || `${(job?.qrType || "qr").toLowerCase()}-qr.png`, {
+        type: blob.type || "image/png",
+      })
+
+      if (navigator.canShare?.({ files: [file] })) {
+        await navigator.share({
+          title: getJobTitle(job),
+          text: `Sharing ${job.qrType || "QR"} from QRBulkGen`,
+          files: [file],
+        })
+      } else {
+        await navigator.share({
+          title: getJobTitle(job),
+          text: `Check this QR from QRBulkGen: ${getShareUrl(job)}`,
+          url: getShareUrl(job),
+        })
+      }
+      setShareJob(null)
+    } catch (shareError) {
+      if (shareError?.name === "AbortError") return
+      setError(shareError.message || "Failed to share QR image.")
+    }
+  }
+
   function handleShareChannel(job, channel) {
     const shareUrl = getShareUrl(job)
     const text = encodeURIComponent(`Check this QR from QRBulkGen: ${shareUrl}`)
@@ -1093,8 +1131,17 @@ export default function Dashboard() {
             <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Share QR</p>
               <h3 className="mt-2 text-2xl font-semibold text-slate-950">{getJobTitle(shareJob)}</h3>
-              <p className="mt-2 text-sm leading-6 text-slate-600">Choose how you want to share this QR job.</p>
+              <p className="mt-2 text-sm leading-6 text-slate-600">
+                Use the QR image share sheet for the richest share options. Gmail compose opens with the destination link, but browsers cannot auto-attach the QR image into Gmail directly.
+              </p>
               <div className="mt-6 grid gap-3">
+                <button
+                  type="button"
+                  onClick={() => handleShareQrImage(shareJob)}
+                  className="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm font-semibold text-sky-700 transition hover:-translate-y-0.5 hover:border-sky-300 hover:shadow"
+                >
+                  Share QR Image
+                </button>
                 <button
                   type="button"
                   onClick={() => handleShareChannel(shareJob, "gmail")}
