@@ -800,8 +800,7 @@ export default function Dashboard() {
             Short Links
           </button>
         </div>
-        {activeWorkspace === "qr" && (
-          <>
+        <div className={activeWorkspace === "qr" ? "space-y-6" : "hidden"}>
             <section id="qr-dashboard" className="flex flex-col gap-5 rounded-[2rem] border border-slate-200 bg-gradient-to-br from-white to-slate-100 p-8 shadow-sm lg:flex-row lg:items-end lg:justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-500">Control Center</p>
@@ -1497,10 +1496,9 @@ export default function Dashboard() {
                 </div>
               )}
             </section>
-          </>
-        )}
+        </div>
 
-        {activeWorkspace === "short-links" && (
+        <div className={activeWorkspace === "short-links" ? "" : "hidden"}>
             <section id="short-links-dashboard" className="overflow-hidden rounded-[1.75rem] border border-slate-200 bg-white shadow-sm">
               <div className="border-b border-slate-200 bg-white px-4 pt-4 pb-3">
                 <div className="flex flex-col gap-3 xl:flex-row xl:items-end">
@@ -1743,10 +1741,7 @@ export default function Dashboard() {
                 ) : null}
               </div>
             </section>
-            )}
-
-          </>
-        )}
+        </div>
         {shareJob ? (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 px-4">
             <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl">
