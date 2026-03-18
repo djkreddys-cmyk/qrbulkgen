@@ -1487,7 +1487,7 @@ bulkRouter.get("/jobs/:id/analysis-report.csv", requireAuth, async (req, res, ne
       );
 
       responseData = ratingExportResult.rows
-        .map((row) => `${row.rating}: ${row.count}`)
+        .map((row) => `Rating ${row.rating} (${row.count})`)
         .join(" | ");
     } else if (typeLabel === "Feedback") {
       const feedbackExportResult = await query(
@@ -1533,7 +1533,7 @@ bulkRouter.get("/jobs/:id/analysis-report.csv", requireAuth, async (req, res, ne
     const columns = [
       { key: "qrType", label: "QR Type" },
       { key: "scanDate", label: "Scan Date" },
-      { key: "responseData", label: "Responses Data" },
+      { key: "responseData", label: "Response" },
       { key: "targetKind", label: "Scan Output Type" },
       { key: "targetTitle", label: "Title" },
       { key: "location", label: "Location" },
