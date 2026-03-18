@@ -2,7 +2,8 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Alert, Linking, Share, Switch, Text, TextInput, TouchableOpacity, View } from "react-native";
 
 import { useAuth } from "../context/AuthContext";
-import { apiRequest, createAuthHeaders } from "../lib/api";
+import { API_BASE_URL, apiRequest, createAuthHeaders } from "../lib/api";
+import { downloadRemoteFile } from "../lib/files";
 
 function Card({ children, style }) {
   return (
@@ -142,6 +143,7 @@ export function ShortLinksScreen({ variant = "create" }) {
   const [analysisById, setAnalysisById] = useState({});
   const [expandedLinkId, setExpandedLinkId] = useState("");
   const [analysisLoadingId, setAnalysisLoadingId] = useState("");
+  const [downloadingReportId, setDownloadingReportId] = useState("");
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -316,6 +318,24 @@ export function ShortLinksScreen({ variant = "create" }) {
       setError(requestError.message || "Failed to load short link analysis");
     } finally {
       setAnalysisLoadingId("");
+    }
+  }
+
+  async function handleDownloadAnalysisReport(link) {
+    try {
+      setDownloadingReportId(link.id);
+      const safeName = String(link.title || link.slug || "short-link").replace(/[^a-z0-9]+/gi, "-").toLowerCase();
+      const savedPath = await downloadRemoteFile({
+        url: `${API_BASE_URL}/short-links/${link.id}/analysis-report.csv`,
+        fileName: `${safeName || "short-link"}-analysis-report-${link.id}.csv`,
+        headers: createAuthHeaders(token),
+      });
+      setMessage(`Excel saved: ${savedPath}`);
+      setError("");
+    } catch (requestError) {
+      setError(requestError.message || "Failed to download short link analysis report");
+    } finally {
+      setDownloadingReportId("");
     }
   }
 
@@ -606,6 +626,25 @@ export function ShortLinksScreen({ variant = "create" }) {
 
                   {expanded && analysis ? (
                     <View style={{ borderRadius: 18, backgroundColor: "#f8fafc", padding: 12, gap: 10, borderWidth: 1, borderColor: "#e2e8f0" }}>
+                      <TouchableOpacity
+                        onPress={() => handleDownloadAnalysisReport(link)}
+                        disabled={downloadingReportId === link.id}
+                        style={{
+                          alignSelf: "flex-start",
+                          borderWidth: 1,
+                          borderColor: "#cbd5e1",
+                          borderRadius: 14,
+                          paddingHorizontal: 14,
+                          paddingVertical: 10,
+                          backgroundColor: "#ffffff",
+                          opacity: downloadingReportId === link.id ? 0.7 : 1,
+                        }}
+                      >
+                        <Text style={{ color: "#0f172a", fontWeight: "700" }}>
+                          {downloadingReportId === link.id ? "Preparing Excel..." : "Download Excel"}
+                        </Text>
+                      </TouchableOpacity>
+
                       <View style={{ borderWidth: 1, borderColor: "#bfdbfe", borderRadius: 16, padding: 12, backgroundColor: "#eff6ff", gap: 6 }}>
                         <Text style={{ color: "#1d4ed8", fontSize: 12, fontWeight: "700" }}>QUICK INSIGHT</Text>
                         <Text style={{ color: "#0f172a", lineHeight: 20 }}>{analysis.quickInsight}</Text>

@@ -18,6 +18,7 @@ function fileExtensionFromMimeType(mimeType, fallback = "bin") {
   if (mimeType === "image/png") return "png";
   if (mimeType === "image/svg+xml") return "svg";
   if (mimeType === "application/zip") return "zip";
+  if (mimeType === "text/csv" || mimeType === "application/csv" || mimeType === "application/vnd.ms-excel") return "csv";
   return fallback;
 }
 
@@ -55,4 +56,15 @@ export async function saveDataUrlFile({ dataUrl, fileName }) {
   });
 
   return targetPath;
+}
+
+export async function downloadRemoteFile({ url, fileName, headers = {} }) {
+  const safeFileName = fileName || `qrbulkgen-${Date.now()}.bin`;
+  const targetPath = `${FileSystem.documentDirectory}${safeFileName}`;
+
+  const result = await FileSystem.downloadAsync(url, targetPath, {
+    headers,
+  });
+
+  return result?.uri || targetPath;
 }

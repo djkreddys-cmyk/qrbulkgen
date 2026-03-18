@@ -287,8 +287,6 @@ shortLinksRouter.get("/short-links/:id/analysis-report.csv", requireAuth, async 
     const visitsResult = await query(
       `SELECT
          ae.created_at,
-         COALESCE(ae.metadata->>'visitorKey', '') AS visitor_key,
-         COALESCE(ae.metadata->>'userAgent', '') AS user_agent,
          COALESCE(ae.metadata->>'ipAddress', '') AS ip_address,
          COALESCE(ae.metadata->>'location', '') AS location,
          COALESCE(ae.metadata->>'locationSource', '') AS location_source,
@@ -310,8 +308,6 @@ shortLinksRouter.get("/short-links/:id/analysis-report.csv", requireAuth, async 
       { key: "targetUrl", label: "Target URL" },
       { key: "visitDate", label: "Visit Date" },
       { key: "visitTime", label: "Visit Time" },
-      { key: "visitorKey", label: "Visitor Key" },
-      { key: "userAgent", label: "User Agent" },
       { key: "ipAddress", label: "IP Address" },
       { key: "location", label: "Location" },
       { key: "locationSource", label: "Location Source" },
@@ -320,9 +316,6 @@ shortLinksRouter.get("/short-links/:id/analysis-report.csv", requireAuth, async 
       { key: "country", label: "Country" },
       { key: "latitude", label: "Latitude" },
       { key: "longitude", label: "Longitude" },
-      { key: "createdAt", label: "Short Link Created At" },
-      { key: "expiresAt", label: "Expires At" },
-      { key: "archived", label: "Archived" },
     ];
 
     const rows = visitsResult.rows.map((row) => {
@@ -334,8 +327,6 @@ shortLinksRouter.get("/short-links/:id/analysis-report.csv", requireAuth, async 
         targetUrl: link.target_url || "",
         visitDate: validDate ? validDate.toISOString().slice(0, 10) : "",
         visitTime: validDate ? validDate.toISOString().slice(11, 19) : "",
-        visitorKey: row.visitor_key || "",
-        userAgent: row.user_agent || "",
         ipAddress: row.ip_address || "",
         location: row.location || "",
         locationSource: row.location_source || "",
@@ -344,9 +335,6 @@ shortLinksRouter.get("/short-links/:id/analysis-report.csv", requireAuth, async 
         country: row.country || "",
         latitude: row.latitude || "",
         longitude: row.longitude || "",
-        createdAt: link.created_at || "",
-        expiresAt: link.expires_at || "",
-        archived: link.archived_at || !link.is_active ? "Yes" : "No",
       };
     });
 

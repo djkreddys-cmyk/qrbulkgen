@@ -1859,7 +1859,7 @@ export default function Dashboard() {
                                   </div>
                                 </div>
                                 <p className="text-xs text-slate-500">
-                                  Excel export includes visit date, visit time, visitor key, IP address, device details, and any stored location metadata for this short URL.
+                                  Excel export now matches the QR analysis sheet format with scan date, response, output type, title, and stored location metadata.
                                 </p>
                               </div>
                             ) : null}
