@@ -1026,16 +1026,6 @@ export function DashboardScreen() {
                         </View>
                       )}
 
-                      {currentTab === "overview" && (
-                        <View style={{ borderWidth: 1, borderColor: "#dbe3f0", borderRadius: 16, padding: 12, backgroundColor: "#ffffff", gap: 8 }}>
-                          <Text style={{ color: "#0f172a", fontWeight: "700" }}>Actionable Insights</Text>
-                          <Text style={{ color: "#475569" }}>{analysis.job?.failureCount > 0 ? `${analysis.job.failureCount} output(s) failed and may need a rerun.` : "Generation quality is clean with no failed outputs recorded."}</Text>
-                          <Text style={{ color: "#475569" }}>{(analysis.engagement?.totalScans || 0) > 0 ? `This QR has ${analysis.engagement.uniqueScans || 0} unique scan(s) and ${analysis.engagement.repeatedScans || 0} repeat visit(s).` : "No scan activity yet. Share or print this QR to start collecting engagement."}</Text>
-                          <Text style={{ color: "#475569" }}>{analysis.engagement?.expiryDate ? (analysis.engagement?.isExpired ? "Expiry has already been reached." : `Expiry is set for ${formatDateTime(analysis.engagement.expiryDate)}.`) : "No expiry date is set for this QR yet."}</Text>
-                          <Text style={{ color: "#475569" }}>{thisJobSuccessRate >= typeAverageSuccessRate && (analysis.engagement?.totalScans || 0) > 0 ? "This job is outperforming the average for its QR type." : "This job is still building enough activity to compare against its QR type average."}</Text>
-                        </View>
-                      )}
-
                       {job.trackingMode !== "tracked" && analysis.typePerformance && (currentTab === "overview" || currentTab === "scans") && (
                         <View style={{ borderWidth: 1, borderColor: "#dbe3f0", borderRadius: 16, padding: 12, backgroundColor: "#ffffff", gap: 8 }}>
                           <Text style={{ color: "#0f172a", fontWeight: "700" }}>{job.qrType} overall performance</Text>
@@ -1051,21 +1041,37 @@ export function DashboardScreen() {
 
                       {analysis.rating && (currentTab === "overview" || currentTab === "responses") && (
                         <View style={{ borderWidth: 1, borderColor: "#dbe3f0", borderRadius: 16, padding: 12, backgroundColor: "#ffffff", gap: 8 }}>
-                          <Text style={{ color: "#0f172a", fontWeight: "700" }}>Rating response breakdown</Text>
-                          {analysis.rating.buckets.map((bucket) => {
-                            const max = Math.max(...analysis.rating.buckets.map((entry) => entry.count || 0), 0);
-                            return (
-                              <View key={bucket.label} style={{ gap: 4 }}>
-                                <View style={{ flexDirection: "row", justifyContent: "space-between", gap: 10 }}>
-                                  <Text style={{ color: "#334155" }}>{bucket.label}</Text>
-                                  <Text style={{ color: "#64748b" }}>{bucket.count}</Text>
-                                </View>
-                                <View style={{ height: 8, borderRadius: 999, backgroundColor: "#e2e8f0", overflow: "hidden" }}>
-                                  <View style={{ height: "100%", borderRadius: 999, backgroundColor: "#d946ef", width: `${max ? Math.max((bucket.count / max) * 100, 6) : 0}%` }} />
-                                </View>
-                              </View>
-                            );
-                          })}
+                          <View style={{ gap: 12 }}>
+                            <View style={{ borderWidth: 1, borderColor: "#dbe3f0", borderRadius: 16, backgroundColor: "#f8fafc", padding: 12, gap: 10 }}>
+                              <Text style={{ color: "#0f172a", fontWeight: "700" }}>Rating response breakdown</Text>
+                              <CategoryBarChart
+                                items={analysis.rating.buckets.map((bucket) => ({
+                                  label: `Rating ${bucket.label}`,
+                                  value: bucket.count || 0,
+                                  helper: "Responses",
+                                  color: "#d946ef",
+                                }))}
+                              />
+                            </View>
+                            <View style={{ borderWidth: 1, borderColor: "#dbe3f0", borderRadius: 16, backgroundColor: "#f8fafc", padding: 12, gap: 10 }}>
+                              <Text style={{ color: "#0f172a", fontWeight: "700" }}>Rating percentage share</Text>
+                              <CategoryBarChart
+                                items={analysis.rating.buckets.map((bucket) => {
+                                  const totalRatings = Math.max(
+                                    analysis.rating.buckets.reduce((sum, entry) => sum + (entry.count || 0), 0),
+                                    1,
+                                  );
+                                  const percent = Math.round(((bucket.count || 0) / totalRatings) * 100);
+                                  return {
+                                    label: `Rating ${bucket.label}`,
+                                    value: percent,
+                                    helper: `${percent}%`,
+                                    color: "#0ea5e9",
+                                  };
+                                })}
+                              />
+                            </View>
+                          </View>
                         </View>
                       )}
 

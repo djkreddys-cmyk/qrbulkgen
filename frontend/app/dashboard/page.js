@@ -1309,20 +1309,6 @@ export default function Dashboard() {
                                   Math.max(analysis.typePerformance.requestedCount || 1, 1)
                                 : 0
                               const thisJobSuccessRate = totalSuccess / Math.max(totalRequested || 1, 1)
-                              const extraInsights = [
-                                totalFailure > 0
-                                  ? `${totalFailure} output${totalFailure === 1 ? "" : "s"} failed during generation and may need a rerun.`
-                                  : "Generation quality is clean with no failed outputs recorded.",
-                                totalScans > 0
-                                  ? `This QR has ${uniqueScans} unique scan${uniqueScans === 1 ? "" : "s"} and ${repeatedScans} repeated visit${repeatedScans === 1 ? "" : "s"}.`
-                                  : "No scan activity yet. Share or print this QR to start collecting engagement.",
-                                analysis.engagement?.expiryDate
-                                  ? `Expiry is ${analysis.engagement?.isExpired ? "already reached" : `set for ${formatDateTime(analysis.engagement.expiryDate)}`}.`
-                                  : "No expiry date is set for this QR yet.",
-                                thisJobSuccessRate >= typeAverageSuccessRate && totalScans > 0
-                                  ? "This job is outperforming the average for its QR type."
-                                  : "This job is still building enough activity to compare against its QR type average.",
-                              ]
                               return (
                                 <div className="mt-4 space-y-4">
                                 <div className="flex flex-wrap gap-2">
@@ -1557,32 +1543,20 @@ export default function Dashboard() {
                                       </div>
                                     </div>
 
-                                    {currentTab === "overview" ? (
-                                      <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                                        <p className="font-medium text-slate-900">Actionable Insights</p>
-                                        <ul className="mt-3 list-disc space-y-2 pl-5 text-sm text-slate-600">
-                                          {!hasTrackedEngagement ? <li>Tracking is unavailable for this QR right now.</li> : null}
-                                          {extraInsights.map((insight, index) => (
-                                            <li key={`${job.id}-insight-${index}`}>{insight}</li>
-                                          ))}
-                                        </ul>
+                                    <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                                      <p className="font-medium text-slate-900">History Note</p>
+                                      <div className="mt-3 space-y-2 text-sm text-slate-600">
+                                        <p>
+                                          <span className="font-medium text-slate-900">Overall history:</span> {lifetimeScans} scan{lifetimeScans === 1 ? "" : "s"} and {lifetimeSubmissions} submission{lifetimeSubmissions === 1 ? "" : "s"}.
+                                        </p>
+                                        <p>
+                                          <span className="font-medium text-slate-900">Latest version:</span> {currentScans} scan{currentScans === 1 ? "" : "s"} and {currentSubmissions} submission{currentSubmissions === 1 ? "" : "s"}.
+                                        </p>
+                                        <p>
+                                          The totals above keep your previous scans, while the latest-version card isolates activity after the most recent update.
+                                        </p>
                                       </div>
-                                    ) : (
-                                      <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                                        <p className="font-medium text-slate-900">History Note</p>
-                                        <div className="mt-3 space-y-2 text-sm text-slate-600">
-                                          <p>
-                                            <span className="font-medium text-slate-900">Overall history:</span> {lifetimeScans} scan{lifetimeScans === 1 ? "" : "s"} and {lifetimeSubmissions} submission{lifetimeSubmissions === 1 ? "" : "s"}.
-                                          </p>
-                                          <p>
-                                            <span className="font-medium text-slate-900">Latest version:</span> {currentScans} scan{currentScans === 1 ? "" : "s"} and {currentSubmissions} submission{currentSubmissions === 1 ? "" : "s"}.
-                                          </p>
-                                          <p>
-                                            The totals above keep your previous scans, while the latest-version card isolates activity after the most recent update.
-                                          </p>
-                                        </div>
-                                      </div>
-                                    )}
+                                    </div>
                                   </div>
                                 )}
 
@@ -1618,53 +1592,39 @@ export default function Dashboard() {
 
                                 {analysis.rating && (currentTab === "overview" || currentTab === "responses") && (
                                   <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                                    <p className="font-medium text-slate-900">Rating response breakdown</p>
-                                    <p className="mt-1 text-sm text-slate-500">Counts and percentage share for each rating option.</p>
-                                    <div className="mt-3 space-y-2">
-                                      {analysis.rating.buckets.map((bucket) => (
-                                        <div key={bucket.label}>
-                                          <div className="flex items-center justify-between text-sm">
-                                            <span className="text-slate-700">{bucket.label}</span>
-                                            <span className="text-slate-500">{bucket.count}</span>
-                                          </div>
-                                          <div className="mt-1 h-2 overflow-hidden rounded-full bg-slate-100">
-                                            <div
-                                              className="h-full rounded-full bg-fuchsia-500"
-                                              style={{
-                                                width: `${Math.max(
-                                                  (bucket.count / Math.max(...analysis.rating.buckets.map((entry) => entry.count), 1)) * 100,
-                                                  6,
-                                                )}%`,
-                                              }}
-                                            />
-                                          </div>
+                                    <div className="grid gap-4 lg:grid-cols-2">
+                                      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                                        <p className="font-medium text-slate-900">Rating response breakdown</p>
+                                        <div className="mt-4">
+                                          <CategoryBarChart
+                                            items={analysis.rating.buckets.map((bucket) => ({
+                                              label: `Rating ${bucket.label}`,
+                                              value: bucket.count || 0,
+                                              helper: "Responses",
+                                              colorClass: "bg-fuchsia-500",
+                                            }))}
+                                          />
                                         </div>
-                                      ))}
-                                    </div>
-                                    <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                                      <p className="font-medium text-slate-900">Rating percentage share</p>
-                                      <div className="mt-3 space-y-3">
-                                        {analysis.rating.buckets.map((bucket) => {
-                                          const totalRatings = Math.max(
-                                            analysis.rating.buckets.reduce((sum, entry) => sum + (entry.count || 0), 0),
-                                            1,
-                                          )
-                                          const percent = Math.round(((bucket.count || 0) / totalRatings) * 100)
-                                          return (
-                                            <div key={`${bucket.label}-percent`}>
-                                              <div className="flex items-center justify-between text-sm">
-                                                <span className="text-slate-700">Rating {bucket.label}</span>
-                                                <span className="text-slate-500">{percent}%</span>
-                                              </div>
-                                              <div className="mt-1 h-2.5 overflow-hidden rounded-full bg-slate-100">
-                                                <div
-                                                  className="h-full rounded-full bg-sky-500"
-                                                  style={{ width: `${Math.max(percent, bucket.count ? 6 : 0)}%` }}
-                                                />
-                                              </div>
-                                            </div>
-                                          )
-                                        })}
+                                      </div>
+                                      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                                        <p className="font-medium text-slate-900">Rating percentage share</p>
+                                        <div className="mt-4">
+                                          <CategoryBarChart
+                                            items={analysis.rating.buckets.map((bucket) => {
+                                              const totalRatings = Math.max(
+                                                analysis.rating.buckets.reduce((sum, entry) => sum + (entry.count || 0), 0),
+                                                1,
+                                              )
+                                              const percent = Math.round(((bucket.count || 0) / totalRatings) * 100)
+                                              return {
+                                                label: `Rating ${bucket.label}`,
+                                                value: percent,
+                                                helper: `${percent}%`,
+                                                colorClass: "bg-sky-500",
+                                              }
+                                            })}
+                                          />
+                                        </div>
                                       </div>
                                     </div>
                                   </div>
