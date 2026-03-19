@@ -164,10 +164,10 @@ function Sparkline({ points }) {
     <div className="space-y-2">
       <div className="flex h-28 items-end justify-between gap-2 rounded-2xl bg-slate-50 px-3 py-3">
         {points.map((point, index) => (
-          <div key={`${point.label || "point"}-${index}`} className="flex min-w-0 flex-1 items-end justify-center">
+          <div key={`${point.label || "point"}-${index}`} className="flex h-full min-w-0 flex-1 items-end justify-center">
             <div
               className={`w-full rounded-full ${point.count > 0 ? "bg-sky-500" : "bg-sky-100"}`}
-              style={{ height: `${Math.max((point.count / max) * 100, point.count > 0 ? 10 : 4)}%` }}
+              style={{ height: `${Math.max((point.count / max) * 100, point.count > 0 ? 14 : 4)}%` }}
               title={`${point.label}: ${point.count}`}
             />
           </div>
@@ -176,6 +176,41 @@ function Sparkline({ points }) {
       <div className="flex items-center justify-between gap-2 text-[11px] text-slate-400">
         <span>{points[0]?.label || ""}</span>
         <span>{points[points.length - 1]?.label || ""}</span>
+      </div>
+    </div>
+  )
+}
+
+function CategoryBarChart({ items }) {
+  if (!items?.length) {
+    return <p className="text-xs text-slate-400">No data</p>
+  }
+
+  const max = Math.max(...items.map((item) => item.value || 0), 1)
+
+  return (
+    <div className="space-y-3">
+      <div className="flex h-28 items-end justify-between gap-3 rounded-2xl bg-slate-50 px-3 py-3">
+        {items.map((item, index) => (
+          <div key={`${item.label}-${index}`} className="flex h-full min-w-0 flex-1 items-end justify-center">
+            <div
+              className={`w-full rounded-full ${item.colorClass || "bg-sky-500"}`}
+              style={{ height: `${Math.max(((item.value || 0) / max) * 100, item.value > 0 ? 14 : 4)}%` }}
+              title={`${item.label}: ${item.value}`}
+            />
+          </div>
+        ))}
+      </div>
+      <div className="grid gap-2 sm:grid-cols-2">
+        {items.map((item, index) => (
+          <div key={`${item.label}-meta-${index}`} className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2 text-sm">
+            <span className="font-medium text-slate-700">{item.label}</span>
+            <span className="text-slate-500">
+              {item.value}
+              {item.helper ? ` · ${item.helper}` : ""}
+            </span>
+          </div>
+        ))}
       </div>
     </div>
   )
