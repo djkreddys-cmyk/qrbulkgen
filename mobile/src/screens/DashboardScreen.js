@@ -798,9 +798,31 @@ export function DashboardScreen() {
                         })}
                       </View>
 
-                      <View style={{ borderWidth: 1, borderColor: "#bfdbfe", borderRadius: 16, padding: 12, backgroundColor: "#eff6ff", gap: 6 }}>
-                        <Text style={{ color: "#1d4ed8", fontSize: 12, fontWeight: "700" }}>QUICK INSIGHT</Text>
-                        <Text style={{ color: "#0f172a", lineHeight: 20 }}>{analysis.insight}</Text>
+                      <View style={{ borderWidth: 1, borderColor: "#dbe3f0", borderRadius: 16, padding: 12, backgroundColor: "#ffffff", gap: 8 }}>
+                        <Text style={{ color: "#64748b", fontSize: 12, fontWeight: "700" }}>ANALYSIS FILTER</Text>
+                        <Text style={{ color: "#475569", lineHeight: 20 }}>Overall report is shown first. Choose a range to refresh only the filtered trend and insights.</Text>
+                        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+                          {[
+                            ["7d", "7 days"],
+                            ["15d", "15 days"],
+                            ["30d", "Last month"],
+                          ].map(([value, label]) => {
+                            const active = (jobTrendFilters[job.id] || createTrendFilterState()).preset === value;
+                            return (
+                              <TouchableOpacity
+                                key={`m-qr-filter-${job.id}-${value}`}
+                                onPress={() => {
+                                  const next = { ...(jobTrendFilters[job.id] || createTrendFilterState()), preset: value };
+                                  setJobTrendFilters((prev) => ({ ...prev, [job.id]: next }));
+                                  loadJobAnalysis(job.id, next);
+                                }}
+                                style={{ borderWidth: 1, borderColor: active ? "#0f172a" : "#dbe3f0", borderRadius: 999, paddingHorizontal: 12, paddingVertical: 8, backgroundColor: active ? "#0f172a" : "#ffffff" }}
+                              >
+                                <Text style={{ color: active ? "#ffffff" : "#334155", fontWeight: "700", fontSize: 12 }}>{label}</Text>
+                              </TouchableOpacity>
+                            );
+                          })}
+                        </View>
                       </View>
 
                       {job.trackingMode !== "tracked" && (currentTab === "overview" || currentTab === "scans") && (

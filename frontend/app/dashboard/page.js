@@ -1213,7 +1213,7 @@ export default function Dashboard() {
                           <h4 className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">
                             Analysis for this QR Job
                           </h4>
-                          {analysisLoadingId === job.id ? (
+                          {analysisLoadingId === job.id && !jobAnalysisById[job.id] ? (
                             <p className="mt-4 text-sm text-slate-500">Loading analysis...</p>
                           ) : jobAnalysisById[job.id] ? (
                             (() => {
@@ -1285,11 +1285,64 @@ export default function Dashboard() {
                                   })}
                                 </div>
 
-                                <div className="rounded-2xl border border-sky-200 bg-sky-50 p-4">
-                                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-700">
-                                    Quick Insight
-                                  </p>
-                                  <p className="mt-2 text-sm font-medium text-slate-800">{analysis.insight}</p>
+                                <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                                  <div className="flex flex-wrap items-start justify-between gap-3">
+                                    <div>
+                                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Analysis Filter</p>
+                                      <p className="mt-2 text-sm text-slate-600">Overall report is shown first. Choose a range to refresh the trend and filtered insights only.</p>
+                                    </div>
+                                    <div className="flex flex-wrap gap-2">
+                                      {[
+                                        ["7d", "7 days"],
+                                        ["15d", "15 days"],
+                                        ["30d", "Last month"],
+                                      ].map(([value, label]) => (
+                                        <button
+                                          key={`qr-filter-${job.id}-${value}`}
+                                          type="button"
+                                          onClick={() => {
+                                            const next = { ...jobTrendFilter, preset: value }
+                                            setJobTrendFilterById((prev) => ({ ...prev, [job.id]: next }))
+                                            loadJobAnalysis(job.id, next)
+                                          }}
+                                          className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${
+                                            jobTrendFilter.preset === value
+                                              ? "border-slate-950 bg-slate-950 text-white"
+                                              : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"
+                                          }`}
+                                        >
+                                          {label}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  </div>
+                                  <div className="mt-3 grid gap-2 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
+                                    <input
+                                      type="date"
+                                      value={jobTrendFilter.startDate}
+                                      onChange={(e) => {
+                                        const next = { ...jobTrendFilter, preset: "custom", startDate: e.target.value }
+                                        setJobTrendFilterById((prev) => ({ ...prev, [job.id]: next }))
+                                      }}
+                                      className="h-11 rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm text-slate-900 outline-none transition focus:border-slate-400"
+                                    />
+                                    <input
+                                      type="date"
+                                      value={jobTrendFilter.endDate}
+                                      onChange={(e) => {
+                                        const next = { ...jobTrendFilter, preset: "custom", endDate: e.target.value }
+                                        setJobTrendFilterById((prev) => ({ ...prev, [job.id]: next }))
+                                      }}
+                                      className="h-11 rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm text-slate-900 outline-none transition focus:border-slate-400"
+                                    />
+                                    <button
+                                      type="button"
+                                      onClick={() => loadJobAnalysis(job.id, { ...jobTrendFilter, preset: "custom" })}
+                                      className="h-11 rounded-2xl border border-slate-950 bg-slate-950 px-4 text-sm font-semibold text-white"
+                                    >
+                                      Apply
+                                    </button>
+                                  </div>
                                 </div>
 
                                 {job.trackingMode !== "tracked" && (currentTab === "overview" || currentTab === "scans") && (
@@ -1452,57 +1505,7 @@ export default function Dashboard() {
                                               : "Recent scan activity for this QR job."}
                                           </p>
                                         </div>
-                                        <div className="flex flex-wrap gap-2">
-                                          {[
-                                            ["7d", "7 days"],
-                                            ["15d", "15 days"],
-                                            ["30d", "Last month"],
-                                          ].map(([value, label]) => (
-                                            <button
-                                              key={`${job.id}-${value}`}
-                                              type="button"
-                                              onClick={() => {
-                                                const next = { ...jobTrendFilter, preset: value }
-                                                setJobTrendFilterById((prev) => ({ ...prev, [job.id]: next }))
-                                                loadJobAnalysis(job.id, next)
-                                              }}
-                                              className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${
-                                                jobTrendFilter.preset === value
-                                                  ? "border-slate-950 bg-slate-950 text-white"
-                                                  : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"
-                                              }`}
-                                            >
-                                              {label}
-                                            </button>
-                                          ))}
-                                        </div>
-                                      </div>
-                                      <div className="mt-3 grid gap-2 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
-                                        <input
-                                          type="date"
-                                          value={jobTrendFilter.startDate}
-                                          onChange={(e) => {
-                                            const next = { ...jobTrendFilter, preset: "custom", startDate: e.target.value }
-                                            setJobTrendFilterById((prev) => ({ ...prev, [job.id]: next }))
-                                          }}
-                                          className="h-11 rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-900 outline-none transition focus:border-slate-400"
-                                        />
-                                        <input
-                                          type="date"
-                                          value={jobTrendFilter.endDate}
-                                          onChange={(e) => {
-                                            const next = { ...jobTrendFilter, preset: "custom", endDate: e.target.value }
-                                            setJobTrendFilterById((prev) => ({ ...prev, [job.id]: next }))
-                                          }}
-                                          className="h-11 rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-900 outline-none transition focus:border-slate-400"
-                                        />
-                                        <button
-                                          type="button"
-                                          onClick={() => loadJobAnalysis(job.id, { ...jobTrendFilter, preset: "custom" })}
-                                          className="h-11 rounded-2xl border border-slate-950 bg-slate-950 px-4 text-sm font-semibold text-white"
-                                        >
-                                          Apply
-                                        </button>
+                                        <MetricPill label="Range" value={jobTrendFilter.preset === "30d" ? "Last month" : jobTrendFilter.preset === "15d" ? "15 days" : jobTrendFilter.preset === "custom" ? "Custom" : "7 days"} tone="accent" />
                                       </div>
                                       <div className="mt-4">
                                         <Sparkline points={scanTrendPoints} />
@@ -1893,7 +1896,7 @@ export default function Dashboard() {
 
                         {analysisLinkId === link.id ? (
                           <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-5">
-                            {analysisLoadingLinkId === link.id ? (
+                            {analysisLoadingLinkId === link.id && !shortLinkAnalysisById[link.id] ? (
                               <p className="text-sm text-slate-500">Loading analysis...</p>
                             ) : shortLinkAnalysisById[link.id] ? (
                               <div className="space-y-5">
@@ -1912,9 +1915,63 @@ export default function Dashboard() {
                                     >
                                       {exportingShortLinkReportId === link.id ? "Preparing Excel..." : "Download Excel"}
                                     </button>
-                                    <div className="max-w-sm rounded-2xl border border-sky-200 bg-sky-50 p-4 text-sm text-slate-700">
-                                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-700">Quick Insight</p>
-                                      <p className="mt-2 leading-6">{shortLinkAnalysisById[link.id].quickInsight}</p>
+                                    <div className="max-w-xl rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-700">
+                                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Analysis Filter</p>
+                                      <p className="mt-2 leading-6 text-slate-600">Overall report is shown first. Apply a range to refresh only the filtered trend insights below.</p>
+                                      <div className="mt-3 flex flex-wrap gap-2">
+                                        {[
+                                          ["7d", "7 days"],
+                                          ["15d", "15 days"],
+                                          ["30d", "Last month"],
+                                        ].map(([value, label]) => {
+                                          const active = (shortLinkTrendFilterById[link.id] || createTrendFilterState()).preset === value
+                                          return (
+                                            <button
+                                              key={`short-filter-${link.id}-${value}`}
+                                              type="button"
+                                              onClick={() => {
+                                                const next = { ...(shortLinkTrendFilterById[link.id] || createTrendFilterState()), preset: value }
+                                                setShortLinkTrendFilterById((prev) => ({ ...prev, [link.id]: next }))
+                                                loadShortLinkAnalysis(link.id, next)
+                                              }}
+                                              className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${
+                                                active
+                                                  ? "border-slate-950 bg-slate-950 text-white"
+                                                  : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"
+                                              }`}
+                                            >
+                                              {label}
+                                            </button>
+                                          )
+                                        })}
+                                      </div>
+                                      <div className="mt-3 grid gap-2 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
+                                        <input
+                                          type="date"
+                                          value={(shortLinkTrendFilterById[link.id] || createTrendFilterState()).startDate}
+                                          onChange={(e) => {
+                                            const next = { ...(shortLinkTrendFilterById[link.id] || createTrendFilterState()), preset: "custom", startDate: e.target.value }
+                                            setShortLinkTrendFilterById((prev) => ({ ...prev, [link.id]: next }))
+                                          }}
+                                          className="h-11 rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm text-slate-900 outline-none transition focus:border-slate-400"
+                                        />
+                                        <input
+                                          type="date"
+                                          value={(shortLinkTrendFilterById[link.id] || createTrendFilterState()).endDate}
+                                          onChange={(e) => {
+                                            const next = { ...(shortLinkTrendFilterById[link.id] || createTrendFilterState()), preset: "custom", endDate: e.target.value }
+                                            setShortLinkTrendFilterById((prev) => ({ ...prev, [link.id]: next }))
+                                          }}
+                                          className="h-11 rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm text-slate-900 outline-none transition focus:border-slate-400"
+                                        />
+                                        <button
+                                          type="button"
+                                          onClick={() => loadShortLinkAnalysis(link.id, { ...(shortLinkTrendFilterById[link.id] || createTrendFilterState()), preset: "custom" })}
+                                          className="h-11 rounded-2xl border border-slate-950 bg-slate-950 px-4 text-sm font-semibold text-white"
+                                        >
+                                          Apply
+                                        </button>
+                                      </div>
                                     </div>
                                   </div>
                                 </div>
@@ -1952,60 +2009,7 @@ export default function Dashboard() {
                                   <div className="rounded-2xl border border-slate-200 bg-white p-5">
                                     <div className="flex flex-wrap items-start justify-between gap-3">
                                       <h4 className="text-base font-semibold text-slate-950">Trend</h4>
-                                      <div className="flex flex-wrap gap-2">
-                                        {[
-                                          ["7d", "7 days"],
-                                          ["15d", "15 days"],
-                                          ["30d", "Last month"],
-                                        ].map(([value, label]) => {
-                                          const active = (shortLinkTrendFilterById[link.id] || createTrendFilterState()).preset === value
-                                          return (
-                                            <button
-                                              key={`${link.id}-${value}`}
-                                              type="button"
-                                              onClick={() => {
-                                                const next = { ...(shortLinkTrendFilterById[link.id] || createTrendFilterState()), preset: value }
-                                                setShortLinkTrendFilterById((prev) => ({ ...prev, [link.id]: next }))
-                                                loadShortLinkAnalysis(link.id, next)
-                                              }}
-                                              className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${
-                                                active
-                                                  ? "border-slate-950 bg-slate-950 text-white"
-                                                  : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"
-                                              }`}
-                                            >
-                                              {label}
-                                            </button>
-                                          )
-                                        })}
-                                      </div>
-                                    </div>
-                                    <div className="mt-3 grid gap-2 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
-                                      <input
-                                        type="date"
-                                        value={(shortLinkTrendFilterById[link.id] || createTrendFilterState()).startDate}
-                                        onChange={(e) => {
-                                          const next = { ...(shortLinkTrendFilterById[link.id] || createTrendFilterState()), preset: "custom", startDate: e.target.value }
-                                          setShortLinkTrendFilterById((prev) => ({ ...prev, [link.id]: next }))
-                                        }}
-                                        className="h-11 rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm text-slate-900 outline-none transition focus:border-slate-400"
-                                      />
-                                      <input
-                                        type="date"
-                                        value={(shortLinkTrendFilterById[link.id] || createTrendFilterState()).endDate}
-                                        onChange={(e) => {
-                                          const next = { ...(shortLinkTrendFilterById[link.id] || createTrendFilterState()), preset: "custom", endDate: e.target.value }
-                                          setShortLinkTrendFilterById((prev) => ({ ...prev, [link.id]: next }))
-                                        }}
-                                        className="h-11 rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm text-slate-900 outline-none transition focus:border-slate-400"
-                                      />
-                                      <button
-                                        type="button"
-                                        onClick={() => loadShortLinkAnalysis(link.id, { ...(shortLinkTrendFilterById[link.id] || createTrendFilterState()), preset: "custom" })}
-                                        className="h-11 rounded-2xl border border-slate-950 bg-slate-950 px-4 text-sm font-semibold text-white"
-                                      >
-                                        Apply
-                                      </button>
+                                      <MetricPill label="Range" value={(shortLinkTrendFilterById[link.id] || createTrendFilterState()).preset === "30d" ? "Last month" : (shortLinkTrendFilterById[link.id] || createTrendFilterState()).preset === "15d" ? "15 days" : (shortLinkTrendFilterById[link.id] || createTrendFilterState()).preset === "custom" ? "Custom" : "7 days"} tone="accent" />
                                     </div>
                                     <div className="mt-4">
                                       <Sparkline points={shortLinkAnalysisById[link.id].trend || []} />
