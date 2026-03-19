@@ -217,7 +217,9 @@ function CategoryBarChart({ items }) {
           <View key={`${item.label}-${index}`} style={{ flex: 1, height: "100%", justifyContent: "flex-end" }}>
             <View
               style={{
-                width: "100%",
+                width: items.length <= 3 ? 56 : 24,
+                maxWidth: "100%",
+                alignSelf: "center",
                 height: `${Math.max(((item.value || 0) / max) * 100, item.value > 0 ? 14 : 4)}%`,
                 borderRadius: 999,
                 backgroundColor: item.color || "#0ea5e9",

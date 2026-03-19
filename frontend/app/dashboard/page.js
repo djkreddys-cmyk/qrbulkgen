@@ -197,8 +197,12 @@ function CategoryBarChart({ items }) {
         {items.map((item, index) => (
           <div key={`${item.label}-${index}`} className="flex h-full min-w-0 flex-1 items-end justify-center">
             <div
-              className={`w-full rounded-full ${item.colorClass || "bg-sky-500"}`}
-              style={{ height: `${Math.max(((item.value || 0) / max) * 100, item.value > 0 ? 14 : 4)}%` }}
+              className={`rounded-full ${item.colorClass || "bg-sky-500"}`}
+              style={{
+                width: items.length <= 3 ? "56px" : "min(100%, 28px)",
+                maxWidth: "100%",
+                height: `${Math.max(((item.value || 0) / max) * 100, item.value > 0 ? 14 : 4)}%`,
+              }}
               title={`${item.label}: ${item.value}`}
             />
           </div>
