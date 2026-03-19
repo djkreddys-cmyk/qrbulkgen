@@ -1295,6 +1295,7 @@ export default function Dashboard() {
                               const currentScans = current.totalScans || 0
                               const currentUnique = current.uniqueScans || 0
                               const currentRepeated = current.repeatedScans || 0
+                              const jobTrendFilter = jobTrendFilterById[job.id] || createTrendFilterState()
                               const filtered = analysis.filteredEngagement || {}
                               const displayedScans = jobTrendFilter.preset === "overall" ? lifetimeScans : Number(filtered.totalScans || 0)
                               const displayedUnique = jobTrendFilter.preset === "overall" ? lifetimeUnique : Number(filtered.uniqueScans || 0)
@@ -1303,7 +1304,6 @@ export default function Dashboard() {
                               const hasTrackedEngagement = Boolean(analysis.engagement?.trackingEnabled)
                               const currentTab = getAnalysisTab(job.id)
                               const scanTrendPoints = analysis.scanTrend || []
-                              const jobTrendFilter = jobTrendFilterById[job.id] || createTrendFilterState()
                               const typeAverageSuccessRate = analysis.typePerformance
                                 ? (analysis.typePerformance.successCount || 0) /
                                   Math.max(analysis.typePerformance.requestedCount || 1, 1)
