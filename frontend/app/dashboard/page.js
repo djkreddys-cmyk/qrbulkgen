@@ -158,34 +158,21 @@ function Sparkline({ points }) {
     return <p className="text-xs text-slate-400">No data</p>
   }
 
-  const width = 180
-  const height = 42
-  const paddingX = 6
   const max = Math.max(...points.map((point) => point.count), 1)
-  const usableWidth = Math.max(width - paddingX * 2, 0)
-  const step = points.length === 1 ? 0 : usableWidth / (points.length - 1)
-  const coordinates = points
-    .map((point, index) => {
-      const x = Math.round(paddingX + index * step)
-      const y = Math.round(height - (point.count / max) * (height - 8) - 4)
-      return { x, y }
-    })
-  const path = coordinates.map((point, index) => `${index === 0 ? "M" : "L"} ${point.x} ${point.y}`).join(" ")
 
   return (
     <div className="space-y-2">
-      <svg viewBox={`0 0 ${width} ${height}`} className="h-12 w-full overflow-visible">
-        <path d={path} fill="none" stroke="currentColor" strokeWidth="3" className="text-sky-500" strokeLinecap="round" />
-        {coordinates.map((point, index) => (
-          <circle
-            key={`${points[index]?.label || "point"}-${index}`}
-            cx={point.x}
-            cy={point.y}
-            r={points.length === 1 ? 4 : 2.5}
-            className="fill-sky-500"
-          />
+      <div className="flex h-28 items-end justify-between gap-2 rounded-2xl bg-slate-50 px-3 py-3">
+        {points.map((point, index) => (
+          <div key={`${point.label || "point"}-${index}`} className="flex min-w-0 flex-1 items-end justify-center">
+            <div
+              className={`w-full rounded-full ${point.count > 0 ? "bg-sky-500" : "bg-sky-100"}`}
+              style={{ height: `${Math.max((point.count / max) * 100, point.count > 0 ? 10 : 4)}%` }}
+              title={`${point.label}: ${point.count}`}
+            />
+          </div>
         ))}
-      </svg>
+      </div>
       <div className="flex items-center justify-between gap-2 text-[11px] text-slate-400">
         <span>{points[0]?.label || ""}</span>
         <span>{points[points.length - 1]?.label || ""}</span>
