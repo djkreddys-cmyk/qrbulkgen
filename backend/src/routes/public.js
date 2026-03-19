@@ -478,6 +478,13 @@ async function findShortLinkBySlug(slug) {
   return result.rows[0] || null;
 }
 
+function validateShortLinkAvailability(row) {
+  const isExpired = row.expires_at ? new Date(row.expires_at).getTime() < Date.now() : false;
+  if (!row.is_active || row.archived_at || isExpired) {
+    throw createHttpError(410, "SHORT_LINK_INACTIVE", "Short link is inactive or expired");
+  }
+}
+
 function serializeResolvedShortLink(row, clickCount) {
   return {
     id: row.id,
@@ -492,10 +499,7 @@ function serializeResolvedShortLink(row, clickCount) {
 }
 
 async function recordShortLinkVisit(req, row, preciseLocation = null) {
-  const isExpired = row.expires_at ? new Date(row.expires_at).getTime() < Date.now() : false;
-  if (!row.is_active || row.archived_at || isExpired) {
-    throw createHttpError(410, "SHORT_LINK_INACTIVE", "Short link is inactive or expired");
-  }
+  validateShortLinkAvailability(row);
 
   const visitorKey = buildVisitorKey(req, row.id);
   const ipAddress = getRequestIp(req).slice(0, 255);
@@ -920,6 +924,35 @@ publicRouter.get("/links/:id", async (req, res, next) => {
         type: row.link_type,
         title: row.title,
         payload,
+        createdAt: row.created_at,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+publicRouter.get("/short-links/:slug/meta", async (req, res, next) => {
+  try {
+    const slug = String(req.params.slug || "").trim();
+    if (!slug) {
+      throw createHttpError(400, "VALIDATION_ERROR", "short link slug is required");
+    }
+
+    const row = await findShortLinkBySlug(slug);
+    if (!row) {
+      throw createHttpError(404, "NOT_FOUND", "Short link not found");
+    }
+
+    validateShortLinkAvailability(row);
+
+    res.json({
+      link: {
+        id: row.id,
+        slug: row.slug,
+        title: row.title || "",
+        targetUrl: row.target_url,
+        expiresAt: row.expires_at,
         createdAt: row.created_at,
       },
     });

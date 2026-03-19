@@ -31,11 +31,17 @@ async function getPreciseLocationPayload() {
   })
 }
 
-export default function ShortLinkRedirectClient({ slug }) {
+export default function ShortLinkRedirectClient({ slug, targetUrl }) {
   const [message, setMessage] = useState("Opening short link...")
 
   useEffect(() => {
     let cancelled = false
+
+    async function continueToTarget() {
+      if (!cancelled && targetUrl) {
+        window.location.replace(targetUrl)
+      }
+    }
 
     async function resolveShortLink() {
       try {
@@ -52,19 +58,21 @@ export default function ShortLinkRedirectClient({ slug }) {
         })
 
         const data = await response.json().catch(() => null)
-        const targetUrl = data?.link?.targetUrl
+        const resolvedTargetUrl = data?.link?.targetUrl || targetUrl
 
-        if (!response.ok || !targetUrl) {
-          throw new Error(data?.error?.message || "Unable to open this short link right now.")
+        if (!response.ok || !resolvedTargetUrl) {
+          await continueToTarget()
+          return
         }
 
         if (!cancelled) {
-          window.location.replace(targetUrl)
+          window.location.replace(resolvedTargetUrl)
         }
       } catch (error) {
         if (!cancelled) {
-          setMessage(error.message || "Unable to open this short link right now.")
+          setMessage(error?.message || "Opening short link...")
         }
+        await continueToTarget()
       }
     }
 
@@ -79,6 +87,13 @@ export default function ShortLinkRedirectClient({ slug }) {
     <main className="flex min-h-screen items-center justify-center bg-slate-50 px-6">
       <div className="max-w-md rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-sm">
         <p className="text-sm font-medium text-slate-600">{message}</p>
+        <p className="mt-3 text-sm text-slate-500">
+          If the redirect does not start automatically, continue to{" "}
+          <a href={targetUrl} className="font-semibold text-sky-700 underline underline-offset-2">
+            the destination
+          </a>
+          .
+        </p>
       </div>
     </main>
   )
