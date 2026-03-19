@@ -166,8 +166,11 @@ function Sparkline({ points }) {
         {points.map((point, index) => (
           <div key={`${point.label || "point"}-${index}`} className="flex h-full min-w-0 flex-1 items-end justify-center">
             <div
-              className={`w-full rounded-full ${point.count > 0 ? "bg-sky-500" : "bg-sky-100"}`}
-              style={{ height: `${Math.max((point.count / max) * 100, point.count > 0 ? 14 : 4)}%` }}
+              className={`rounded-full ${point.count > 0 ? "bg-sky-500" : "bg-sky-100"}`}
+              style={{
+                width: points.length === 1 ? "48px" : "min(100%, 28px)",
+                height: `${Math.max((point.count / max) * 100, point.count > 0 ? 14 : 4)}%`,
+              }}
               title={`${point.label}: ${point.count}`}
             />
           </div>
@@ -1448,20 +1451,22 @@ export default function Dashboard() {
                                       </div>
                                     </div>
                                   </div>
-                                  <div className="mt-4 space-y-3">
-                                    <ProgressBar
-                                      label="Unique visitor share"
-                                      value={currentUnique}
-                                      total={Math.max(currentScans, 1)}
-                                      colorClass="bg-sky-500"
-                                      helper={currentScans ? `${Math.round((currentUnique / currentScans) * 100)}%` : "0%"}
-                                    />
-                                    <ProgressBar
-                                      label="Repeat visitor share"
-                                      value={currentRepeated}
-                                      total={Math.max(currentScans, 1)}
-                                      colorClass="bg-violet-500"
-                                      helper={currentScans ? `${Math.round((currentRepeated / currentScans) * 100)}%` : "0%"}
+                                  <div className="mt-4">
+                                    <CategoryBarChart
+                                      items={[
+                                        {
+                                          label: "Unique visitor share",
+                                          value: currentUnique,
+                                          helper: currentScans ? `${Math.round((currentUnique / currentScans) * 100)}%` : "0%",
+                                          colorClass: "bg-sky-500",
+                                        },
+                                        {
+                                          label: "Repeat visitor share",
+                                          value: currentRepeated,
+                                          helper: currentScans ? `${Math.round((currentRepeated / currentScans) * 100)}%` : "0%",
+                                          colorClass: "bg-violet-500",
+                                        },
+                                      ]}
                                     />
                                   </div>
                                   <div className="mt-3 grid gap-2 text-sm text-slate-600 md:grid-cols-2">
@@ -1986,18 +1991,26 @@ export default function Dashboard() {
                                 <div className="grid gap-4 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
                                   <div className="rounded-2xl border border-slate-200 bg-white p-5">
                                     <h4 className="text-base font-semibold text-slate-950">Visit breakdown</h4>
-                                    <div className="mt-4 space-y-4">
-                                      <ProgressBar
-                                        label="Unique visitors"
-                                        value={shortLinkAnalysisById[link.id].uniqueVisits}
-                                        total={Math.max(shortLinkAnalysisById[link.id].totalVisits, 1)}
-                                        colorClass="bg-sky-500"
-                                      />
-                                      <ProgressBar
-                                        label="Repeat visits"
-                                        value={shortLinkAnalysisById[link.id].repeatVisits}
-                                        total={Math.max(shortLinkAnalysisById[link.id].totalVisits, 1)}
-                                        colorClass="bg-emerald-500"
+                                    <div className="mt-4">
+                                      <CategoryBarChart
+                                        items={[
+                                          {
+                                            label: "Unique visitors",
+                                            value: shortLinkAnalysisById[link.id].uniqueVisits,
+                                            helper: shortLinkAnalysisById[link.id].totalVisits
+                                              ? `${Math.round((shortLinkAnalysisById[link.id].uniqueVisits / Math.max(shortLinkAnalysisById[link.id].totalVisits, 1)) * 100)}%`
+                                              : "0%",
+                                            colorClass: "bg-sky-500",
+                                          },
+                                          {
+                                            label: "Repeat visits",
+                                            value: shortLinkAnalysisById[link.id].repeatVisits,
+                                            helper: shortLinkAnalysisById[link.id].totalVisits
+                                              ? `${Math.round((shortLinkAnalysisById[link.id].repeatVisits / Math.max(shortLinkAnalysisById[link.id].totalVisits, 1)) * 100)}%`
+                                              : "0%",
+                                            colorClass: "bg-emerald-500",
+                                          },
+                                        ]}
                                       />
                                     </div>
                                   </div>

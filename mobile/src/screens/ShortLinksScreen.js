@@ -79,21 +79,60 @@ function Sparkline({ points }) {
     <View style={{ gap: 8 }}>
       <View style={{ flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between", gap: 6, height: 42 }}>
         {points.map((point, index) => (
-          <View
-            key={`${point.label}-${index}`}
-            style={{
-              flex: 1,
-              minWidth: points.length === 1 ? 28 : 10,
-              height: `${Math.max((point.count / max) * 100, point.count > 0 ? 12 : 4)}%`,
-              borderRadius: 999,
-              backgroundColor: point.count > 0 ? "#0ea5e9" : "#dbeafe",
-            }}
-          />
+          <View key={`${point.label}-${index}`} style={{ flex: 1, height: "100%", justifyContent: "flex-end", alignItems: "center" }}>
+            <View
+              style={{
+                width: points.length === 1 ? 32 : 18,
+                maxWidth: "100%",
+                height: `${Math.max((point.count / max) * 100, point.count > 0 ? 12 : 4)}%`,
+                borderRadius: 999,
+                backgroundColor: point.count > 0 ? "#0ea5e9" : "#dbeafe",
+              }}
+            />
+          </View>
         ))}
       </View>
       <View style={{ flexDirection: "row", justifyContent: "space-between", gap: 8 }}>
         <Text style={{ color: "#94a3b8", fontSize: 11 }}>{points[0]?.label || ""}</Text>
         <Text style={{ color: "#94a3b8", fontSize: 11 }}>{points[points.length - 1]?.label || ""}</Text>
+      </View>
+    </View>
+  );
+}
+
+function CategoryBarChart({ items }) {
+  if (!items?.length) {
+    return <Text style={{ color: "#94a3b8", fontSize: 12 }}>No data</Text>;
+  }
+
+  const max = Math.max(...items.map((item) => item.value || 0), 1);
+
+  return (
+    <View style={{ gap: 10 }}>
+      <View style={{ flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between", gap: 8, height: 112, borderRadius: 16, backgroundColor: "#f8fafc", paddingHorizontal: 12, paddingVertical: 12 }}>
+        {items.map((item, index) => (
+          <View key={`${item.label}-${index}`} style={{ flex: 1, height: "100%", justifyContent: "flex-end" }}>
+            <View
+              style={{
+                width: "100%",
+                height: `${Math.max(((item.value || 0) / max) * 100, item.value > 0 ? 14 : 4)}%`,
+                borderRadius: 999,
+                backgroundColor: item.color || "#0ea5e9",
+              }}
+            />
+          </View>
+        ))}
+      </View>
+      <View style={{ gap: 8 }}>
+        {items.map((item, index) => (
+          <View key={`${item.label}-meta-${index}`} style={{ flexDirection: "row", justifyContent: "space-between", gap: 10, borderRadius: 12, backgroundColor: "#f8fafc", paddingHorizontal: 12, paddingVertical: 10 }}>
+            <Text style={{ color: "#334155", fontWeight: "600", flex: 1 }}>{item.label}</Text>
+            <Text style={{ color: "#64748b" }}>
+              {item.value}
+              {item.helper ? ` | ${item.helper}` : ""}
+            </Text>
+          </View>
+        ))}
       </View>
     </View>
   );
@@ -711,8 +750,22 @@ export function ShortLinksScreen({ variant = "create" }) {
 
                       <Card style={{ padding: 14, gap: 10 }}>
                         <Text style={{ color: "#0f172a", fontWeight: "700" }}>Visit breakdown</Text>
-                        <ProgressBar label="Unique visitors" value={analysis.uniqueVisits} total={Math.max(analysis.totalVisits, 1)} color="#0ea5e9" />
-                        <ProgressBar label="Repeat visits" value={analysis.repeatVisits} total={Math.max(analysis.totalVisits, 1)} color="#10b981" />
+                        <CategoryBarChart
+                          items={[
+                            {
+                              label: "Unique visitors",
+                              value: analysis.uniqueVisits,
+                              helper: analysis.totalVisits ? `${Math.round((analysis.uniqueVisits / Math.max(analysis.totalVisits, 1)) * 100)}%` : "0%",
+                              color: "#0ea5e9",
+                            },
+                            {
+                              label: "Repeat visits",
+                              value: analysis.repeatVisits,
+                              helper: analysis.totalVisits ? `${Math.round((analysis.repeatVisits / Math.max(analysis.totalVisits, 1)) * 100)}%` : "0%",
+                              color: "#10b981",
+                            },
+                          ]}
+                        />
                       </Card>
 
                       <Card style={{ padding: 14, gap: 10 }}>
