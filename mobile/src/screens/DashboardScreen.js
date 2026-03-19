@@ -236,15 +236,11 @@ function CategoryBarChart({ items }) {
       </View>
       <View style={{ gap: 8 }}>
         {items.map((item, index) => (
-          <View key={`${item.label}-meta-${index}`} style={{ flexDirection: "row", justifyContent: "space-between", gap: 10, borderRadius: 12, backgroundColor: "#f8fafc", paddingHorizontal: 12, paddingVertical: 10 }}>
+          <View key={`${item.label}-meta-${index}`} style={{ flexDirection: "row", gap: 10, borderRadius: 12, backgroundColor: "#f8fafc", paddingHorizontal: 12, paddingVertical: 10 }}>
             <View style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: 8 }}>
               <View style={{ width: 10, height: 10, borderRadius: 999, backgroundColor: item.color || "#0ea5e9" }} />
               <Text style={{ color: "#334155", fontWeight: "600", flex: 1 }}>{item.label}</Text>
             </View>
-            <Text style={{ color: "#64748b" }}>
-              {item.value}
-              {item.helper ? ` | ${item.helper}` : ""}
-            </Text>
           </View>
         ))}
       </View>
@@ -1049,7 +1045,12 @@ export function DashboardScreen() {
                         <View style={{ borderWidth: 1, borderColor: "#dbe3f0", borderRadius: 16, padding: 12, backgroundColor: "#ffffff", gap: 8 }}>
                           <View style={{ gap: 12 }}>
                             <View style={{ borderWidth: 1, borderColor: "#dbe3f0", borderRadius: 16, backgroundColor: "#f8fafc", padding: 12, gap: 10 }}>
-                              <Text style={{ color: "#0f172a", fontWeight: "700" }}>Rating response breakdown</Text>
+                              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+                                <Text style={{ color: "#0f172a", fontWeight: "700", flex: 1 }}>Rating response breakdown</Text>
+                                <View style={{ borderRadius: 999, backgroundColor: "#ffffff", paddingHorizontal: 10, paddingVertical: 5 }}>
+                                  <Text style={{ color: "#475569", fontSize: 12, fontWeight: "700" }}>Repeated scans: {displayedRepeated}</Text>
+                                </View>
+                              </View>
                               <CategoryBarChart
                                 items={analysis.rating.buckets.map((bucket) => ({
                                   label: `Rating ${bucket.label}`,
@@ -1060,7 +1061,12 @@ export function DashboardScreen() {
                               />
                             </View>
                             <View style={{ borderWidth: 1, borderColor: "#dbe3f0", borderRadius: 16, backgroundColor: "#f8fafc", padding: 12, gap: 10 }}>
-                              <Text style={{ color: "#0f172a", fontWeight: "700" }}>Rating percentage share</Text>
+                              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+                                <Text style={{ color: "#0f172a", fontWeight: "700", flex: 1 }}>Rating percentage share</Text>
+                                <View style={{ borderRadius: 999, backgroundColor: "#ffffff", paddingHorizontal: 10, paddingVertical: 5 }}>
+                                  <Text style={{ color: "#475569", fontSize: 12, fontWeight: "700" }}>Repeated scans: {displayedRepeated}</Text>
+                                </View>
+                              </View>
                               <CategoryBarChart
                                 items={analysis.rating.buckets.map((bucket) => {
                                   const totalRatings = Math.max(

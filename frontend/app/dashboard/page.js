@@ -216,14 +216,10 @@ function CategoryBarChart({ items }) {
       </div>
       <div className="grid gap-2 sm:grid-cols-2">
         {items.map((item, index) => (
-          <div key={`${item.label}-meta-${index}`} className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2 text-sm">
+          <div key={`${item.label}-meta-${index}`} className="flex items-center rounded-xl bg-slate-50 px-3 py-2 text-sm">
             <span className="flex items-center gap-2 font-medium text-slate-700">
               <span className={`h-2.5 w-2.5 rounded-full ${item.colorClass || "bg-sky-500"}`} />
               {item.label}
-            </span>
-            <span className="text-slate-500">
-              {item.value}
-              {item.helper ? ` · ${item.helper}` : ""}
             </span>
           </div>
         ))}
@@ -1585,7 +1581,12 @@ export default function Dashboard() {
                                   <div className="rounded-2xl border border-slate-200 bg-white p-4">
                                     <div className="grid gap-4 lg:grid-cols-2">
                                       <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                                        <p className="font-medium text-slate-900">Rating response breakdown</p>
+                                        <div className="flex flex-wrap items-center justify-between gap-3">
+                                          <p className="font-medium text-slate-900">Rating response breakdown</p>
+                                          <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-600 shadow-sm">
+                                            Repeated scans: {displayedRepeated}
+                                          </span>
+                                        </div>
                                         <div className="mt-4">
                                           <CategoryBarChart
                                             items={analysis.rating.buckets.map((bucket) => ({
@@ -1598,7 +1599,12 @@ export default function Dashboard() {
                                         </div>
                                       </div>
                                       <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                                        <p className="font-medium text-slate-900">Rating percentage share</p>
+                                        <div className="flex flex-wrap items-center justify-between gap-3">
+                                          <p className="font-medium text-slate-900">Rating percentage share</p>
+                                          <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-600 shadow-sm">
+                                            Repeated scans: {displayedRepeated}
+                                          </span>
+                                        </div>
                                         <div className="mt-4">
                                           <CategoryBarChart
                                             items={analysis.rating.buckets.map((bucket) => {
