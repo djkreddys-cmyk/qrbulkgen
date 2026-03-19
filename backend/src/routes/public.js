@@ -363,9 +363,46 @@ function resolveManagedLinkDestination(row) {
   }
 }
 
+function normalizeIpCandidate(value) {
+  let ip = String(value || "").trim();
+  if (!ip) return "";
+
+  if (ip.startsWith("::ffff:")) {
+    ip = ip.slice(7);
+  }
+
+  if (ip.startsWith("[") && ip.includes("]")) {
+    ip = ip.slice(1, ip.indexOf("]"));
+  } else if (/^\d+\.\d+\.\d+\.\d+:\d+$/.test(ip)) {
+    ip = ip.replace(/:\d+$/, "");
+  }
+
+  return ip;
+}
+
+function getFirstPublicIp(values = []) {
+  const candidates = values
+    .flatMap((value) => String(value || "").split(","))
+    .map((value) => normalizeIpCandidate(value))
+    .filter(Boolean);
+
+  return candidates.find((candidate) => isPublicIp(candidate)) || candidates[0] || "";
+}
+
 function getRequestIp(req) {
-  const forwarded = String(req.headers["x-forwarded-for"] || "").split(",")[0].trim();
-  return forwarded || req.ip || "";
+  return getFirstPublicIp([
+    req.headers["cf-connecting-ip"],
+    req.headers["x-real-ip"],
+    req.headers["x-client-ip"],
+    req.headers["x-forwarded-for"],
+    req.headers["x-cluster-client-ip"],
+    req.headers["forwarded"],
+    req.headers["fastly-client-ip"],
+    req.headers["true-client-ip"],
+    req.headers["x-vercel-forwarded-for"],
+    req.ip,
+    req.socket?.remoteAddress,
+  ]);
 }
 
 function normalizeTrackingUrl(url) {
@@ -379,6 +416,72 @@ function normalizeTrackingUrl(url) {
   } catch {
     return raw;
   }
+}
+
+async function findShortLinkBySlug(slug) {
+  const result = await query(
+    `SELECT id, slug, title, target_url, click_count, expires_at, last_visited_at, archived_at, is_active, created_at, updated_at
+     FROM short_links
+     WHERE slug = $1
+     LIMIT 1`,
+    [slug],
+  );
+  return result.rows[0] || null;
+}
+
+function serializeResolvedShortLink(row, clickCount) {
+  return {
+    id: row.id,
+    slug: row.slug,
+    title: row.title || "",
+    targetUrl: row.target_url,
+    clickCount,
+    expiresAt: row.expires_at,
+    lastVisitedAt: new Date().toISOString(),
+    createdAt: row.created_at,
+  };
+}
+
+async function recordShortLinkVisit(req, row, preciseLocation = null) {
+  const isExpired = row.expires_at ? new Date(row.expires_at).getTime() < Date.now() : false;
+  if (!row.is_active || row.archived_at || isExpired) {
+    throw createHttpError(410, "SHORT_LINK_INACTIVE", "Short link is inactive or expired");
+  }
+
+  const ipAddress = getRequestIp(req).slice(0, 255);
+  const approximateLocation = await lookupApproximateLocation(ipAddress);
+  const normalizedPreciseLocation = normalizePreciseLocationPayload(preciseLocation);
+  const preferredLocation = normalizedPreciseLocation || approximateLocation;
+
+  await query(
+    `UPDATE short_links
+     SET click_count = click_count + 1,
+         last_visited_at = NOW(),
+         updated_at = NOW()
+     WHERE id = $1`,
+    [row.id],
+  );
+
+  await trackEvent({
+    eventType: "short-link.visit",
+    metadata: {
+      shortLinkId: row.id,
+      slug: row.slug,
+      targetUrl: row.target_url,
+      visitorKey: buildVisitorKey(req, row.id),
+      userAgent: String(req.headers["user-agent"] || "").slice(0, 255),
+      ipAddress,
+      location: preferredLocation?.label || null,
+      locationSource: preferredLocation?.source || null,
+      city: preferredLocation?.city || null,
+      region: preferredLocation?.region || null,
+      country: preferredLocation?.country || null,
+      latitude: preferredLocation?.latitude || null,
+      longitude: preferredLocation?.longitude || null,
+    },
+  });
+
+  return serializeResolvedShortLink(row, Number(row.click_count || 0) + 1);
 }
 
 function buildVisitorKey(req, linkId = "") {
@@ -747,67 +850,35 @@ publicRouter.get("/short-links/:slug", async (req, res, next) => {
       throw createHttpError(400, "VALIDATION_ERROR", "short link slug is required");
     }
 
-    const result = await query(
-      `SELECT id, slug, title, target_url, click_count, expires_at, last_visited_at, archived_at, is_active, created_at, updated_at
-       FROM short_links
-       WHERE slug = $1
-       LIMIT 1`,
-      [slug],
-    );
-
-    const row = result.rows[0];
+    const row = await findShortLinkBySlug(slug);
     if (!row) {
       throw createHttpError(404, "NOT_FOUND", "Short link not found");
     }
 
-    const isExpired = row.expires_at ? new Date(row.expires_at).getTime() < Date.now() : false;
-    if (!row.is_active || row.archived_at || isExpired) {
-      throw createHttpError(410, "SHORT_LINK_INACTIVE", "Short link is inactive or expired");
-    }
-
-    const ipAddress = getRequestIp(req).slice(0, 255);
-    const approximateLocation = await lookupApproximateLocation(ipAddress);
-
-    await query(
-      `UPDATE short_links
-       SET click_count = click_count + 1,
-           last_visited_at = NOW(),
-           updated_at = NOW()
-       WHERE id = $1`,
-      [row.id],
-    );
-
-    await trackEvent({
-      eventType: "short-link.visit",
-      metadata: {
-        shortLinkId: row.id,
-        slug: row.slug,
-        targetUrl: row.target_url,
-        visitorKey: buildVisitorKey(req, row.id),
-        userAgent: String(req.headers["user-agent"] || "").slice(0, 255),
-        ipAddress,
-        location: approximateLocation?.label || null,
-        locationSource: approximateLocation?.source || null,
-        city: approximateLocation?.city || null,
-        region: approximateLocation?.region || null,
-        country: approximateLocation?.country || null,
-        latitude: approximateLocation?.latitude || null,
-        longitude: approximateLocation?.longitude || null,
-      },
-    });
+    const link = await recordShortLinkVisit(req, row);
 
     res.json({
-      link: {
-        id: row.id,
-        slug: row.slug,
-        title: row.title || "",
-        targetUrl: row.target_url,
-        clickCount: Number(row.click_count || 0) + 1,
-        expiresAt: row.expires_at,
-        lastVisitedAt: new Date().toISOString(),
-        createdAt: row.created_at,
-      },
+      link,
     });
+  } catch (error) {
+    next(error);
+  }
+});
+
+publicRouter.post("/short-links/:slug/resolve", async (req, res, next) => {
+  try {
+    const slug = String(req.params.slug || "").trim();
+    if (!slug) {
+      throw createHttpError(400, "VALIDATION_ERROR", "short link slug is required");
+    }
+
+    const row = await findShortLinkBySlug(slug);
+    if (!row) {
+      throw createHttpError(404, "NOT_FOUND", "Short link not found");
+    }
+
+    const link = await recordShortLinkVisit(req, row, req.body?.preciseLocation || null);
+    res.json({ link });
   } catch (error) {
     next(error);
   }

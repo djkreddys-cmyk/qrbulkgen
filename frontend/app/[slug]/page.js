@@ -1,6 +1,6 @@
-import { notFound, redirect } from "next/navigation"
+import { notFound } from "next/navigation"
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:4000/api"
+import ShortLinkRedirectClient from "./ShortLinkRedirectClient"
 export const dynamic = "force-dynamic"
 
 const RESERVED_SLUGS = new Set([
@@ -34,20 +34,5 @@ export default async function ShortLinkRedirectPage({ params }) {
     notFound()
   }
 
-  const response = await fetch(`${API_BASE_URL}/public/short-links/${encodeURIComponent(slug)}`, {
-    cache: "no-store",
-  })
-
-  if (!response.ok) {
-    notFound()
-  }
-
-  const data = await response.json()
-  const targetUrl = data?.link?.targetUrl
-
-  if (!targetUrl) {
-    notFound()
-  }
-
-  redirect(targetUrl)
+  return <ShortLinkRedirectClient slug={slug} />
 }
