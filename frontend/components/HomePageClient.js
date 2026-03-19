@@ -229,8 +229,8 @@ export default function HomePageClient() {
         </div>
       </section>
 
-      <section className="grid gap-6 xl:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)] xl:items-stretch">
-        <div className="flex h-full flex-col rounded-[2rem] border border-slate-200 bg-slate-950 px-7 py-8 text-white shadow-[0_22px_60px_rgba(15,23,42,0.18)]">
+      <section className="grid gap-6 xl:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)] xl:items-start">
+        <div className="rounded-[2rem] border border-slate-200 bg-slate-950 px-7 py-8 text-white shadow-[0_22px_60px_rgba(15,23,42,0.18)]">
           <p className="text-sm font-semibold uppercase tracking-[0.22em] text-slate-300">Featured guide</p>
           <h2 className="mt-4 max-w-[13ch] text-[2.4rem] font-black leading-[1.02] tracking-tight">
             {featuredBlogPost.title}
@@ -249,6 +249,30 @@ export default function HomePageClient() {
               {featuredBlogPost.sections[0]?.paragraphs?.[0] || "Read the guide to see the full workflow."}
             </p>
           </div>
+          {featuredBlogPost.sections[1] ? (
+            <div className="mt-4 rounded-[1.5rem] border border-white/10 bg-white/5 p-5">
+              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-300">
+                {featuredBlogPost.sections[1].heading}
+              </p>
+              {featuredBlogPost.sections[1].paragraphs?.[0] ? (
+                <p className="mt-3 text-sm leading-7 text-slate-200">
+                  {featuredBlogPost.sections[1].paragraphs[0]}
+                </p>
+              ) : null}
+              {!!featuredBlogPost.sections[1].bullets?.length && (
+                <ul className="mt-4 grid gap-2">
+                  {featuredBlogPost.sections[1].bullets.slice(0, 4).map((bullet) => (
+                    <li
+                      key={bullet}
+                      className="rounded-xl border border-white/10 bg-slate-950/40 px-3 py-3 text-sm font-medium text-slate-200"
+                    >
+                      {bullet}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          ) : null}
           <div className="mt-7 flex flex-wrap gap-3">
             <Link
               href={`/blog/${featuredBlogPost.slug}`}
