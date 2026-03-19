@@ -19,6 +19,22 @@ export default function AuthScreen({ defaultMode = "register" }) {
 
   const isRegisterMode = mode === "register"
 
+  function getFriendlyAuthError(submitError) {
+    if (submitError?.code === "ACCOUNT_ALREADY_EXISTS") {
+      return "An account with this email or mobile number already exists."
+    }
+
+    if (String(submitError?.message || "").includes("users_email_key")) {
+      return "An account with this email already exists."
+    }
+
+    if (String(submitError?.message || "").includes("users_phone_key")) {
+      return "An account with this mobile number already exists."
+    }
+
+    return submitError?.message || "Unable to complete this request right now."
+  }
+
   async function handleSubmit(event) {
     event.preventDefault()
     setError("")
@@ -37,7 +53,7 @@ export default function AuthScreen({ defaultMode = "register" }) {
       saveAuthSession(data)
       router.push("/dashboard")
     } catch (submitError) {
-      setError(submitError.message)
+      setError(getFriendlyAuthError(submitError))
     } finally {
       setIsSubmitting(false)
     }

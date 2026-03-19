@@ -26,6 +26,13 @@ function isEmailIdentifier(value) {
   return String(value || "").includes("@");
 }
 
+function isUserUniqueConstraintError(error) {
+  return (
+    error?.code === "23505" &&
+    (error?.constraint === "users_email_key" || error?.constraint === "users_phone_key")
+  );
+}
+
 function validateRegisterPayload(body) {
   const name = String(body.name || "").trim();
   const identifier = String(body.identifier || body.email || body.phone || "").trim();
@@ -137,6 +144,17 @@ authRouter.post("/register", async (req, res, next) => {
       eventType: "auth.register",
     });
   } catch (error) {
+    if (isUserUniqueConstraintError(error)) {
+      next(
+        createHttpError(
+          409,
+          "ACCOUNT_ALREADY_EXISTS",
+          "An account with this email or mobile number already exists",
+        ),
+      );
+      return;
+    }
+
     next(error);
   }
 });
