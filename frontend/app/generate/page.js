@@ -65,7 +65,7 @@ export default function GeneratePage() {
             <div className="inline-flex overflow-hidden rounded-2xl border border-slate-900 shadow-sm">
               <Link
                 href="/short-links"
-                className="inline-flex items-center justify-center px-5 py-2.5 text-sm font-semibold text-slate-900 transition hover:bg-slate-50"
+                className="inline-flex items-center justify-center bg-slate-950 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800"
               >
                 Short URL
               </Link>

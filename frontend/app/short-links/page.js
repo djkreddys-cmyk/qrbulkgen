@@ -399,7 +399,7 @@ export default function ShortLinksPage() {
             <Link href="/generate" className="rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-white">
               Generate
             </Link>
-            <span className="rounded-full border border-sky-200 bg-sky-50 px-4 py-2 text-sm font-semibold text-sky-700">
+            <span className="rounded-full border border-slate-950 bg-slate-950 px-4 py-2 text-sm font-semibold text-white">
               Short URL
             </span>
           </div>
@@ -423,23 +423,26 @@ export default function ShortLinksPage() {
             </div>
           </div>
 
-          <form className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_minmax(0,0.95fr)_minmax(0,0.85fr)_auto]" onSubmit={handleCreate}>
-                <div>
+          <form className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_minmax(0,0.95fr)_minmax(0,0.85fr)_auto] xl:items-end" onSubmit={handleCreate}>
+                <div className="flex flex-col justify-end">
                   <label className="mb-1 block text-sm font-medium text-slate-700">Title</label>
                   <input value={title} onChange={(event) => setTitle(event.target.value)} className="w-full rounded-xl border border-slate-200 px-4 py-3" placeholder="Campaign landing page" />
+                  <div className="mt-1 min-h-[1.25rem]" />
                 </div>
-                <div>
+                <div className="flex flex-col justify-end">
                   <label className="mb-1 block text-sm font-medium text-slate-700">Target URL</label>
                   <input value={targetUrl} onChange={(event) => setTargetUrl(event.target.value)} className="w-full rounded-xl border border-slate-200 px-4 py-3" placeholder="https://example.com" />
+                  <div className="mt-1 min-h-[1.25rem]" />
                 </div>
-                <div>
+                <div className="flex flex-col justify-end">
                   <label className="mb-1 block text-sm font-medium text-slate-700">Custom slug (optional)</label>
                   <input value={slug} onChange={(event) => setSlug(event.target.value)} className="w-full rounded-xl border border-slate-200 px-4 py-3" placeholder="event2026" />
-                  <p className="mt-1 text-xs text-slate-500">Leave blank to auto-generate.</p>
+                  <p className="mt-1 min-h-[1.25rem] text-xs text-slate-500">Leave blank to auto-generate.</p>
                 </div>
-                <div>
+                <div className="flex flex-col justify-end">
                   <label className="mb-1 block text-sm font-medium text-slate-700">Expiry (optional)</label>
                   <input value={expiresAt} onChange={(event) => setExpiresAt(event.target.value)} className="w-full rounded-xl border border-slate-200 px-4 py-3" placeholder="DD-MM-YYYY" />
+                  <div className="mt-1 min-h-[1.25rem]" />
                 </div>
                 <div className="flex items-end xl:min-w-[11rem]">
                   <button disabled={isSubmitting} className="w-full rounded-xl bg-slate-950 px-4 py-3 font-semibold text-white disabled:opacity-60">

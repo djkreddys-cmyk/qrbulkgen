@@ -110,6 +110,46 @@ function buildTrendLabel(value) {
   return parsed.toISOString().slice(5, 10);
 }
 
+async function reverseLookupLocation(latitude, longitude) {
+  const lat = String(latitude || "").trim();
+  const lng = String(longitude || "").trim();
+  if (!lat || !lng) {
+    return null;
+  }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 1800);
+
+  try {
+    const response = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lng)}`,
+      {
+        signal: controller.signal,
+        headers: {
+          Accept: "application/json",
+          "User-Agent": "QRBulkGen/1.0",
+        },
+      },
+    );
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const data = await response.json().catch(() => null);
+    const address = data?.address || {};
+    return {
+      city: String(address.city || address.town || address.village || address.county || "").trim(),
+      region: String(address.state || address.region || address.state_district || "").trim(),
+      country: String(address.country || "").trim(),
+    };
+  } catch (_error) {
+    return null;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 function escapeCsvValue(value) {
   const text = String(value ?? "");
   if (!/[",\n]/.test(text)) return text;
@@ -344,9 +384,25 @@ shortLinksRouter.get("/short-links/:id/analysis-report.csv", requireAuth, async 
       { key: "longitude", label: "Longitude" },
     ];
 
-    const rows = visitsResult.rows.map((row) => {
+    const geoCache = new Map();
+    const rows = await Promise.all(visitsResult.rows.map(async (row) => {
       const visitedAt = row.created_at ? new Date(row.created_at) : null;
       const validDate = visitedAt && !Number.isNaN(visitedAt.getTime()) ? visitedAt : null;
+      let city = row.city || "";
+      let region = row.region || "";
+      let country = row.country || "";
+
+      if ((!city || !region || !country) && row.latitude && row.longitude) {
+        const cacheKey = `${row.latitude},${row.longitude}`;
+        if (!geoCache.has(cacheKey)) {
+          geoCache.set(cacheKey, reverseLookupLocation(row.latitude, row.longitude));
+        }
+        const reverseLocation = await geoCache.get(cacheKey);
+        city = city || reverseLocation?.city || "";
+        region = region || reverseLocation?.region || "";
+        country = country || reverseLocation?.country || "";
+      }
+
       return {
         title: link.title || link.slug || "",
         shortUrl: buildShortLinkUrl(link.slug),
@@ -356,13 +412,13 @@ shortLinksRouter.get("/short-links/:id/analysis-report.csv", requireAuth, async 
         ipAddress: row.ip_address || "",
         location: row.location || "",
         locationSource: row.location_source || "",
-        city: row.city || "",
-        region: row.region || "",
-        country: row.country || "",
+        city,
+        region,
+        country,
         latitude: row.latitude || "",
         longitude: row.longitude || "",
       };
-    });
+    }));
 
     const csv = buildCsv(columns, rows);
     const safeBase = String(link.title || link.slug || "short-link").replace(/[^a-z0-9]+/gi, "-").replace(/^-+|-+$/g, "").toLowerCase();

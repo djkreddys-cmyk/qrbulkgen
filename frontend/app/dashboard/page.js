@@ -882,14 +882,14 @@ export default function Dashboard() {
                   <button
                     type="button"
                     onClick={() => setActiveWorkspace("qr")}
-                    className={`rounded-2xl border px-4 py-3 text-left text-sm font-semibold transition ${activeWorkspace === "qr" ? "border-slate-300 bg-slate-50 text-slate-900 shadow-sm" : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50"}`}
+                    className={`rounded-2xl border px-4 py-3 text-left text-sm font-semibold transition ${activeWorkspace === "qr" ? "border-slate-950 bg-slate-950 text-white shadow-sm" : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50"}`}
                   >
                     QR Dashboard
                   </button>
                   <button
                     type="button"
                     onClick={() => setActiveWorkspace("short-links")}
-                    className={`rounded-2xl border px-4 py-3 text-left text-sm font-semibold transition ${activeWorkspace === "short-links" ? "border-sky-200 bg-sky-50 text-sky-700 shadow-sm" : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50"}`}
+                    className={`rounded-2xl border px-4 py-3 text-left text-sm font-semibold transition ${activeWorkspace === "short-links" ? "border-slate-950 bg-slate-950 text-white shadow-sm" : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50"}`}
                   >
                     Short URLs
                   </button>
@@ -903,14 +903,14 @@ export default function Dashboard() {
           <button
             type="button"
             onClick={() => setActiveWorkspace("qr")}
-            className={`rounded-2xl border px-4 py-3 text-sm font-semibold transition ${activeWorkspace === "qr" ? "border-slate-300 bg-slate-50 text-slate-900 shadow-sm" : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50"}`}
+            className={`rounded-2xl border px-4 py-3 text-sm font-semibold transition ${activeWorkspace === "qr" ? "border-slate-950 bg-slate-950 text-white shadow-sm" : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50"}`}
           >
             QR Dashboard
           </button>
           <button
             type="button"
             onClick={() => setActiveWorkspace("short-links")}
-            className={`rounded-2xl border px-4 py-3 text-sm font-semibold transition ${activeWorkspace === "short-links" ? "border-sky-200 bg-sky-50 text-sky-700 shadow-sm" : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50"}`}
+            className={`rounded-2xl border px-4 py-3 text-sm font-semibold transition ${activeWorkspace === "short-links" ? "border-slate-950 bg-slate-950 text-white shadow-sm" : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50"}`}
           >
             Short URLs
           </button>

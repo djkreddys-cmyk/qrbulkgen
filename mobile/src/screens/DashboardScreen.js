@@ -438,27 +438,27 @@ export function DashboardScreen() {
             onPress={() => setWorkspace("qr")}
             style={{
               borderWidth: 1,
-              borderColor: workspace === "qr" ? "#cbd5e1" : "#dbe3f0",
+              borderColor: workspace === "qr" ? "#0f172a" : "#dbe3f0",
               borderRadius: 18,
               paddingVertical: 13,
               paddingHorizontal: 16,
-              backgroundColor: workspace === "qr" ? "#f8fafc" : "#ffffff",
+              backgroundColor: workspace === "qr" ? "#0f172a" : "#ffffff",
             }}
           >
-            <Text style={{ color: "#0f172a", fontWeight: "700" }}>QR Dashboard</Text>
+            <Text style={{ color: workspace === "qr" ? "#ffffff" : "#0f172a", fontWeight: "700" }}>QR Dashboard</Text>
           </TouchableOpacity>
           <TouchableOpacity
             onPress={() => setWorkspace("short-links")}
             style={{
               borderWidth: 1,
-              borderColor: workspace === "short-links" ? "#93c5fd" : "#dbe3f0",
+              borderColor: workspace === "short-links" ? "#0f172a" : "#dbe3f0",
               borderRadius: 18,
               paddingVertical: 13,
               paddingHorizontal: 16,
-              backgroundColor: workspace === "short-links" ? "#e0f2fe" : "#ffffff",
+              backgroundColor: workspace === "short-links" ? "#0f172a" : "#ffffff",
             }}
           >
-            <Text style={{ color: workspace === "short-links" ? "#0369a1" : "#0f172a", fontWeight: "700" }}>Short URL</Text>
+            <Text style={{ color: workspace === "short-links" ? "#ffffff" : "#0f172a", fontWeight: "700" }}>Short URL</Text>
           </TouchableOpacity>
         </View>
       </Card>
