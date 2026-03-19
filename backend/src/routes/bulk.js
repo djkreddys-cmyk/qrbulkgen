@@ -113,8 +113,8 @@ function parseDateFilter(value, endOfDay = false) {
   return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
 }
 
-function resolveTrendWindow(query = {}) {
-  const preset = String(query.trendRange || "7d").trim().toLowerCase();
+function resolveTrendWindow(query = {}, fallbackStart = null) {
+  const preset = String(query.trendRange || "overall").trim().toLowerCase();
   const customStart = parseDateFilter(query.startDate);
   const customEnd = parseDateFilter(query.endDate, true);
   const today = new Date();
@@ -127,6 +127,17 @@ function resolveTrendWindow(query = {}) {
       endDate: customEnd,
       startDaySql: customStart.slice(0, 10),
       endDaySql: customEnd.slice(0, 10),
+    };
+  }
+
+  if (preset === "overall") {
+    const start = parseDateFilter(fallbackStart) || new Date(today).toISOString();
+    return {
+      preset: "overall",
+      startDate: start,
+      endDate: today.toISOString(),
+      startDaySql: String(start).slice(0, 10),
+      endDaySql: today.toISOString().slice(0, 10),
     };
   }
 
@@ -1188,7 +1199,7 @@ bulkRouter.get("/jobs/:id/analysis", requireAuth, async (req, res, next) => {
 
     const typeLabel = getQrTypeLabel(job);
     const versionStartedAt = job.completed_at || job.created_at || null;
-    const trendWindow = resolveTrendWindow(req.query);
+    const trendWindow = resolveTrendWindow(req.query, job.created_at);
 
     const lifetimeLinkStatsResult = await query(
       `WITH links AS (
@@ -1663,6 +1674,7 @@ bulkRouter.get("/jobs/:id/analysis-report.csv", requireAuth, async (req, res, ne
     const typeLabel = getQrTypeLabel(job);
     const trackingMode = String(job.tracking_mode || "tracked").toLowerCase() === "tracked" ? "tracked" : "direct";
     const versionStartedAt = job.completed_at || job.created_at || null;
+    const trendWindow = resolveTrendWindow(req.query, job.created_at);
 
     const scanRowsResult = await query(
       `WITH links AS (
@@ -1699,8 +1711,10 @@ bulkRouter.get("/jobs/:id/analysis-report.csv", requireAuth, async (req, res, ne
             regexp_replace(lower(split_part(links.url, '?exp=', 1)), '^https?://(www\\.)?', '')
        WHERE ae.event_type = 'qr.public.scan'
          AND ($3::timestamptz IS NULL OR ae.created_at >= $3::timestamptz)
+         AND ae.created_at >= $4::timestamptz
+         AND ae.created_at <= $5::timestamptz
        ORDER BY ae.created_at DESC`,
-      [job.managed_link_id, job.id, versionStartedAt],
+      [job.managed_link_id, job.id, versionStartedAt, trendWindow.startDate, trendWindow.endDate],
     );
 
     const columns = [

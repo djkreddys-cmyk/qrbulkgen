@@ -118,8 +118,8 @@ function parseTrendDate(value, endOfDay = false) {
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
-function resolveTrendWindow(query = {}) {
-  const preset = String(query.trendRange || "7d").trim().toLowerCase();
+function resolveTrendWindow(query = {}, fallbackStart = null) {
+  const preset = String(query.trendRange || "overall").trim().toLowerCase();
   const customStart = parseTrendDate(query.startDate);
   const customEnd = parseTrendDate(query.endDate, true);
   const today = new Date();
@@ -132,6 +132,18 @@ function resolveTrendWindow(query = {}) {
       endDate: customEnd.toISOString(),
       startDaySql: customStart.toISOString().slice(0, 10),
       endDaySql: customEnd.toISOString().slice(0, 10),
+    };
+  }
+
+  if (preset === "overall") {
+    const start = parseTrendDate(fallbackStart) || new Date(today);
+    start.setUTCHours(0, 0, 0, 0);
+    return {
+      preset: "overall",
+      startDate: start.toISOString(),
+      endDate: today.toISOString(),
+      startDaySql: start.toISOString().slice(0, 10),
+      endDaySql: today.toISOString().slice(0, 10),
     };
   }
 
@@ -260,8 +272,6 @@ shortLinksRouter.get("/short-links/:id/analysis", requireAuth, async (req, res, 
       throw createHttpError(400, "VALIDATION_ERROR", "Short link id is required");
     }
 
-    const trendWindow = resolveTrendWindow(req.query);
-
     const linkResult = await query(
       `SELECT id, slug, title, target_url, click_count, expires_at, last_visited_at, archived_at, is_active, created_at
        FROM short_links
@@ -274,6 +284,8 @@ shortLinksRouter.get("/short-links/:id/analysis", requireAuth, async (req, res, 
     if (!link) {
       throw createHttpError(404, "NOT_FOUND", "Short link not found");
     }
+
+    const trendWindow = resolveTrendWindow(req.query, link.created_at);
 
     const eventsResult = await query(
       `${SHORT_LINK_DEDUPED_EVENTS_CTE}
@@ -396,6 +408,8 @@ shortLinksRouter.get("/short-links/:id/analysis-report.csv", requireAuth, async 
       throw createHttpError(404, "NOT_FOUND", "Short link not found");
     }
 
+    const trendWindow = resolveTrendWindow(req.query, link.created_at);
+
     const visitsResult = await query(
       `${SHORT_LINK_DEDUPED_EVENTS_CTE}
        SELECT
@@ -409,8 +423,10 @@ shortLinksRouter.get("/short-links/:id/analysis-report.csv", requireAuth, async 
          COALESCE(metadata->>'latitude', '') AS latitude,
          COALESCE(metadata->>'longitude', '') AS longitude
        FROM deduped_events
+       WHERE created_at >= $2::timestamptz
+         AND created_at <= $3::timestamptz
        ORDER BY created_at DESC`,
-      [id],
+      [id, trendWindow.startDate, trendWindow.endDate],
     );
 
     const columns = [

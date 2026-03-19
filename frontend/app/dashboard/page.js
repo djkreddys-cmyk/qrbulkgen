@@ -123,7 +123,7 @@ function formatCompactDate(value) {
 
 function createTrendFilterState(overrides = {}) {
   return {
-    preset: "7d",
+    preset: "overall",
     startDate: "",
     endDate: "",
     ...overrides,
@@ -693,7 +693,7 @@ export default function Dashboard() {
 
     try {
       setExportingReportJobId(job.id)
-      const response = await fetch(`${API_BASE_URL}/qr/jobs/${job.id}/analysis-report.csv`, {
+      const response = await fetch(`${API_BASE_URL}/qr/jobs/${job.id}/analysis-report.csv${buildTrendQuery(jobTrendFilterById[job.id] || createTrendFilterState())}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -730,7 +730,7 @@ export default function Dashboard() {
 
     try {
       setExportingShortLinkReportId(link.id)
-      const response = await fetch(`${API_BASE_URL}/short-links/${link.id}/analysis-report.csv`, {
+      const response = await fetch(`${API_BASE_URL}/short-links/${link.id}/analysis-report.csv${buildTrendQuery(shortLinkTrendFilterById[link.id] || createTrendFilterState())}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -1286,13 +1286,11 @@ export default function Dashboard() {
                                 </div>
 
                                 <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                                  <div className="flex flex-wrap items-start justify-between gap-3">
-                                    <div>
-                                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Analysis Filter</p>
-                                      <p className="mt-2 text-sm text-slate-600">Overall report is shown first. Choose a range to refresh the trend and filtered insights only.</p>
-                                    </div>
-                                    <div className="flex flex-wrap gap-2">
+                                  <div className="flex flex-wrap items-center justify-between gap-3">
+                                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Analysis Filter</p>
+                                    <div className="flex flex-wrap items-center justify-end gap-2">
                                       {[
+                                        ["overall", "Overall"],
                                         ["7d", "7 days"],
                                         ["15d", "15 days"],
                                         ["30d", "Last month"],
@@ -1300,11 +1298,11 @@ export default function Dashboard() {
                                         <button
                                           key={`qr-filter-${job.id}-${value}`}
                                           type="button"
-                                          onClick={() => {
-                                            const next = { ...jobTrendFilter, preset: value }
-                                            setJobTrendFilterById((prev) => ({ ...prev, [job.id]: next }))
-                                            loadJobAnalysis(job.id, next)
-                                          }}
+                                              onClick={() => {
+                                                const next = { ...jobTrendFilter, preset: value, startDate: value === "overall" ? "" : jobTrendFilter.startDate, endDate: value === "overall" ? "" : jobTrendFilter.endDate }
+                                                setJobTrendFilterById((prev) => ({ ...prev, [job.id]: next }))
+                                                loadJobAnalysis(job.id, next)
+                                              }}
                                           className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${
                                             jobTrendFilter.preset === value
                                               ? "border-slate-950 bg-slate-950 text-white"
@@ -1314,34 +1312,42 @@ export default function Dashboard() {
                                           {label}
                                         </button>
                                       ))}
+                                      <input
+                                        type="date"
+                                        value={jobTrendFilter.startDate}
+                                        onChange={(e) => {
+                                          const next = { ...jobTrendFilter, preset: "custom", startDate: e.target.value }
+                                          setJobTrendFilterById((prev) => ({ ...prev, [job.id]: next }))
+                                        }}
+                                        className="h-11 rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm text-slate-900 outline-none transition focus:border-slate-400"
+                                      />
+                                      <input
+                                        type="date"
+                                        value={jobTrendFilter.endDate}
+                                        onChange={(e) => {
+                                          const next = { ...jobTrendFilter, preset: "custom", endDate: e.target.value }
+                                          setJobTrendFilterById((prev) => ({ ...prev, [job.id]: next }))
+                                        }}
+                                        className="h-11 rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm text-slate-900 outline-none transition focus:border-slate-400"
+                                      />
+                                      <button
+                                        type="button"
+                                        onClick={() => loadJobAnalysis(job.id, { ...jobTrendFilter, preset: "custom" })}
+                                        className="h-11 rounded-2xl border border-slate-950 bg-slate-950 px-4 text-sm font-semibold text-white"
+                                      >
+                                        Apply
+                                      </button>
+                                      {hasTrackedEngagement ? (
+                                        <button
+                                          type="button"
+                                          onClick={() => handleDownloadAnalysisReport(job)}
+                                          disabled={exportingReportJobId === job.id}
+                                          className="h-11 rounded-xl border border-slate-950 bg-slate-950 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+                                        >
+                                          {exportingReportJobId === job.id ? "Preparing Excel..." : "Download Excel"}
+                                        </button>
+                                      ) : null}
                                     </div>
-                                  </div>
-                                  <div className="mt-3 grid gap-2 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
-                                    <input
-                                      type="date"
-                                      value={jobTrendFilter.startDate}
-                                      onChange={(e) => {
-                                        const next = { ...jobTrendFilter, preset: "custom", startDate: e.target.value }
-                                        setJobTrendFilterById((prev) => ({ ...prev, [job.id]: next }))
-                                      }}
-                                      className="h-11 rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm text-slate-900 outline-none transition focus:border-slate-400"
-                                    />
-                                    <input
-                                      type="date"
-                                      value={jobTrendFilter.endDate}
-                                      onChange={(e) => {
-                                        const next = { ...jobTrendFilter, preset: "custom", endDate: e.target.value }
-                                        setJobTrendFilterById((prev) => ({ ...prev, [job.id]: next }))
-                                      }}
-                                      className="h-11 rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm text-slate-900 outline-none transition focus:border-slate-400"
-                                    />
-                                    <button
-                                      type="button"
-                                      onClick={() => loadJobAnalysis(job.id, { ...jobTrendFilter, preset: "custom" })}
-                                      className="h-11 rounded-2xl border border-slate-950 bg-slate-950 px-4 text-sm font-semibold text-white"
-                                    >
-                                      Apply
-                                    </button>
                                   </div>
                                 </div>
 
@@ -1399,16 +1405,6 @@ export default function Dashboard() {
                                       </p>
                                     </div>
                                     <div className="flex flex-wrap items-center justify-end gap-2">
-                                      {hasTrackedEngagement ? (
-                                        <button
-                                          type="button"
-                                          onClick={() => handleDownloadAnalysisReport(job)}
-                                          disabled={exportingReportJobId === job.id}
-                                          className="rounded-xl border border-slate-950 bg-slate-950 px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
-                                        >
-                                          {exportingReportJobId === job.id ? "Preparing Excel..." : "Download Excel"}
-                                        </button>
-                                      ) : null}
                                       <MetricPill
                                         label="Tracking"
                                         value={hasTrackedEngagement ? "Active" : "Unavailable"}
@@ -1505,7 +1501,7 @@ export default function Dashboard() {
                                               : "Recent scan activity for this QR job."}
                                           </p>
                                         </div>
-                                        <MetricPill label="Range" value={jobTrendFilter.preset === "30d" ? "Last month" : jobTrendFilter.preset === "15d" ? "15 days" : jobTrendFilter.preset === "custom" ? "Custom" : "7 days"} tone="accent" />
+                                        <MetricPill label="Range" value={jobTrendFilter.preset === "overall" ? "Overall" : jobTrendFilter.preset === "30d" ? "Last month" : jobTrendFilter.preset === "15d" ? "15 days" : jobTrendFilter.preset === "custom" ? "Custom" : "7 days"} tone="accent" />
                                       </div>
                                       <div className="mt-4">
                                         <Sparkline points={scanTrendPoints} />
@@ -1906,20 +1902,12 @@ export default function Dashboard() {
                                     <h4 className="mt-2 text-xl font-semibold text-slate-950">{link.title || link.slug}</h4>
                                     <p className="mt-1 text-sm text-slate-500">Analysis has been moved to the dashboard so QR and short URL reporting stay in one workspace.</p>
                                   </div>
-                                  <div className="flex flex-wrap items-start justify-end gap-3">
-                                    <button
-                                      type="button"
-                                      onClick={() => handleDownloadShortLinkAnalysisReport(link)}
-                                      disabled={exportingShortLinkReportId === link.id}
-                                      className="rounded-xl border border-slate-950 bg-slate-950 px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
-                                    >
-                                      {exportingShortLinkReportId === link.id ? "Preparing Excel..." : "Download Excel"}
-                                    </button>
-                                    <div className="max-w-xl rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-700">
+                                  <div className="w-full rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-700">
+                                    <div className="flex flex-wrap items-center justify-between gap-3">
                                       <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Analysis Filter</p>
-                                      <p className="mt-2 leading-6 text-slate-600">Overall report is shown first. Apply a range to refresh only the filtered trend insights below.</p>
-                                      <div className="mt-3 flex flex-wrap gap-2">
-                                        {[
+                                      <div className="flex flex-wrap items-center justify-end gap-2">
+                                      {[
+                                          ["overall", "Overall"],
                                           ["7d", "7 days"],
                                           ["15d", "15 days"],
                                           ["30d", "Last month"],
@@ -1930,7 +1918,8 @@ export default function Dashboard() {
                                               key={`short-filter-${link.id}-${value}`}
                                               type="button"
                                               onClick={() => {
-                                                const next = { ...(shortLinkTrendFilterById[link.id] || createTrendFilterState()), preset: value }
+                                                const currentFilter = shortLinkTrendFilterById[link.id] || createTrendFilterState()
+                                                const next = { ...currentFilter, preset: value, startDate: value === "overall" ? "" : currentFilter.startDate, endDate: value === "overall" ? "" : currentFilter.endDate }
                                                 setShortLinkTrendFilterById((prev) => ({ ...prev, [link.id]: next }))
                                                 loadShortLinkAnalysis(link.id, next)
                                               }}
@@ -1944,8 +1933,6 @@ export default function Dashboard() {
                                             </button>
                                           )
                                         })}
-                                      </div>
-                                      <div className="mt-3 grid gap-2 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
                                         <input
                                           type="date"
                                           value={(shortLinkTrendFilterById[link.id] || createTrendFilterState()).startDate}
@@ -1970,6 +1957,14 @@ export default function Dashboard() {
                                           className="h-11 rounded-2xl border border-slate-950 bg-slate-950 px-4 text-sm font-semibold text-white"
                                         >
                                           Apply
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => handleDownloadShortLinkAnalysisReport(link)}
+                                          disabled={exportingShortLinkReportId === link.id}
+                                          className="h-11 rounded-xl border border-slate-950 bg-slate-950 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+                                        >
+                                          {exportingShortLinkReportId === link.id ? "Preparing Excel..." : "Download Excel"}
                                         </button>
                                       </div>
                                     </div>
@@ -2009,7 +2004,7 @@ export default function Dashboard() {
                                   <div className="rounded-2xl border border-slate-200 bg-white p-5">
                                     <div className="flex flex-wrap items-start justify-between gap-3">
                                       <h4 className="text-base font-semibold text-slate-950">Trend</h4>
-                                      <MetricPill label="Range" value={(shortLinkTrendFilterById[link.id] || createTrendFilterState()).preset === "30d" ? "Last month" : (shortLinkTrendFilterById[link.id] || createTrendFilterState()).preset === "15d" ? "15 days" : (shortLinkTrendFilterById[link.id] || createTrendFilterState()).preset === "custom" ? "Custom" : "7 days"} tone="accent" />
+                                      <MetricPill label="Range" value={(shortLinkTrendFilterById[link.id] || createTrendFilterState()).preset === "overall" ? "Overall" : (shortLinkTrendFilterById[link.id] || createTrendFilterState()).preset === "30d" ? "Last month" : (shortLinkTrendFilterById[link.id] || createTrendFilterState()).preset === "15d" ? "15 days" : (shortLinkTrendFilterById[link.id] || createTrendFilterState()).preset === "custom" ? "Custom" : "7 days"} tone="accent" />
                                     </div>
                                     <div className="mt-4">
                                       <Sparkline points={shortLinkAnalysisById[link.id].trend || []} />
