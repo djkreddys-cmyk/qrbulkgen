@@ -185,15 +185,25 @@ shortLinksRouter.get("/short-links/:id/analysis", requireAuth, async (req, res, 
     );
 
     const trendResult = await query(
-      `SELECT
-         DATE(created_at) AS day,
-         COUNT(*)::int AS visit_count
-       FROM analytics_events
-       WHERE event_type = 'short-link.visit'
-         AND metadata->>'shortLinkId' = $1
-         AND created_at >= NOW() - INTERVAL '7 days'
-       GROUP BY DATE(created_at)
-       ORDER BY DATE(created_at) ASC`,
+      `WITH days AS (
+         SELECT generate_series(CURRENT_DATE - INTERVAL '6 days', CURRENT_DATE, INTERVAL '1 day')::date AS day
+       ),
+       counts AS (
+         SELECT
+           DATE(created_at) AS day,
+           COUNT(*)::int AS visit_count
+         FROM analytics_events
+         WHERE event_type = 'short-link.visit'
+           AND metadata->>'shortLinkId' = $1
+           AND created_at >= CURRENT_DATE - INTERVAL '6 days'
+         GROUP BY DATE(created_at)
+       )
+       SELECT
+         days.day,
+         COALESCE(counts.visit_count, 0)::int AS visit_count
+       FROM days
+       LEFT JOIN counts ON counts.day = days.day
+       ORDER BY days.day ASC`,
       [id],
     );
 

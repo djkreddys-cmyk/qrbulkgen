@@ -74,20 +74,31 @@ function Sparkline({ points }) {
 
   const width = 180
   const height = 42
+  const paddingX = 6
   const max = Math.max(...points.map((point) => point.count), 1)
-  const step = points.length === 1 ? width : width / (points.length - 1)
-  const path = points
+  const usableWidth = Math.max(width - paddingX * 2, 0)
+  const step = points.length === 1 ? 0 : usableWidth / (points.length - 1)
+  const coordinates = points
     .map((point, index) => {
-      const x = Math.round(index * step)
+      const x = Math.round(paddingX + index * step)
       const y = Math.round(height - (point.count / max) * (height - 8) - 4)
-      return `${index === 0 ? "M" : "L"} ${x} ${y}`
+      return { x, y }
     })
-    .join(" ")
+  const path = coordinates.map((point, index) => `${index === 0 ? "M" : "L"} ${point.x} ${point.y}`).join(" ")
 
   return (
     <div className="space-y-2">
       <svg viewBox={`0 0 ${width} ${height}`} className="h-12 w-full overflow-visible">
         <path d={path} fill="none" stroke="currentColor" strokeWidth="3" className="text-sky-500" strokeLinecap="round" />
+        {coordinates.map((point, index) => (
+          <circle
+            key={`${points[index]?.label || "point"}-${index}`}
+            cx={point.x}
+            cy={point.y}
+            r={points.length === 1 ? 4 : 2.5}
+            className="fill-sky-500"
+          />
+        ))}
       </svg>
       <div className="flex items-center justify-between gap-2 text-[11px] text-slate-400">
         <span>{points[0]?.label || ""}</span>

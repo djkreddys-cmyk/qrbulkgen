@@ -180,16 +180,16 @@ function MiniSparkline({ points }) {
 
   return (
     <View style={{ gap: 8 }}>
-      <View style={{ flexDirection: "row", alignItems: "flex-end", gap: 4, height: 42 }}>
+      <View style={{ flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between", gap: 6, height: 42 }}>
         {points.map((point, index) => (
           <View
             key={`${point.label}-${index}`}
             style={{
               flex: 1,
-              minWidth: 8,
+              minWidth: points.length === 1 ? 28 : 10,
               height: `${Math.max((point.count / max) * 100, point.count > 0 ? 12 : 4)}%`,
               borderRadius: 999,
-              backgroundColor: "#0ea5e9",
+              backgroundColor: point.count > 0 ? "#0ea5e9" : "#dbeafe",
             }}
           />
         ))}

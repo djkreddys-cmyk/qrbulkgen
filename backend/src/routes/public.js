@@ -765,6 +765,9 @@ publicRouter.get("/short-links/:slug", async (req, res, next) => {
       throw createHttpError(410, "SHORT_LINK_INACTIVE", "Short link is inactive or expired");
     }
 
+    const ipAddress = getRequestIp(req).slice(0, 255);
+    const approximateLocation = await lookupApproximateLocation(ipAddress);
+
     await query(
       `UPDATE short_links
        SET click_count = click_count + 1,
@@ -782,7 +785,14 @@ publicRouter.get("/short-links/:slug", async (req, res, next) => {
         targetUrl: row.target_url,
         visitorKey: buildVisitorKey(req, row.id),
         userAgent: String(req.headers["user-agent"] || "").slice(0, 255),
-        ipAddress: getRequestIp(req).slice(0, 255),
+        ipAddress,
+        location: approximateLocation?.label || null,
+        locationSource: approximateLocation?.source || null,
+        city: approximateLocation?.city || null,
+        region: approximateLocation?.region || null,
+        country: approximateLocation?.country || null,
+        latitude: approximateLocation?.latitude || null,
+        longitude: approximateLocation?.longitude || null,
       },
     });
 
