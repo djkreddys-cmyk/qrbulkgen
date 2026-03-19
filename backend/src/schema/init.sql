@@ -19,6 +19,14 @@ ALTER TABLE users
 ALTER TABLE users
   ALTER COLUMN email DROP NOT NULL;
 
+UPDATE users
+SET email = NULL
+WHERE email = '';
+
+UPDATE users
+SET phone = NULL
+WHERE phone = '';
+
 CREATE UNIQUE INDEX IF NOT EXISTS users_phone_unique_idx
   ON users(phone)
   WHERE phone IS NOT NULL;

@@ -26,6 +26,11 @@ function isEmailIdentifier(value) {
   return String(value || "").includes("@");
 }
 
+function toNullableValue(value) {
+  const normalized = String(value || "").trim();
+  return normalized ? normalized : null;
+}
+
 function isUserUniqueConstraintError(error) {
   return (
     error?.code === "23505" &&
@@ -142,30 +147,19 @@ function buildResetPasswordUrl(token) {
 authRouter.post("/register", async (req, res, next) => {
   try {
     const { name, email, phone, password } = validateRegisterPayload(req.body);
-    console.info("[auth/register] parsed payload", {
-      name,
-      email,
-      phone,
-      identifier: req.body?.identifier || req.body?.email || req.body?.phone || "",
-    });
+    const emailValue = toNullableValue(email);
+    const phoneValue = toNullableValue(phone);
 
     const result = await withTransaction(async (client) => {
       const existingUser = await client.query("SELECT id, email, phone FROM users WHERE email = $1 OR phone = $2 LIMIT 1", [
-        email || null,
-        phone || null,
+        emailValue,
+        phoneValue,
       ]);
 
       if (existingUser.rows[0]) {
-        console.info("[auth/register] existing user match", {
-          inputEmail: email,
-          inputPhone: phone,
-          matchedUserId: existingUser.rows[0].id,
-          matchedEmail: existingUser.rows[0].email,
-          matchedPhone: existingUser.rows[0].phone,
-        });
         throw buildExistingAccountError({
-          email: Boolean(email && existingUser.rows[0].email === email),
-          phone: Boolean(phone && existingUser.rows[0].phone === phone),
+          email: Boolean(emailValue && existingUser.rows[0].email === emailValue),
+          phone: Boolean(phoneValue && existingUser.rows[0].phone === phoneValue),
         });
       }
 
@@ -173,7 +167,7 @@ authRouter.post("/register", async (req, res, next) => {
         `INSERT INTO users (name, email, phone, password_hash)
          VALUES ($1, $2, $3, $4)
          RETURNING id, name, email, phone`,
-        [name, email, phone, hashPassword(password)],
+        [name, emailValue, phoneValue, hashPassword(password)],
       );
 
       const user = insertedUser.rows[0];
@@ -189,10 +183,6 @@ authRouter.post("/register", async (req, res, next) => {
     });
   } catch (error) {
     if (isUserUniqueConstraintError(error)) {
-      console.info("[auth/register] unique constraint conflict", {
-        constraint: error.constraint,
-        detail: error.detail || null,
-      });
       next(mapUserUniqueConstraintError(error));
       return;
     }
