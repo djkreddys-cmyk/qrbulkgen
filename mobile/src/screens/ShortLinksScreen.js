@@ -70,7 +70,7 @@ function ProgressBar({ label, value, total, color = "#0ea5e9" }) {
 
 function Sparkline({ points }) {
   if (!points?.length) {
-    return <Text style={{ color: "#94a3b8", fontSize: 12 }}>No visit trend recorded yet.</Text>;
+    return <Text style={{ color: "#94a3b8", fontSize: 12 }}>No data</Text>;
   }
 
   const max = Math.max(...points.map((point) => point.count || 0), 1);

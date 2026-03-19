@@ -155,7 +155,7 @@ function isExpiringSoonLink(link) {
 
 function Sparkline({ points }) {
   if (!points.length) {
-    return <p className="text-xs text-slate-400">No scan trend yet.</p>
+    return <p className="text-xs text-slate-400">No data</p>
   }
 
   const width = 180
@@ -1139,7 +1139,6 @@ export default function Dashboard() {
                             ) : null}
                           </div>
                           <h3 className="text-lg font-semibold text-slate-950">{getJobTitle(job)}</h3>
-                          <p className="font-mono text-xs text-slate-500">{job.id}</p>
                           <div className="grid gap-x-6 gap-y-1.5 border-t border-slate-100 pt-2 text-sm text-slate-600 sm:grid-cols-2">
                             <p><span className="font-medium text-slate-900">Type:</span> {job.qrType || "-"}</p>
                             <p><span className="font-medium text-slate-900">File:</span> {job.sourceFileName || "-"}</p>
@@ -1398,11 +1397,6 @@ export default function Dashboard() {
                                   <div className="flex items-start justify-between gap-4">
                                     <div>
                                       <p className="font-medium text-slate-900">Usage Report</p>
-                                      <p className="mt-1 text-sm text-slate-500">
-                                        {hasTrackedEngagement
-                                          ? "See both total history and the latest updated-version activity for this QR."
-                                          : "Tracking is unavailable for this QR right now."}
-                                      </p>
                                     </div>
                                     <div className="flex flex-wrap items-center justify-end gap-2">
                                       <MetricPill
@@ -1424,9 +1418,6 @@ export default function Dashboard() {
                                     </div>
                                     <div className="rounded-2xl border border-sky-200 bg-sky-50 p-4">
                                       <p className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-700">Latest Updated Version</p>
-                                      <p className="mt-1 text-xs text-slate-500">
-                                        {current.versionStartedAt ? `Counts from ${formatDateTime(current.versionStartedAt)}` : "Counts for the latest saved version."}
-                                      </p>
                                       <div className="mt-3 grid gap-3 md:grid-cols-2">
                                         <AnalysisStat label="Scans" value={currentScans} />
                                         <AnalysisStat label="Unique" value={currentUnique} tone="accent" />
@@ -1435,11 +1426,6 @@ export default function Dashboard() {
                                       </div>
                                     </div>
                                   </div>
-                                  {hasTrackedEngagement ? (
-                                    <p className="mt-3 text-xs text-slate-500">
-                                      Excel export includes scan date, scan time, destination/output, IP, visitor key, and any stored location metadata.
-                                    </p>
-                                  ) : null}
                                   <div className="mt-4 space-y-3">
                                     <ProgressBar
                                       label="Unique visitor share"
@@ -1495,11 +1481,6 @@ export default function Dashboard() {
                                       <div className="flex flex-wrap items-start justify-between gap-3">
                                         <div>
                                           <p className="font-medium text-slate-900">Scan trend</p>
-                                          <p className="mt-1 text-sm text-slate-500">
-                                            {lifetimeScans > currentScans
-                                              ? "Latest-version trend is shown here. Overall history remains in the usage totals above."
-                                              : "Recent scan activity for this QR job."}
-                                          </p>
                                         </div>
                                         <MetricPill label="Range" value={jobTrendFilter.preset === "overall" ? "Overall" : jobTrendFilter.preset === "30d" ? "Last month" : jobTrendFilter.preset === "15d" ? "15 days" : jobTrendFilter.preset === "custom" ? "Custom" : "7 days"} tone="accent" />
                                       </div>
@@ -1857,11 +1838,10 @@ export default function Dashboard() {
                               </div>
                               <div>
                                 <h3 className="text-lg font-semibold text-slate-950">{link.title || link.slug}</h3>
-                                <p className="mt-1 font-mono text-xs text-slate-500">{link.id}</p>
                               </div>
                               <p className="break-all text-sm font-medium text-slate-900">{link.url}</p>
                               <p className="break-all text-sm text-slate-600">Target: {link.targetUrl}</p>
-                              <div className="grid gap-x-6 gap-y-1.5 border-t border-slate-100 pt-2 text-sm text-slate-600 sm:grid-cols-2">
+                              <div className="flex flex-wrap items-center gap-x-6 gap-y-1.5 border-t border-slate-100 pt-2 text-sm text-slate-600">
                                 <p><span className="font-medium text-slate-900">Created:</span> {formatDateTime(link.createdAt)}</p>
                                 <p><span className="font-medium text-slate-900">Last visit:</span> {formatDateTime(link.lastVisitedAt)}</p>
                                 <p><span className="font-medium text-slate-900">Expiry:</span> {formatDateTime(link.expiresAt)}</p>
@@ -1900,7 +1880,6 @@ export default function Dashboard() {
                                   <div>
                                     <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Short URL Analytics</p>
                                     <h4 className="mt-2 text-xl font-semibold text-slate-950">{link.title || link.slug}</h4>
-                                    <p className="mt-1 text-sm text-slate-500">Analysis has been moved to the dashboard so QR and short URL reporting stay in one workspace.</p>
                                   </div>
                                   <div className="w-full rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-700">
                                     <div className="flex flex-wrap items-center justify-between gap-3">
@@ -2011,9 +1990,6 @@ export default function Dashboard() {
                                     </div>
                                   </div>
                                 </div>
-                                <p className="text-xs text-slate-500">
-                                  Excel export now matches the QR analysis sheet format with scan date, response, output type, title, and stored location metadata.
-                                </p>
                               </div>
                             ) : null}
                           </div>

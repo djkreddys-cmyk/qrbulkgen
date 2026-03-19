@@ -173,7 +173,7 @@ function PerformanceBadge({ label, tone = "default" }) {
 
 function MiniSparkline({ points }) {
   if (!points.length) {
-    return <Text style={{ color: "#94a3b8", fontSize: 12 }}>No scan trend yet.</Text>;
+    return <Text style={{ color: "#94a3b8", fontSize: 12 }}>No data</Text>;
   }
 
   const max = Math.max(...points.map((point) => point.count || 0), 1);
@@ -842,11 +842,6 @@ export function DashboardScreen() {
                       {(currentTab === "overview" || currentTab === "scans" || currentTab === "expiry") && (
                         <View style={{ borderWidth: 1, borderColor: "#dbe3f0", borderRadius: 16, padding: 12, backgroundColor: "#ffffff", gap: 8 }}>
                           <Text style={{ color: "#0f172a", fontWeight: "700" }}>Usage Report</Text>
-                          <Text style={{ color: "#64748b" }}>
-                            {hasTrackedEngagement
-                              ? "See both total history and the latest updated-version activity for this QR."
-                              : "Tracking is unavailable for this QR right now."}
-                          </Text>
                           <View style={{ alignSelf: "flex-start" }}>
                             <PerformanceBadge label={hasTrackedEngagement ? "Tracking active" : "Tracking unavailable"} tone={hasTrackedEngagement ? "success" : "default"} />
                           </View>
@@ -862,9 +857,6 @@ export function DashboardScreen() {
                             </View>
                             <View style={{ borderWidth: 1, borderColor: "#bfdbfe", borderRadius: 16, padding: 12, backgroundColor: "#eff6ff", gap: 8 }}>
                               <Text style={{ color: "#1d4ed8", fontSize: 12, fontWeight: "700" }}>LATEST UPDATED VERSION</Text>
-                              <Text style={{ color: "#64748b" }}>
-                                {current.versionStartedAt ? `Counts from ${formatDateTime(current.versionStartedAt)}` : "Counts for the latest saved version."}
-                              </Text>
                               <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}>
                                 <AnalysisStat label="Scans" value={current.totalScans || 0} />
                                 <AnalysisStat label="Unique" value={current.uniqueScans || 0} tone="#1d4ed8" />
@@ -876,7 +868,6 @@ export function DashboardScreen() {
                           {(currentTab === "overview" || currentTab === "scans") && (
                             <View style={{ borderWidth: 1, borderColor: "#dbe3f0", borderRadius: 16, padding: 12, backgroundColor: "#f8fafc", gap: 8 }}>
                               <Text style={{ color: "#0f172a", fontWeight: "700" }}>Scan trend</Text>
-                              <Text style={{ color: "#64748b" }}>Recent scan activity for this QR job.</Text>
                               <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
                                 {[
                                   ["7d", "7 days"],
@@ -944,7 +935,6 @@ export function DashboardScreen() {
                       {currentTab === "overview" && (
                         <View style={{ borderWidth: 1, borderColor: "#dbe3f0", borderRadius: 16, padding: 12, backgroundColor: "#ffffff", gap: 8 }}>
                           <Text style={{ color: "#0f172a", fontWeight: "700" }}>Actionable Insights</Text>
-                          {!hasTrackedEngagement ? <Text style={{ color: "#475569" }}>Tracking is unavailable for this QR right now.</Text> : null}
                           <Text style={{ color: "#475569" }}>{analysis.job?.failureCount > 0 ? `${analysis.job.failureCount} output(s) failed and may need a rerun.` : "Generation quality is clean with no failed outputs recorded."}</Text>
                           <Text style={{ color: "#475569" }}>{(analysis.engagement?.totalScans || 0) > 0 ? `This QR has ${analysis.engagement.uniqueScans || 0} unique scan(s) and ${analysis.engagement.repeatedScans || 0} repeat visit(s).` : "No scan activity yet. Share or print this QR to start collecting engagement."}</Text>
                           <Text style={{ color: "#475569" }}>{analysis.engagement?.expiryDate ? (analysis.engagement?.isExpired ? "Expiry has already been reached." : `Expiry is set for ${formatDateTime(analysis.engagement.expiryDate)}.`) : "No expiry date is set for this QR yet."}</Text>
