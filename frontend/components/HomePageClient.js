@@ -170,14 +170,14 @@ export default function HomePageClient() {
   const featuredBlogPost = blogPosts.find((post) => post.slug === activeBlogPost) || blogPosts[0]
 
   return (
-    <main className="mx-auto flex max-w-[88rem] flex-col gap-20 px-4 py-14 md:px-6 md:py-16 xl:px-8">
-      <section className="grid gap-10 xl:grid-cols-[1.02fr_0.98fr] xl:items-start">
-        <div className="space-y-7 xl:pt-3">
+    <main className="mx-auto flex max-w-[84rem] flex-col gap-16 px-4 py-12 md:px-6 md:py-16 xl:px-8">
+      <section className="grid gap-8 xl:grid-cols-[minmax(0,1.02fr)_minmax(0,0.98fr)] xl:items-center">
+        <div className="space-y-7 xl:pr-6">
           <p className="inline-flex rounded-full border border-sky-300/70 bg-white/85 px-4 py-2 text-xs font-semibold uppercase tracking-[0.24em] text-sky-900 shadow-sm">
             Blog, guides, QR codes, and Short URLs
           </p>
           <h1 className="max-w-3xl text-[clamp(3.2rem,7vw,6.2rem)] font-black leading-[0.92] tracking-tight text-slate-950">
-            Learn the QR and Short URL workflows first, then launch them from the same product.
+            Learn, create, and track QR codes and Short URLs from one product.
           </h1>
           <p className="max-w-[58rem] text-[1.05rem] leading-8 text-slate-600 md:text-lg">
             QRBulkGen now leads with practical content for bulk QR generation, Short URL tracking,
@@ -186,13 +186,13 @@ export default function HomePageClient() {
           </p>
         </div>
 
-        <div className="space-y-5">
+        <div className="space-y-5 xl:pl-2">
           <div className="rounded-[2.2rem] border border-white/70 bg-white/80 p-7 shadow-[0_24px_90px_rgba(15,23,42,0.12)] backdrop-blur md:p-8">
-            <div className="grid gap-4 md:grid-cols-2">
+            <div className="grid auto-rows-fr gap-4 md:grid-cols-2">
               {operatingModes.map((mode) => (
                 <div
                   key={mode.label}
-                  className="min-h-[212px] rounded-[1.5rem] border border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(243,247,255,0.92))] p-5 shadow-sm"
+                  className="flex h-full min-h-[212px] flex-col rounded-[1.5rem] border border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(243,247,255,0.92))] p-5 shadow-sm"
                 >
                   <div className="flex items-start justify-between gap-4">
                     <div>
@@ -229,8 +229,8 @@ export default function HomePageClient() {
         </div>
       </section>
 
-      <section className="grid gap-6 xl:grid-cols-[0.92fr_1.08fr] xl:items-start">
-        <div className="rounded-[2rem] border border-slate-200 bg-slate-950 px-7 py-8 text-white shadow-[0_22px_60px_rgba(15,23,42,0.18)]">
+      <section className="grid gap-6 xl:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)] xl:items-stretch">
+        <div className="flex h-full flex-col rounded-[2rem] border border-slate-200 bg-slate-950 px-7 py-8 text-white shadow-[0_22px_60px_rgba(15,23,42,0.18)]">
           <p className="text-sm font-semibold uppercase tracking-[0.22em] text-slate-300">Featured guide</p>
           <h2 className="mt-4 max-w-[13ch] text-[2.4rem] font-black leading-[1.02] tracking-tight">
             {featuredBlogPost.title}
@@ -279,13 +279,13 @@ export default function HomePageClient() {
               View all articles
             </Link>
           </div>
-          <div className="mt-6 grid gap-4 md:grid-cols-2">
+          <div className="mt-6 grid auto-rows-fr gap-4 md:grid-cols-2">
             {blogPosts.slice(0, 6).map((post) => (
               <button
                 key={post.slug}
                 type="button"
                 onClick={() => setActiveBlogPost(post.slug)}
-                className={`rounded-[1.5rem] border px-5 py-5 text-left transition ${
+                className={`flex h-full flex-col rounded-[1.5rem] border px-5 py-5 text-left transition ${
                   activeBlogPost === post.slug
                     ? "border-slate-950 bg-slate-950 text-white shadow-[0_18px_45px_rgba(15,23,42,0.12)]"
                     : "border-slate-200 bg-slate-50 text-slate-950 hover:-translate-y-1 hover:bg-white"
@@ -305,14 +305,14 @@ export default function HomePageClient() {
         </div>
       </section>
 
-      <section className="grid gap-5 xl:grid-cols-[1.15fr_0.85fr] xl:items-stretch">
-        <div className="grid gap-4 md:grid-cols-3">
+      <section className="grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)] xl:items-stretch">
+        <div className="grid auto-rows-fr gap-4 md:grid-cols-3">
           {homepageStats.map((stat) => (
             <button
               key={stat.id}
               type="button"
               onClick={() => setActiveStatCard(stat.id)}
-              className={`min-h-[176px] rounded-[1.75rem] border px-5 py-5 text-left shadow-[0_16px_45px_rgba(15,23,42,0.08)] backdrop-blur transition ${
+              className={`flex h-full min-h-[176px] flex-col rounded-[1.75rem] border px-5 py-5 text-left shadow-[0_16px_45px_rgba(15,23,42,0.08)] backdrop-blur transition ${
                 activeStatCard === stat.id
                   ? "border-slate-950 bg-slate-950 text-white"
                   : "border-white/90 bg-white/85 text-slate-950 hover:-translate-y-1"
@@ -410,8 +410,8 @@ export default function HomePageClient() {
           </div>
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="rounded-[1.75rem] border border-white/80 bg-white/90 p-6 shadow-sm">
+        <div className="grid auto-rows-fr gap-4 sm:grid-cols-2">
+          <div className="flex h-full flex-col rounded-[1.75rem] border border-white/80 bg-white/90 p-6 shadow-sm">
             <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">QR reports</p>
             <h3 className="mt-3 text-2xl font-black tracking-tight text-slate-950">
               Job-by-job analysis for single and bulk QR workflows.
@@ -421,7 +421,7 @@ export default function HomePageClient() {
               feedback summaries, expiry state, and downloadable reports from one dashboard layout.
             </p>
           </div>
-          <div className="rounded-[1.75rem] border border-white/80 bg-white/90 p-6 shadow-sm">
+          <div className="flex h-full flex-col rounded-[1.75rem] border border-white/80 bg-white/90 p-6 shadow-sm">
             <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">Short URL reports</p>
             <h3 className="mt-3 text-2xl font-black tracking-tight text-slate-950">
               Visitor reporting with trend filters and location-rich exports.
@@ -435,14 +435,14 @@ export default function HomePageClient() {
         </div>
       </section>
 
-      <section className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
-        <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+      <section className="grid gap-6 xl:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)] xl:items-stretch">
+        <div className="grid auto-rows-fr gap-6 md:grid-cols-2 xl:grid-cols-3">
           {bestFeatures.map((feature) => (
             <button
               key={feature.id}
               type="button"
               onClick={() => setActiveFeatureCard(feature.id)}
-              className={`flex min-h-[265px] flex-col justify-between rounded-[2rem] border p-7 text-left shadow-sm transition ${
+              className={`flex h-full min-h-[265px] flex-col justify-between rounded-[2rem] border p-7 text-left shadow-sm transition ${
                 activeFeatureCard === feature.id
                   ? "border-slate-950 bg-slate-950 text-white shadow-[0_20px_60px_rgba(15,23,42,0.18)]"
                   : "border-white/80 bg-white/85 text-slate-950 hover:-translate-y-1"
@@ -486,22 +486,22 @@ export default function HomePageClient() {
         </div>
       </section>
 
-      <section className="grid gap-8 lg:grid-cols-[0.9fr_1.1fr] lg:items-start">
+      <section className="grid gap-8 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:items-start">
         <div className="rounded-[2rem] border border-white/80 bg-white/85 p-8 shadow-sm backdrop-blur">
           <p className="text-sm font-semibold uppercase tracking-[0.22em] text-slate-500">QR types</p>
           <h2 className="mt-3 text-[2.8rem] font-black tracking-tight text-slate-950">
-            One generator, the QR types your teams actually need.
+            One aligned workspace for the QR formats your teams actually use.
           </h2>
           <p className="mt-5 leading-8 text-slate-600">
             Create operational codes, marketing codes, scan-and-respond experiences, and public pages
-            from the same interface. The styling model stays consistent while the payload changes.
+            from the same interface. The layout, styling model, and reporting stay consistent while the payload changes.
           </p>
         </div>
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid auto-rows-fr gap-4 sm:grid-cols-2">
           {qrTypeGroups.map((group) => (
             <div
               key={group.title}
-              className="rounded-[1.75rem] border border-white/80 bg-white/85 px-6 py-6 shadow-sm backdrop-blur"
+              className="flex h-full flex-col rounded-[1.75rem] border border-white/80 bg-white/85 px-6 py-6 shadow-sm backdrop-blur"
             >
               <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">{group.title}</p>
               <p className="mt-4 text-sm font-semibold leading-7 text-slate-800">{group.body}</p>
@@ -517,11 +517,11 @@ export default function HomePageClient() {
             Start free, then scale only when the workflow proves itself.
           </h2>
         </div>
-        <div className="grid gap-6 lg:grid-cols-3">
+        <div className="grid auto-rows-fr gap-6 lg:grid-cols-3">
           {pricingTiers.map((tier) => (
             <article
               key={tier.name}
-              className={`rounded-[2rem] border p-7 shadow-sm ${
+              className={`flex h-full flex-col rounded-[2rem] border p-7 shadow-sm ${
                 tier.featured
                   ? "border-slate-950 bg-slate-950 text-white shadow-[0_20px_60px_rgba(15,23,42,0.18)]"
                   : "border-white/80 bg-white/85 text-slate-950 backdrop-blur"
@@ -546,7 +546,7 @@ export default function HomePageClient() {
               </ul>
               <Link
                 href={tier.ctaHref}
-                className={`mt-8 inline-flex rounded-full px-5 py-3 text-sm font-semibold ${
+                className={`mt-auto inline-flex rounded-full px-5 py-3 text-sm font-semibold ${
                   tier.featured ? "bg-white text-slate-950" : "bg-slate-950 text-white"
                 }`}
               >
@@ -568,12 +568,12 @@ export default function HomePageClient() {
             campaigns, events, ratings, and feedback so visitors can enter the product with the right context.
           </p>
         </div>
-        <div className="grid gap-6 lg:grid-cols-3">
+        <div className="grid auto-rows-fr gap-6 lg:grid-cols-3">
           {blogPosts.map((post) => (
             <Link
               key={post.slug}
               href={`/blog/${post.slug}`}
-              className="rounded-[2rem] border border-white/80 bg-white/85 p-7 shadow-sm transition hover:-translate-y-1 hover:shadow-lg"
+              className="flex h-full flex-col rounded-[2rem] border border-white/80 bg-white/85 p-7 shadow-sm transition hover:-translate-y-1 hover:shadow-lg"
             >
               <div className="flex flex-wrap gap-3 text-sm text-slate-500">
                 <span>{post.category}</span>
@@ -589,7 +589,7 @@ export default function HomePageClient() {
       </section>
 
       <section className="rounded-[2rem] border border-white/80 bg-white/85 px-8 py-8 shadow-sm backdrop-blur">
-        <div className="grid gap-8 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
+        <div className="grid gap-8 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:items-center">
           <div>
             <p className="text-sm font-semibold uppercase tracking-[0.22em] text-slate-500">Mobile app</p>
             <h2 className="mt-3 max-w-[12ch] text-[2.35rem] font-black tracking-tight text-slate-950">
@@ -615,13 +615,13 @@ export default function HomePageClient() {
             </div>
           </div>
           <div className="space-y-4 rounded-[1.75rem] border border-slate-200/80 bg-slate-50 px-6 py-6">
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid auto-rows-fr gap-4 sm:grid-cols-2">
               {mobileFeatureDetails.map((item) => (
                 <button
                   key={item.id}
                   type="button"
                   onClick={() => setActiveMobileFeature(item.id)}
-                  className={`rounded-[1.35rem] px-4 py-4 text-left text-sm font-semibold transition ${
+                  className={`flex h-full items-center rounded-[1.35rem] px-4 py-4 text-left text-sm font-semibold transition ${
                     activeMobileFeature === item.id
                       ? "bg-slate-950 text-white shadow-lg"
                       : "border border-slate-300 bg-white text-slate-900 hover:border-slate-950"
