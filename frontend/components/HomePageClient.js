@@ -229,7 +229,7 @@ export default function HomePageClient() {
         </div>
       </section>
 
-      <section className="grid gap-6 xl:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)] xl:items-start">
+      <section className="space-y-6">
         <div className="rounded-[2rem] border border-slate-200 bg-slate-950 px-7 py-8 text-white shadow-[0_22px_60px_rgba(15,23,42,0.18)]">
           <div className="grid gap-6 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
             <div>
@@ -412,7 +412,7 @@ export default function HomePageClient() {
         </div>
       </section>
 
-      <section className="grid gap-6 xl:grid-cols-[0.92fr_1.08fr] xl:items-start">
+      <section className="space-y-6">
         <div className="rounded-[2rem] border border-slate-200 bg-white/90 p-8 shadow-sm backdrop-blur">
           <p className="text-sm font-semibold uppercase tracking-[0.22em] text-slate-500">Analysis reports</p>
           <h2 className="mt-3 text-[2.5rem] font-black tracking-tight text-slate-950">
@@ -517,7 +517,7 @@ export default function HomePageClient() {
         </div>
       </section>
 
-      <section className="grid gap-8 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:items-start">
+      <section className="space-y-6">
         <div className="rounded-[2rem] border border-white/80 bg-white/85 p-8 shadow-sm backdrop-blur">
           <p className="text-sm font-semibold uppercase tracking-[0.22em] text-slate-500">QR types</p>
           <h2 className="mt-3 text-[2.8rem] font-black tracking-tight text-slate-950">
@@ -528,7 +528,7 @@ export default function HomePageClient() {
             from the same interface. The layout, styling model, and reporting stay consistent while the payload changes.
           </p>
         </div>
-        <div className="grid auto-rows-fr gap-4 sm:grid-cols-2">
+        <div className="grid auto-rows-fr gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {qrTypeGroups.map((group) => (
             <div
               key={group.title}
