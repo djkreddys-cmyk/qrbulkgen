@@ -8,6 +8,26 @@ const { requireAuth } = require("../middleware/auth");
 const { trackEvent } = require("../services/analytics");
 
 const shortLinksRouter = express.Router();
+const SHORT_LINK_DEDUPED_EVENTS_CTE = `
+  WITH ranked_events AS (
+    SELECT
+      ae.*,
+      COALESCE(ae.metadata->>'visitorKey', '') AS visitor_key,
+      LAG(ae.created_at) OVER (
+        PARTITION BY COALESCE(ae.metadata->>'shortLinkId', ''), COALESCE(ae.metadata->>'visitorKey', '')
+        ORDER BY ae.created_at ASC
+      ) AS previous_created_at
+    FROM analytics_events ae
+    WHERE ae.event_type = 'short-link.visit'
+      AND ae.metadata->>'shortLinkId' = $1
+  ),
+  deduped_events AS (
+    SELECT *
+    FROM ranked_events
+    WHERE previous_created_at IS NULL
+       OR created_at - previous_created_at > INTERVAL '12 seconds'
+  )
+`;
 
 function buildShortLinkUrl(slug) {
   const frontendUrl = String(loadEnv().frontendUrl || "http://localhost:3000").replace(/\/$/, "");
@@ -175,27 +195,25 @@ shortLinksRouter.get("/short-links/:id/analysis", requireAuth, async (req, res, 
     }
 
     const eventsResult = await query(
-      `SELECT
+      `${SHORT_LINK_DEDUPED_EVENTS_CTE}
+       SELECT
          COUNT(*)::int AS total_visits,
-         COUNT(DISTINCT COALESCE(metadata->>'visitorKey', ''))::int AS unique_visits
-       FROM analytics_events
-       WHERE event_type = 'short-link.visit'
-         AND metadata->>'shortLinkId' = $1`,
+         COUNT(DISTINCT NULLIF(visitor_key, ''))::int AS unique_visits
+       FROM deduped_events`,
       [id],
     );
 
     const trendResult = await query(
-      `WITH days AS (
+      `${SHORT_LINK_DEDUPED_EVENTS_CTE},
+       days AS (
          SELECT generate_series(CURRENT_DATE - INTERVAL '6 days', CURRENT_DATE, INTERVAL '1 day')::date AS day
        ),
        counts AS (
          SELECT
            DATE(created_at) AS day,
            COUNT(*)::int AS visit_count
-         FROM analytics_events
-         WHERE event_type = 'short-link.visit'
-           AND metadata->>'shortLinkId' = $1
-           AND created_at >= CURRENT_DATE - INTERVAL '6 days'
+         FROM deduped_events
+         WHERE created_at >= CURRENT_DATE - INTERVAL '6 days'
          GROUP BY DATE(created_at)
        )
        SELECT
@@ -208,13 +226,12 @@ shortLinksRouter.get("/short-links/:id/analysis", requireAuth, async (req, res, 
     );
 
     const latestVisitorsResult = await query(
-      `SELECT
+      `${SHORT_LINK_DEDUPED_EVENTS_CTE}
+       SELECT
          created_at,
          metadata->>'userAgent' AS user_agent,
          metadata->>'ipAddress' AS ip_address
-       FROM analytics_events
-       WHERE event_type = 'short-link.visit'
-         AND metadata->>'shortLinkId' = $1
+       FROM deduped_events
        ORDER BY created_at DESC
        LIMIT 3`,
       [id],
@@ -295,20 +312,19 @@ shortLinksRouter.get("/short-links/:id/analysis-report.csv", requireAuth, async 
     }
 
     const visitsResult = await query(
-      `SELECT
-         ae.created_at,
-         COALESCE(ae.metadata->>'ipAddress', '') AS ip_address,
-         COALESCE(ae.metadata->>'location', '') AS location,
-         COALESCE(ae.metadata->>'locationSource', '') AS location_source,
-         COALESCE(ae.metadata->>'city', '') AS city,
-         COALESCE(ae.metadata->>'region', '') AS region,
-         COALESCE(ae.metadata->>'country', '') AS country,
-         COALESCE(ae.metadata->>'latitude', '') AS latitude,
-         COALESCE(ae.metadata->>'longitude', '') AS longitude
-       FROM analytics_events ae
-       WHERE ae.event_type = 'short-link.visit'
-         AND ae.metadata->>'shortLinkId' = $1
-       ORDER BY ae.created_at DESC`,
+      `${SHORT_LINK_DEDUPED_EVENTS_CTE}
+       SELECT
+         created_at,
+         COALESCE(metadata->>'ipAddress', '') AS ip_address,
+         COALESCE(metadata->>'location', '') AS location,
+         COALESCE(metadata->>'locationSource', '') AS location_source,
+         COALESCE(metadata->>'city', '') AS city,
+         COALESCE(metadata->>'region', '') AS region,
+         COALESCE(metadata->>'country', '') AS country,
+         COALESCE(metadata->>'latitude', '') AS latitude,
+         COALESCE(metadata->>'longitude', '') AS longitude
+       FROM deduped_events
+       ORDER BY created_at DESC`,
       [id],
     );
 

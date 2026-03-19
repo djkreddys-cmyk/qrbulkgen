@@ -211,6 +211,55 @@ function normalizePreciseLocationPayload(value) {
   };
 }
 
+async function enrichPreciseLocationPayload(location) {
+  if (!location) {
+    return null;
+  }
+
+  if ((location.city && location.region && location.country) || !location.latitude || !location.longitude) {
+    return location;
+  }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 1800);
+
+  try {
+    const response = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(location.latitude)}&lon=${encodeURIComponent(location.longitude)}`,
+      {
+        signal: controller.signal,
+        headers: {
+          Accept: "application/json",
+          "User-Agent": "QRBulkGen/1.0",
+        },
+      },
+    );
+
+    if (!response.ok) {
+      return location;
+    }
+
+    const data = await response.json().catch(() => null);
+    const address = data?.address || {};
+    const city = String(address.city || address.town || address.village || address.county || location.city || "").trim();
+    const region = String(address.state || address.region || address.state_district || location.region || "").trim();
+    const country = String(address.country || location.country || "").trim();
+    const label = buildApproximateLocationLabel({ city, region, country }) || location.label;
+
+    return {
+      ...location,
+      city,
+      region,
+      country,
+      label,
+    };
+  } catch (_error) {
+    return location;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 function buildPublicAssetUrl(req, relativePath) {
   const base = getRequestBaseUrl(req);
   return `${base}/uploads/${relativePath.replace(/\\/g, "/")}`;
@@ -448,10 +497,46 @@ async function recordShortLinkVisit(req, row, preciseLocation = null) {
     throw createHttpError(410, "SHORT_LINK_INACTIVE", "Short link is inactive or expired");
   }
 
+  const visitorKey = buildVisitorKey(req, row.id);
   const ipAddress = getRequestIp(req).slice(0, 255);
   const approximateLocation = await lookupApproximateLocation(ipAddress);
-  const normalizedPreciseLocation = normalizePreciseLocationPayload(preciseLocation);
+  const normalizedPreciseLocation = await enrichPreciseLocationPayload(normalizePreciseLocationPayload(preciseLocation));
   const preferredLocation = normalizedPreciseLocation || approximateLocation;
+  const duplicateVisitResult = await query(
+    `SELECT id
+     FROM analytics_events
+     WHERE event_type = 'short-link.visit'
+       AND COALESCE(metadata->>'shortLinkId', '') = $1
+       AND COALESCE(metadata->>'visitorKey', '') = $2
+       AND created_at >= NOW() - INTERVAL '12 seconds'
+     ORDER BY created_at DESC
+     LIMIT 1`,
+    [row.id, visitorKey],
+  );
+
+  if (duplicateVisitResult.rows[0]) {
+    await query(
+      `UPDATE analytics_events
+       SET metadata = COALESCE(metadata, '{}'::jsonb) || jsonb_strip_nulls($2::jsonb)
+       WHERE id = $1`,
+      [
+        duplicateVisitResult.rows[0].id,
+        JSON.stringify({
+          userAgent: String(req.headers["user-agent"] || "").slice(0, 255) || null,
+          ipAddress: ipAddress || null,
+          location: preferredLocation?.label || null,
+          locationSource: preferredLocation?.source || null,
+          city: preferredLocation?.city || null,
+          region: preferredLocation?.region || null,
+          country: preferredLocation?.country || null,
+          latitude: preferredLocation?.latitude || null,
+          longitude: preferredLocation?.longitude || null,
+        }),
+      ],
+    );
+
+    return serializeResolvedShortLink(row, Number(row.click_count || 0));
+  }
 
   await query(
     `UPDATE short_links
@@ -468,7 +553,7 @@ async function recordShortLinkVisit(req, row, preciseLocation = null) {
       shortLinkId: row.id,
       slug: row.slug,
       targetUrl: row.target_url,
-      visitorKey: buildVisitorKey(req, row.id),
+      visitorKey,
       userAgent: String(req.headers["user-agent"] || "").slice(0, 255),
       ipAddress,
       location: preferredLocation?.label || null,
@@ -683,7 +768,7 @@ publicRouter.post("/track-view", async (req, res, next) => {
     const linkId = String(req.body.linkId || "").trim();
     const ipAddress = getRequestIp(req).slice(0, 255);
     const approximateLocation = await lookupApproximateLocation(ipAddress);
-    const preciseLocation = normalizePreciseLocationPayload(req.body.preciseLocation);
+    const preciseLocation = await enrichPreciseLocationPayload(normalizePreciseLocationPayload(req.body.preciseLocation));
     const preferredLocation = preciseLocation || approximateLocation;
 
     if (!sourceUrl && !linkId) {
