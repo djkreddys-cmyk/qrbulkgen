@@ -29,7 +29,7 @@ function isEmailIdentifier(value) {
 function isUserUniqueConstraintError(error) {
   return (
     error?.code === "23505" &&
-    (error?.constraint === "users_email_key" || error?.constraint === "users_phone_key")
+    (error?.constraint === "users_email_key" || error?.constraint === "users_phone_unique_idx")
   );
 }
 
@@ -54,7 +54,7 @@ function mapUserUniqueConstraintError(error) {
     return buildExistingAccountError({ email: true, phone: false });
   }
 
-  if (error?.constraint === "users_phone_key") {
+  if (error?.constraint === "users_phone_unique_idx") {
     return buildExistingAccountError({ email: false, phone: true });
   }
 
