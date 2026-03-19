@@ -214,10 +214,13 @@ function CategoryBarChart({ items }) {
           </div>
         ))}
       </div>
-      <div className="grid gap-2 sm:grid-cols-2">
+      <div
+        className="grid gap-2"
+        style={{ gridTemplateColumns: `repeat(${Math.max(items.length, 1)}, minmax(0, 1fr))` }}
+      >
         {items.map((item, index) => (
-          <div key={`${item.label}-meta-${index}`} className="flex items-center rounded-xl bg-slate-50 px-3 py-2 text-sm">
-            <span className="flex items-center gap-2 font-medium text-slate-700">
+          <div key={`${item.label}-meta-${index}`} className="flex items-center justify-center rounded-xl bg-slate-50 px-3 py-2 text-sm">
+            <span className="flex items-center gap-2 font-medium text-slate-700 text-center">
               <span className={`h-2.5 w-2.5 rounded-full ${item.colorClass || "bg-sky-500"}`} />
               {item.label}
             </span>

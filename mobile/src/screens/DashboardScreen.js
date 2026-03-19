@@ -235,14 +235,16 @@ function CategoryBarChart({ items }) {
         ))}
       </View>
       <View style={{ gap: 8 }}>
+        <View style={{ flexDirection: "row", gap: 8 }}>
         {items.map((item, index) => (
-          <View key={`${item.label}-meta-${index}`} style={{ flexDirection: "row", gap: 10, borderRadius: 12, backgroundColor: "#f8fafc", paddingHorizontal: 12, paddingVertical: 10 }}>
-            <View style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: 8 }}>
+          <View key={`${item.label}-meta-${index}`} style={{ flex: 1, flexDirection: "row", justifyContent: "center", borderRadius: 12, backgroundColor: "#f8fafc", paddingHorizontal: 12, paddingVertical: 10 }}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
               <View style={{ width: 10, height: 10, borderRadius: 999, backgroundColor: item.color || "#0ea5e9" }} />
-              <Text style={{ color: "#334155", fontWeight: "600", flex: 1 }}>{item.label}</Text>
+              <Text style={{ color: "#334155", fontWeight: "600", textAlign: "center" }}>{item.label}</Text>
             </View>
           </View>
         ))}
+        </View>
       </View>
     </View>
   );
