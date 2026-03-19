@@ -1478,25 +1478,7 @@ export default function Dashboard() {
                                       </div>
                                     </div>
                                   </div>
-                                  <div className="mt-4">
-                                    <BreakdownBars
-                                      items={[
-                                        {
-                                          label: "Unique scans",
-                                          value: displayedUnique,
-                                          helper: displayedScans ? `${Math.round((displayedUnique / Math.max(displayedScans, 1)) * 100)}%` : "0%",
-                                          colorClass: "bg-emerald-500",
-                                        },
-                                        {
-                                          label: "Repeated users",
-                                          value: displayedRepeated,
-                                          helper: displayedScans ? `${Math.round((displayedRepeated / Math.max(displayedScans, 1)) * 100)}%` : "0%",
-                                          colorClass: "bg-rose-500",
-                                        },
-                                      ]}
-                                    />
-                                  </div>
-                                  <div className="mt-3 grid gap-2 text-sm text-slate-600 md:grid-cols-2">
+                                  <div className="mt-4 grid gap-2 text-sm text-slate-600 md:grid-cols-2">
                                     <p>
                                       <span className="font-medium text-slate-900">Last scan:</span>{" "}
                                       {formatDateTime(current.lastScanAt)}
@@ -1526,11 +1508,28 @@ export default function Dashboard() {
                                       {current.expiredLinks || 0}
                                     </p>
                                   </div>
-                                </div>
-                                )}
-
-                                {(currentTab === "overview" || currentTab === "scans") && (
-                                  <div className="grid gap-4 xl:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
+                                  <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
+                                    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                                      <p className="font-medium text-slate-900">Unique and repeated users</p>
+                                      <div className="mt-4">
+                                        <BreakdownBars
+                                          items={[
+                                            {
+                                              label: "Unique scans",
+                                              value: displayedUnique,
+                                              helper: displayedScans ? `${Math.round((displayedUnique / Math.max(displayedScans, 1)) * 100)}%` : "0%",
+                                              colorClass: "bg-emerald-500",
+                                            },
+                                            {
+                                              label: "Repeated users",
+                                              value: displayedRepeated,
+                                              helper: displayedScans ? `${Math.round((displayedRepeated / Math.max(displayedScans, 1)) * 100)}%` : "0%",
+                                              colorClass: "bg-rose-500",
+                                            },
+                                          ]}
+                                        />
+                                      </div>
+                                    </div>
                                     <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                                       <div className="flex flex-wrap items-start justify-between gap-3">
                                         <div>
@@ -1542,22 +1541,8 @@ export default function Dashboard() {
                                         <Sparkline points={scanTrendPoints} />
                                       </div>
                                     </div>
-
-                                    <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                                      <p className="font-medium text-slate-900">History Note</p>
-                                      <div className="mt-3 space-y-2 text-sm text-slate-600">
-                                        <p>
-                                          <span className="font-medium text-slate-900">Overall history:</span> {lifetimeScans} scan{lifetimeScans === 1 ? "" : "s"} and {lifetimeSubmissions} submission{lifetimeSubmissions === 1 ? "" : "s"}.
-                                        </p>
-                                        <p>
-                                          <span className="font-medium text-slate-900">Latest version:</span> {currentScans} scan{currentScans === 1 ? "" : "s"} and {currentSubmissions} submission{currentSubmissions === 1 ? "" : "s"}.
-                                        </p>
-                                        <p>
-                                          The totals above keep your previous scans, while the latest-version card isolates activity after the most recent update.
-                                        </p>
-                                      </div>
-                                    </div>
                                   </div>
+                                </div>
                                 )}
 
                                 {job.trackingMode !== "tracked" && analysis.typePerformance && (currentTab === "overview" || currentTab === "scans") && (
