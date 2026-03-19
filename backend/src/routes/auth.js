@@ -33,6 +33,34 @@ function isUserUniqueConstraintError(error) {
   );
 }
 
+function buildExistingAccountError({ email, phone }) {
+  if (email) {
+    return createHttpError(409, "EMAIL_ALREADY_EXISTS", "An account with this email already exists");
+  }
+
+  if (phone) {
+    return createHttpError(409, "PHONE_ALREADY_EXISTS", "An account with this mobile number already exists");
+  }
+
+  return createHttpError(
+    409,
+    "ACCOUNT_ALREADY_EXISTS",
+    "An account with this email or mobile number already exists",
+  );
+}
+
+function mapUserUniqueConstraintError(error) {
+  if (error?.constraint === "users_email_key") {
+    return buildExistingAccountError({ email: true, phone: false });
+  }
+
+  if (error?.constraint === "users_phone_key") {
+    return buildExistingAccountError({ email: false, phone: true });
+  }
+
+  return buildExistingAccountError({ email: false, phone: false });
+}
+
 function validateRegisterPayload(body) {
   const name = String(body.name || "").trim();
   const identifier = String(body.identifier || body.email || body.phone || "").trim();
@@ -116,13 +144,16 @@ authRouter.post("/register", async (req, res, next) => {
     const { name, email, phone, password } = validateRegisterPayload(req.body);
 
     const result = await withTransaction(async (client) => {
-      const existingUser = await client.query("SELECT id FROM users WHERE email = $1 OR phone = $2 LIMIT 1", [
+      const existingUser = await client.query("SELECT id, email, phone FROM users WHERE email = $1 OR phone = $2 LIMIT 1", [
         email || null,
         phone || null,
       ]);
 
       if (existingUser.rows[0]) {
-        throw createHttpError(409, "ACCOUNT_ALREADY_EXISTS", "An account with this email or mobile number already exists");
+        throw buildExistingAccountError({
+          email: Boolean(email && existingUser.rows[0].email === email),
+          phone: Boolean(phone && existingUser.rows[0].phone === phone),
+        });
       }
 
       const insertedUser = await client.query(
@@ -145,13 +176,7 @@ authRouter.post("/register", async (req, res, next) => {
     });
   } catch (error) {
     if (isUserUniqueConstraintError(error)) {
-      next(
-        createHttpError(
-          409,
-          "ACCOUNT_ALREADY_EXISTS",
-          "An account with this email or mobile number already exists",
-        ),
-      );
+      next(mapUserUniqueConstraintError(error));
       return;
     }
 

@@ -20,6 +20,14 @@ export default function AuthScreen({ defaultMode = "register" }) {
   const isRegisterMode = mode === "register"
 
   function getFriendlyAuthError(submitError) {
+    if (submitError?.code === "EMAIL_ALREADY_EXISTS") {
+      return "An account with this email already exists."
+    }
+
+    if (submitError?.code === "PHONE_ALREADY_EXISTS") {
+      return "An account with this mobile number already exists."
+    }
+
     if (submitError?.code === "ACCOUNT_ALREADY_EXISTS") {
       return "An account with this email or mobile number already exists."
     }
