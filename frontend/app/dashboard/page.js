@@ -162,17 +162,20 @@ function Sparkline({ points }) {
 
   return (
     <div className="space-y-2">
-      <div className="flex h-28 items-end justify-between gap-2 rounded-2xl bg-slate-50 px-3 py-3">
+      <div className="flex h-32 items-end justify-between gap-2 rounded-2xl bg-slate-50 px-3 py-3">
         {points.map((point, index) => (
           <div key={`${point.label || "point"}-${index}`} className="flex h-full min-w-0 flex-1 items-end justify-center">
-            <div
-              className={`rounded-full ${point.count > 0 ? "bg-sky-500" : "bg-sky-100"}`}
-              style={{
-                width: points.length === 1 ? "48px" : "min(100%, 28px)",
-                height: `${Math.max((point.count / max) * 100, point.count > 0 ? 14 : 4)}%`,
-              }}
-              title={`${point.label}: ${point.count}`}
-            />
+            <div className="flex h-full flex-col items-center justify-end gap-2">
+              <span className="text-xs font-semibold text-slate-500">{point.count}</span>
+              <div
+                className={`rounded-full ${point.count > 0 ? "bg-sky-500" : "bg-sky-100"}`}
+                style={{
+                  width: points.length === 1 ? "48px" : "min(100%, 28px)",
+                  height: `${Math.max((point.count / max) * 100, point.count > 0 ? 14 : 4)}%`,
+                }}
+                title={`${point.label}: ${point.count}`}
+              />
+            </div>
           </div>
         ))}
       </div>
@@ -193,18 +196,21 @@ function CategoryBarChart({ items }) {
 
   return (
     <div className="space-y-3">
-      <div className="flex h-28 items-end justify-between gap-3 rounded-2xl bg-slate-50 px-3 py-3">
+      <div className="flex h-32 items-end justify-between gap-3 rounded-2xl bg-slate-50 px-3 py-3">
         {items.map((item, index) => (
           <div key={`${item.label}-${index}`} className="flex h-full min-w-0 flex-1 items-end justify-center">
-            <div
-              className={`rounded-full ${item.colorClass || "bg-sky-500"}`}
-              style={{
-                width: items.length <= 3 ? "56px" : "min(100%, 28px)",
-                maxWidth: "100%",
-                height: `${Math.max(((item.value || 0) / max) * 100, item.value > 0 ? 14 : 4)}%`,
-              }}
-              title={`${item.label}: ${item.value}`}
-            />
+            <div className="flex h-full flex-col items-center justify-end gap-2">
+              <span className="text-xs font-semibold text-slate-500">{item.value}</span>
+              <div
+                className={`rounded-full ${item.colorClass || "bg-sky-500"}`}
+                style={{
+                  width: items.length <= 3 ? "56px" : "min(100%, 28px)",
+                  maxWidth: "100%",
+                  height: `${Math.max(((item.value || 0) / max) * 100, item.value > 0 ? 14 : 4)}%`,
+                }}
+                title={`${item.label}: ${item.value}`}
+              />
+            </div>
           </div>
         ))}
       </div>

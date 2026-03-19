@@ -77,18 +77,21 @@ function Sparkline({ points }) {
 
   return (
     <View style={{ gap: 8 }}>
-      <View style={{ flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between", gap: 6, height: 42 }}>
+      <View style={{ flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between", gap: 6, height: 62 }}>
         {points.map((point, index) => (
           <View key={`${point.label}-${index}`} style={{ flex: 1, height: "100%", justifyContent: "flex-end", alignItems: "center" }}>
-            <View
-              style={{
-                width: points.length === 1 ? 32 : 18,
-                maxWidth: "100%",
-                height: `${Math.max((point.count / max) * 100, point.count > 0 ? 12 : 4)}%`,
-                borderRadius: 999,
-                backgroundColor: point.count > 0 ? "#0ea5e9" : "#dbeafe",
-              }}
-            />
+            <View style={{ height: "100%", justifyContent: "flex-end", alignItems: "center", gap: 4 }}>
+              <Text style={{ color: "#64748b", fontSize: 11, fontWeight: "700" }}>{point.count}</Text>
+              <View
+                style={{
+                  width: points.length === 1 ? 32 : 18,
+                  maxWidth: "100%",
+                  height: `${Math.max((point.count / max) * 100, point.count > 0 ? 12 : 4)}%`,
+                  borderRadius: 999,
+                  backgroundColor: point.count > 0 ? "#0ea5e9" : "#dbeafe",
+                }}
+              />
+            </View>
           </View>
         ))}
       </View>
@@ -109,19 +112,22 @@ function CategoryBarChart({ items }) {
 
   return (
     <View style={{ gap: 10 }}>
-      <View style={{ flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between", gap: 8, height: 112, borderRadius: 16, backgroundColor: "#f8fafc", paddingHorizontal: 12, paddingVertical: 12 }}>
+      <View style={{ flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between", gap: 8, height: 132, borderRadius: 16, backgroundColor: "#f8fafc", paddingHorizontal: 12, paddingVertical: 12 }}>
         {items.map((item, index) => (
           <View key={`${item.label}-${index}`} style={{ flex: 1, height: "100%", justifyContent: "flex-end" }}>
-            <View
-              style={{
-                width: items.length <= 3 ? 56 : 24,
-                maxWidth: "100%",
-                alignSelf: "center",
-                height: `${Math.max(((item.value || 0) / max) * 100, item.value > 0 ? 14 : 4)}%`,
-                borderRadius: 999,
-                backgroundColor: item.color || "#0ea5e9",
-              }}
-            />
+            <View style={{ height: "100%", justifyContent: "flex-end", alignItems: "center", gap: 6 }}>
+              <Text style={{ color: "#64748b", fontSize: 11, fontWeight: "700" }}>{item.value}</Text>
+              <View
+                style={{
+                  width: items.length <= 3 ? 56 : 24,
+                  maxWidth: "100%",
+                  alignSelf: "center",
+                  height: `${Math.max(((item.value || 0) / max) * 100, item.value > 0 ? 14 : 4)}%`,
+                  borderRadius: 999,
+                  backgroundColor: item.color || "#0ea5e9",
+                }}
+              />
+            </View>
           </View>
         ))}
       </View>
