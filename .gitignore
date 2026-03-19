@@ -1,5 +1,7 @@
 node_modules/
+**/node_modules/
 .next/
+**/.next/
 .env
 .env.*
 !.env.example
@@ -7,3 +9,6 @@ dist/
 build/
 uploads/
 mobile/.expo/
+**/.expo/
+mobile/android/.gradle/
+*.log
