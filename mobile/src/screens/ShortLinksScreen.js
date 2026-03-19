@@ -131,6 +131,24 @@ function SectionEyebrow({ children }) {
   return <Text style={{ fontSize: 12, fontWeight: "700", color: "#64748b", letterSpacing: 2 }}>{children}</Text>;
 }
 
+function createTrendFilterState(overrides = {}) {
+  return {
+    preset: "7d",
+    startDate: "",
+    endDate: "",
+    ...overrides,
+  };
+}
+
+function buildTrendQuery(filter = {}) {
+  const params = new URLSearchParams();
+  if (filter?.preset) params.set("trendRange", filter.preset);
+  if (filter?.startDate) params.set("startDate", filter.startDate);
+  if (filter?.endDate) params.set("endDate", filter.endDate);
+  const text = params.toString();
+  return text ? `?${text}` : "";
+}
+
 export function ShortLinksScreen({ variant = "create" }) {
   const { token } = useAuth();
   const [title, setTitle] = useState("");
@@ -141,6 +159,7 @@ export function ShortLinksScreen({ variant = "create" }) {
   const [links, setLinks] = useState([]);
   const [createdLink, setCreatedLink] = useState(null);
   const [analysisById, setAnalysisById] = useState({});
+  const [trendFiltersById, setTrendFiltersById] = useState({});
   const [expandedLinkId, setExpandedLinkId] = useState("");
   const [analysisLoadingId, setAnalysisLoadingId] = useState("");
   const [downloadingReportId, setDownloadingReportId] = useState("");
@@ -294,20 +313,10 @@ export function ShortLinksScreen({ variant = "create" }) {
     );
   }
 
-  async function handleToggleAnalysis(linkId) {
-    if (expandedLinkId === linkId) {
-      setExpandedLinkId("");
-      return;
-    }
-
-    setExpandedLinkId(linkId);
-    if (analysisById[linkId]) {
-      return;
-    }
-
+  async function loadAnalysis(linkId, filter = createTrendFilterState()) {
     try {
       setAnalysisLoadingId(linkId);
-      const data = await apiRequest(`/short-links/${linkId}/analysis`, {
+      const data = await apiRequest(`/short-links/${linkId}/analysis${buildTrendQuery(filter)}`, {
         headers: createAuthHeaders(token),
       });
       setAnalysisById((prev) => ({
@@ -319,6 +328,23 @@ export function ShortLinksScreen({ variant = "create" }) {
     } finally {
       setAnalysisLoadingId("");
     }
+  }
+
+  async function handleToggleAnalysis(linkId) {
+    if (expandedLinkId === linkId) {
+      setExpandedLinkId("");
+      return;
+    }
+
+    setExpandedLinkId(linkId);
+    const filter = trendFiltersById[linkId] || createTrendFilterState();
+    if (!trendFiltersById[linkId]) {
+      setTrendFiltersById((prev) => ({ ...prev, [linkId]: filter }));
+    }
+    if (analysisById[linkId]) {
+      return;
+    }
+    await loadAnalysis(linkId, filter);
   }
 
   async function handleDownloadAnalysisReport(link) {
@@ -668,7 +694,58 @@ export function ShortLinksScreen({ variant = "create" }) {
                       </Card>
 
                       <Card style={{ padding: 14, gap: 10 }}>
-                        <Text style={{ color: "#0f172a", fontWeight: "700" }}>7-day trend</Text>
+                        <Text style={{ color: "#0f172a", fontWeight: "700" }}>Trend</Text>
+                        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+                          {[
+                            ["7d", "7 days"],
+                            ["15d", "15 days"],
+                            ["30d", "Last month"],
+                          ].map(([value, label]) => {
+                            const active = (trendFiltersById[link.id] || createTrendFilterState()).preset === value;
+                            return (
+                              <TouchableOpacity
+                                key={`${link.id}-${value}`}
+                                onPress={() => {
+                                  const next = { ...(trendFiltersById[link.id] || createTrendFilterState()), preset: value };
+                                  setTrendFiltersById((prev) => ({ ...prev, [link.id]: next }));
+                                  loadAnalysis(link.id, next);
+                                }}
+                                style={{
+                                  borderWidth: 1,
+                                  borderColor: active ? "#0f172a" : "#dbe3f0",
+                                  borderRadius: 999,
+                                  paddingHorizontal: 12,
+                                  paddingVertical: 8,
+                                  backgroundColor: active ? "#0f172a" : "#ffffff",
+                                }}
+                              >
+                                <Text style={{ color: active ? "#ffffff" : "#334155", fontWeight: "700", fontSize: 12 }}>{label}</Text>
+                              </TouchableOpacity>
+                            );
+                          })}
+                        </View>
+                        <View style={{ flexDirection: "row", gap: 8 }}>
+                          <TextInput
+                            value={(trendFiltersById[link.id] || createTrendFilterState()).startDate}
+                            onChangeText={(value) => setTrendFiltersById((prev) => ({ ...prev, [link.id]: { ...(prev[link.id] || createTrendFilterState()), preset: "custom", startDate: value } }))}
+                            placeholder="Start YYYY-MM-DD"
+                            placeholderTextColor="#94a3b8"
+                            style={{ flex: 1, borderWidth: 1, borderColor: "#dbe3f0", borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, backgroundColor: "#ffffff", color: "#0f172a" }}
+                          />
+                          <TextInput
+                            value={(trendFiltersById[link.id] || createTrendFilterState()).endDate}
+                            onChangeText={(value) => setTrendFiltersById((prev) => ({ ...prev, [link.id]: { ...(prev[link.id] || createTrendFilterState()), preset: "custom", endDate: value } }))}
+                            placeholder="End YYYY-MM-DD"
+                            placeholderTextColor="#94a3b8"
+                            style={{ flex: 1, borderWidth: 1, borderColor: "#dbe3f0", borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, backgroundColor: "#ffffff", color: "#0f172a" }}
+                          />
+                        </View>
+                        <TouchableOpacity
+                          onPress={() => loadAnalysis(link.id, { ...(trendFiltersById[link.id] || createTrendFilterState()), preset: "custom" })}
+                          style={{ alignSelf: "flex-start", borderWidth: 1, borderColor: "#0f172a", borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10, backgroundColor: "#0f172a" }}
+                        >
+                          <Text style={{ color: "#ffffff", fontWeight: "700" }}>Apply custom range</Text>
+                        </TouchableOpacity>
                         <Sparkline points={analysis.trend || []} />
                       </Card>
 

@@ -110,6 +110,45 @@ function buildTrendLabel(value) {
   return parsed.toISOString().slice(5, 10);
 }
 
+function parseTrendDate(value, endOfDay = false) {
+  const raw = String(value || "").trim();
+  if (!raw) return null;
+  const suffix = endOfDay ? "T23:59:59.999Z" : "T00:00:00.000Z";
+  const parsed = new Date(raw.includes("T") ? raw : `${raw}${suffix}`);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function resolveTrendWindow(query = {}) {
+  const preset = String(query.trendRange || "7d").trim().toLowerCase();
+  const customStart = parseTrendDate(query.startDate);
+  const customEnd = parseTrendDate(query.endDate, true);
+  const today = new Date();
+  today.setUTCHours(23, 59, 59, 999);
+
+  if (customStart && customEnd && customStart <= customEnd) {
+    return {
+      preset: "custom",
+      startDate: customStart.toISOString(),
+      endDate: customEnd.toISOString(),
+      startDaySql: customStart.toISOString().slice(0, 10),
+      endDaySql: customEnd.toISOString().slice(0, 10),
+    };
+  }
+
+  const days = preset === "15d" ? 15 : preset === "30d" ? 30 : 7;
+  const start = new Date(today);
+  start.setUTCDate(start.getUTCDate() - (days - 1));
+  start.setUTCHours(0, 0, 0, 0);
+
+  return {
+    preset: days === 30 ? "30d" : days === 15 ? "15d" : "7d",
+    startDate: start.toISOString(),
+    endDate: today.toISOString(),
+    startDaySql: start.toISOString().slice(0, 10),
+    endDaySql: today.toISOString().slice(0, 10),
+  };
+}
+
 async function reverseLookupLocation(latitude, longitude) {
   const lat = String(latitude || "").trim();
   const lng = String(longitude || "").trim();
@@ -221,6 +260,8 @@ shortLinksRouter.get("/short-links/:id/analysis", requireAuth, async (req, res, 
       throw createHttpError(400, "VALIDATION_ERROR", "Short link id is required");
     }
 
+    const trendWindow = resolveTrendWindow(req.query);
+
     const linkResult = await query(
       `SELECT id, slug, title, target_url, click_count, expires_at, last_visited_at, archived_at, is_active, created_at
        FROM short_links
@@ -246,14 +287,15 @@ shortLinksRouter.get("/short-links/:id/analysis", requireAuth, async (req, res, 
     const trendResult = await query(
       `${SHORT_LINK_DEDUPED_EVENTS_CTE},
        days AS (
-         SELECT generate_series(CURRENT_DATE - INTERVAL '6 days', CURRENT_DATE, INTERVAL '1 day')::date AS day
+         SELECT generate_series($2::date, $3::date, INTERVAL '1 day')::date AS day
        ),
        counts AS (
          SELECT
            DATE(created_at) AS day,
            COUNT(*)::int AS visit_count
          FROM deduped_events
-         WHERE created_at >= CURRENT_DATE - INTERVAL '6 days'
+         WHERE created_at >= $4::timestamptz
+           AND created_at <= $5::timestamptz
          GROUP BY DATE(created_at)
        )
        SELECT
@@ -262,7 +304,7 @@ shortLinksRouter.get("/short-links/:id/analysis", requireAuth, async (req, res, 
        FROM days
        LEFT JOIN counts ON counts.day = days.day
        ORDER BY days.day ASC`,
-      [id],
+      [id, trendWindow.startDaySql, trendWindow.endDaySql, trendWindow.startDate, trendWindow.endDate],
     );
 
     const latestVisitorsResult = await query(
@@ -318,6 +360,9 @@ shortLinksRouter.get("/short-links/:id/analysis", requireAuth, async (req, res, 
         isArchived: Boolean(link.archived_at),
         isActive: Boolean(link.is_active),
         quickInsight,
+        trendRange: trendWindow.preset,
+        trendStartDate: trendWindow.startDate,
+        trendEndDate: trendWindow.endDate,
         trend,
         latestVisitors: latestVisitorsResult.rows.map((row) => ({
           visitedAt: row.created_at,

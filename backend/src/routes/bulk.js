@@ -113,6 +113,37 @@ function parseDateFilter(value, endOfDay = false) {
   return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
 }
 
+function resolveTrendWindow(query = {}) {
+  const preset = String(query.trendRange || "7d").trim().toLowerCase();
+  const customStart = parseDateFilter(query.startDate);
+  const customEnd = parseDateFilter(query.endDate, true);
+  const today = new Date();
+  today.setUTCHours(23, 59, 59, 999);
+
+  if (customStart && customEnd && new Date(customStart) <= new Date(customEnd)) {
+    return {
+      preset: "custom",
+      startDate: customStart,
+      endDate: customEnd,
+      startDaySql: customStart.slice(0, 10),
+      endDaySql: customEnd.slice(0, 10),
+    };
+  }
+
+  const days = preset === "15d" ? 15 : preset === "30d" ? 30 : 7;
+  const start = new Date(today);
+  start.setUTCDate(start.getUTCDate() - (days - 1));
+  start.setUTCHours(0, 0, 0, 0);
+
+  return {
+    preset: days === 30 ? "30d" : days === 15 ? "15d" : "7d",
+    startDate: start.toISOString(),
+    endDate: today.toISOString(),
+    startDaySql: start.toISOString().slice(0, 10),
+    endDaySql: today.toISOString().slice(0, 10),
+  };
+}
+
 function parseBooleanFlag(value) {
   const raw = String(value || "").trim().toLowerCase();
   return raw === "1" || raw === "true" || raw === "yes";
@@ -137,6 +168,47 @@ function getQrTypeLabel(row) {
   return row.job_type === "single"
     ? String(row.managed_qr_type || row.bulk_qr_type || "Text")
     : String(row.bulk_qr_type || row.managed_qr_type || "Text");
+}
+
+async function reverseLookupLocation(latitude, longitude) {
+  const lat = String(latitude || "").trim();
+  const lng = String(longitude || "").trim();
+  if (!lat || !lng) {
+    return null;
+  }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 1800);
+
+  try {
+    const response = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lng)}`,
+      {
+        signal: controller.signal,
+        headers: {
+          Accept: "application/json",
+          "User-Agent": "QRBulkGen/1.0",
+        },
+      },
+    );
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const data = await response.json().catch(() => null);
+    const address = data?.address || {};
+
+    return {
+      city: String(address.city || address.town || address.village || address.county || "").trim(),
+      region: String(address.state || address.region || address.state_district || "").trim(),
+      country: String(address.country || "").trim(),
+    };
+  } catch (_error) {
+    return null;
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 function extractPublicAnalysisTarget(content) {
@@ -1116,6 +1188,7 @@ bulkRouter.get("/jobs/:id/analysis", requireAuth, async (req, res, next) => {
 
     const typeLabel = getQrTypeLabel(job);
     const versionStartedAt = job.completed_at || job.created_at || null;
+    const trendWindow = resolveTrendWindow(req.query);
 
     const lifetimeLinkStatsResult = await query(
       `WITH links AS (
@@ -1231,22 +1304,41 @@ bulkRouter.get("/jobs/:id/analysis", requireAuth, async (req, res, next) => {
          FROM qr_job_items i
          INNER JOIN managed_qr_links m ON m.id = i.managed_link_id
          WHERE i.job_id = $2
+       ),
+       days AS (
+         SELECT generate_series($3::date, $4::date, INTERVAL '1 day')::date AS day
+       ),
+       counts AS (
+         SELECT
+           DATE(ae.created_at) AS day,
+           COUNT(*)::int AS count
+         FROM analytics_events ae
+         INNER JOIN links
+           ON ae.metadata->>'linkId' = links.id::text
+           OR ae.metadata->>'targetUrl' = links.url
+           OR regexp_replace(lower(split_part(COALESCE(ae.metadata->>'targetUrl', ''), '?exp=', 1)), '^https?://(www\\.)?', '') =
+              regexp_replace(lower(split_part(links.url, '?exp=', 1)), '^https?://(www\\.)?', '')
+         WHERE ae.event_type = 'qr.public.scan'
+           AND ($5::timestamptz IS NULL OR ae.created_at >= $5::timestamptz)
+           AND ae.created_at >= $6::timestamptz
+           AND ae.created_at <= $7::timestamptz
+         GROUP BY DATE(ae.created_at)
        )
        SELECT
-         TO_CHAR(DATE(ae.created_at), 'YYYY-MM-DD') AS label,
-         COUNT(*)::int AS count
-       FROM analytics_events ae
-       INNER JOIN links
-         ON ae.metadata->>'linkId' = links.id::text
-         OR ae.metadata->>'targetUrl' = links.url
-         OR regexp_replace(lower(split_part(COALESCE(ae.metadata->>'targetUrl', ''), '?exp=', 1)), '^https?://(www\\.)?', '') =
-            regexp_replace(lower(split_part(links.url, '?exp=', 1)), '^https?://(www\\.)?', '')
-       WHERE ae.event_type = 'qr.public.scan'
-         AND ($3::timestamptz IS NULL OR ae.created_at >= $3::timestamptz)
-       GROUP BY DATE(ae.created_at)
-       ORDER BY DATE(ae.created_at) ASC
-       LIMIT 10`,
-      [job.managed_link_id, job.id, versionStartedAt],
+         TO_CHAR(days.day, 'YYYY-MM-DD') AS label,
+         COALESCE(counts.count, 0)::int AS count
+       FROM days
+       LEFT JOIN counts ON counts.day = days.day
+       ORDER BY days.day ASC`,
+      [
+        job.managed_link_id,
+        job.id,
+        trendWindow.startDaySql,
+        trendWindow.endDaySql,
+        versionStartedAt,
+        trendWindow.startDate,
+        trendWindow.endDate,
+      ],
     );
 
     const linkStats = linkStatsResult.rows[0] || {};
@@ -1514,6 +1606,9 @@ bulkRouter.get("/jobs/:id/analysis", requireAuth, async (req, res, next) => {
           ...engagement,
           versionStartedAt,
         },
+        trendRange: trendWindow.preset,
+        trendStartDate: trendWindow.startDate,
+        trendEndDate: trendWindow.endDate,
         scanTrend: scanTrendResult.rows.map((row) => ({
           label: row.label,
           count: row.count,
@@ -1624,9 +1719,35 @@ bulkRouter.get("/jobs/:id/analysis-report.csv", requireAuth, async (req, res, ne
       { key: "ipAddress", label: "IP Address" },
     ];
 
-    let rows = scanRowsResult.rows.map((row) => {
+    const geoCache = new Map();
+    const enrichLocationRow = async (row) => {
+      let city = row.city || "";
+      let region = row.region || "";
+      let country = row.country || "";
+
+      if ((!city || !region || !country) && row.latitude && row.longitude) {
+        const cacheKey = `${row.latitude},${row.longitude}`;
+        if (!geoCache.has(cacheKey)) {
+          geoCache.set(cacheKey, reverseLookupLocation(row.latitude, row.longitude));
+        }
+
+        const reverseLocation = await geoCache.get(cacheKey);
+        city = city || reverseLocation?.city || "";
+        region = region || reverseLocation?.region || "";
+        country = country || reverseLocation?.country || "";
+      }
+
+      return {
+        city,
+        region,
+        country,
+      };
+    };
+
+    let rows = await Promise.all(scanRowsResult.rows.map(async (row) => {
       const scannedAt = row.created_at ? new Date(row.created_at) : null;
       const validDate = scannedAt && !Number.isNaN(scannedAt.getTime()) ? scannedAt : null;
+      const enrichedLocation = await enrichLocationRow(row);
       return {
         qrType: typeLabel,
         scanDate: validDate ? validDate.toISOString().slice(0, 10) : "",
@@ -1635,14 +1756,14 @@ bulkRouter.get("/jobs/:id/analysis-report.csv", requireAuth, async (req, res, ne
         targetTitle: row.target_title || "",
         location: row.location || "",
         locationSource: row.location_source || "",
-        city: row.city || "",
-        region: row.region || "",
-        country: row.country || "",
+        city: enrichedLocation.city,
+        region: enrichedLocation.region,
+        country: enrichedLocation.country,
         latitude: row.latitude || "",
         longitude: row.longitude || "",
         ipAddress: row.ip_address || "",
       };
-    });
+    }));
 
     if (typeLabel === "Rating") {
       const ratingExportResult = await query(
@@ -1699,9 +1820,10 @@ bulkRouter.get("/jobs/:id/analysis-report.csv", requireAuth, async (req, res, ne
         [job.managed_link_id, job.id, versionStartedAt],
       );
 
-      rows = ratingExportResult.rows.map((row) => {
+      rows = await Promise.all(ratingExportResult.rows.map(async (row) => {
         const createdAt = row.created_at ? new Date(row.created_at) : null;
         const validDate = createdAt && !Number.isNaN(createdAt.getTime()) ? createdAt : null;
+        const enrichedLocation = await enrichLocationRow(row);
         return {
           qrType: typeLabel,
           scanDate: validDate ? validDate.toISOString().slice(0, 10) : "",
@@ -1710,14 +1832,14 @@ bulkRouter.get("/jobs/:id/analysis-report.csv", requireAuth, async (req, res, ne
           targetTitle: row.title || job.managed_title || "",
           location: row.location || "",
           locationSource: row.location_source || "",
-          city: row.city || "",
-          region: row.region || "",
-          country: row.country || "",
+          city: enrichedLocation.city,
+          region: enrichedLocation.region,
+          country: enrichedLocation.country,
           latitude: row.latitude || "",
           longitude: row.longitude || "",
           ipAddress: row.ip_address || "",
         };
-      });
+      }));
     } else if (typeLabel === "Feedback") {
       const feedbackExportResult = await query(
         `WITH links AS (
@@ -1774,7 +1896,7 @@ bulkRouter.get("/jobs/:id/analysis-report.csv", requireAuth, async (req, res, ne
         [job.managed_link_id, job.id, versionStartedAt],
       );
 
-      rows = feedbackExportResult.rows.map((row) => {
+      rows = await Promise.all(feedbackExportResult.rows.map(async (row) => {
         const createdAt = row.created_at ? new Date(row.created_at) : null;
         const validDate = createdAt && !Number.isNaN(createdAt.getTime()) ? createdAt : null;
         const questions = Array.isArray(row.questions) ? row.questions : [];
@@ -1788,6 +1910,7 @@ bulkRouter.get("/jobs/:id/analysis-report.csv", requireAuth, async (req, res, ne
           })
           .filter(Boolean)
           .join(" | ");
+        const enrichedLocation = await enrichLocationRow(row);
 
         return {
           qrType: typeLabel,
@@ -1797,14 +1920,14 @@ bulkRouter.get("/jobs/:id/analysis-report.csv", requireAuth, async (req, res, ne
           targetTitle: row.title || job.managed_title || "",
           location: row.location || "",
           locationSource: row.location_source || "",
-          city: row.city || "",
-          region: row.region || "",
-          country: row.country || "",
+          city: enrichedLocation.city,
+          region: enrichedLocation.region,
+          country: enrichedLocation.country,
           latitude: row.latitude || "",
           longitude: row.longitude || "",
           ipAddress: row.ip_address || "",
         };
-      });
+      }));
     }
 
     const csv = buildCsv(columns, rows);

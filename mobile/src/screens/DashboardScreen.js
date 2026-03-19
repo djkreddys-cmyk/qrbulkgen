@@ -220,6 +220,24 @@ function getJobTitle(job) {
   return job.jobType === "single" ? job.qrType || "Single QR" : `${job.qrType || "Bulk"} Bulk`;
 }
 
+function createTrendFilterState(overrides = {}) {
+  return {
+    preset: "7d",
+    startDate: "",
+    endDate: "",
+    ...overrides,
+  };
+}
+
+function buildTrendQuery(filter = {}) {
+  const params = new URLSearchParams();
+  if (filter?.preset) params.set("trendRange", filter.preset);
+  if (filter?.startDate) params.set("startDate", filter.startDate);
+  if (filter?.endDate) params.set("endDate", filter.endDate);
+  const text = params.toString();
+  return text ? `?${text}` : "";
+}
+
 function getShareUrl(job) {
   if (job?.trackingMode === "tracked" && job?.managedLink?.id) {
     const origin = API_BASE_URL.replace(/\/api\/?$/, "");
@@ -238,6 +256,7 @@ export function DashboardScreen() {
   const [jobs, setJobs] = useState([]);
   const [expandedJobId, setExpandedJobId] = useState("");
   const [jobAnalysis, setJobAnalysis] = useState({});
+  const [jobTrendFilters, setJobTrendFilters] = useState({});
   const [busyAnalysisJobId, setBusyAnalysisJobId] = useState("");
   const [busyJobId, setBusyJobId] = useState("");
   const [analysisTabByJobId, setAnalysisTabByJobId] = useState({});
@@ -326,20 +345,10 @@ export function DashboardScreen() {
     );
   }
 
-  async function handleToggleAnalysis(jobId) {
-    if (expandedJobId === jobId) {
-      setExpandedJobId("");
-      return;
-    }
-
-    setExpandedJobId(jobId);
-    if (jobAnalysis[jobId]) {
-      return;
-    }
-
+  async function loadJobAnalysis(jobId, filter = createTrendFilterState()) {
     try {
       setBusyAnalysisJobId(jobId);
-      const data = await apiRequest(`/qr/jobs/${jobId}/analysis`, {
+      const data = await apiRequest(`/qr/jobs/${jobId}/analysis${buildTrendQuery(filter)}`, {
         headers: createAuthHeaders(token),
       });
       setJobAnalysis((prev) => ({
@@ -351,6 +360,23 @@ export function DashboardScreen() {
     } finally {
       setBusyAnalysisJobId("");
     }
+  }
+
+  async function handleToggleAnalysis(jobId) {
+    if (expandedJobId === jobId) {
+      setExpandedJobId("");
+      return;
+    }
+
+    setExpandedJobId(jobId);
+    const filter = jobTrendFilters[jobId] || createTrendFilterState();
+    if (!jobTrendFilters[jobId]) {
+      setJobTrendFilters((prev) => ({ ...prev, [jobId]: filter }));
+    }
+    if (jobAnalysis[jobId]) {
+      return;
+    }
+    await loadJobAnalysis(jobId, filter);
   }
 
   function getAnalysisTab(jobId) {
@@ -829,6 +855,57 @@ export function DashboardScreen() {
                             <View style={{ borderWidth: 1, borderColor: "#dbe3f0", borderRadius: 16, padding: 12, backgroundColor: "#f8fafc", gap: 8 }}>
                               <Text style={{ color: "#0f172a", fontWeight: "700" }}>Scan trend</Text>
                               <Text style={{ color: "#64748b" }}>Recent scan activity for this QR job.</Text>
+                              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+                                {[
+                                  ["7d", "7 days"],
+                                  ["15d", "15 days"],
+                                  ["30d", "Last month"],
+                                ].map(([value, label]) => {
+                                  const active = (jobTrendFilters[job.id] || createTrendFilterState()).preset === value;
+                                  return (
+                                    <TouchableOpacity
+                                      key={`${job.id}-${value}`}
+                                      onPress={() => {
+                                        const next = { ...(jobTrendFilters[job.id] || createTrendFilterState()), preset: value };
+                                        setJobTrendFilters((prev) => ({ ...prev, [job.id]: next }));
+                                        loadJobAnalysis(job.id, next);
+                                      }}
+                                      style={{
+                                        borderWidth: 1,
+                                        borderColor: active ? "#0f172a" : "#dbe3f0",
+                                        borderRadius: 999,
+                                        paddingHorizontal: 12,
+                                        paddingVertical: 8,
+                                        backgroundColor: active ? "#0f172a" : "#ffffff",
+                                      }}
+                                    >
+                                      <Text style={{ color: active ? "#ffffff" : "#334155", fontWeight: "700", fontSize: 12 }}>{label}</Text>
+                                    </TouchableOpacity>
+                                  );
+                                })}
+                              </View>
+                              <View style={{ flexDirection: "row", gap: 8 }}>
+                                <TextInput
+                                  value={(jobTrendFilters[job.id] || createTrendFilterState()).startDate}
+                                  onChangeText={(value) => setJobTrendFilters((prev) => ({ ...prev, [job.id]: { ...(prev[job.id] || createTrendFilterState()), preset: "custom", startDate: value } }))}
+                                  placeholder="Start YYYY-MM-DD"
+                                  placeholderTextColor="#94a3b8"
+                                  style={{ flex: 1, borderWidth: 1, borderColor: "#dbe3f0", borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, backgroundColor: "#ffffff", color: "#0f172a" }}
+                                />
+                                <TextInput
+                                  value={(jobTrendFilters[job.id] || createTrendFilterState()).endDate}
+                                  onChangeText={(value) => setJobTrendFilters((prev) => ({ ...prev, [job.id]: { ...(prev[job.id] || createTrendFilterState()), preset: "custom", endDate: value } }))}
+                                  placeholder="End YYYY-MM-DD"
+                                  placeholderTextColor="#94a3b8"
+                                  style={{ flex: 1, borderWidth: 1, borderColor: "#dbe3f0", borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, backgroundColor: "#ffffff", color: "#0f172a" }}
+                                />
+                              </View>
+                              <TouchableOpacity
+                                onPress={() => loadJobAnalysis(job.id, { ...(jobTrendFilters[job.id] || createTrendFilterState()), preset: "custom" })}
+                                style={{ alignSelf: "flex-start", borderWidth: 1, borderColor: "#0f172a", borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10, backgroundColor: "#0f172a" }}
+                              >
+                                <Text style={{ color: "#ffffff", fontWeight: "700" }}>Apply custom range</Text>
+                              </TouchableOpacity>
                               <MiniSparkline points={analysis.scanTrend || []} />
                             </View>
                           )}
