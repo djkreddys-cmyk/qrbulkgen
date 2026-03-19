@@ -211,7 +211,10 @@ function CategoryBarChart({ items }) {
       <div className="grid gap-2 sm:grid-cols-2">
         {items.map((item, index) => (
           <div key={`${item.label}-meta-${index}`} className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2 text-sm">
-            <span className="font-medium text-slate-700">{item.label}</span>
+            <span className="flex items-center gap-2 font-medium text-slate-700">
+              <span className={`h-2.5 w-2.5 rounded-full ${item.colorClass || "bg-sky-500"}`} />
+              {item.label}
+            </span>
             <span className="text-slate-500">
               {item.value}
               {item.helper ? ` · ${item.helper}` : ""}
