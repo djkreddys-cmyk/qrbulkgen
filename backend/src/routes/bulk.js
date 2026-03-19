@@ -1305,6 +1305,36 @@ bulkRouter.get("/jobs/:id/analysis", requireAuth, async (req, res, next) => {
       [job.managed_link_id, job.id, versionStartedAt],
     );
 
+    const filteredLinkStatsResult = await query(
+      `WITH links AS (
+         SELECT id, content AS url, qr_type, title, expires_at
+         FROM managed_qr_links
+         WHERE id = $1
+         UNION
+         SELECT m.id, m.content AS url, m.qr_type, m.title, m.expires_at
+         FROM qr_job_items i
+         INNER JOIN managed_qr_links m ON m.id = i.managed_link_id
+         WHERE i.job_id = $2
+       )
+       SELECT
+         COUNT(ae.id)::int AS total_scans,
+         COUNT(DISTINCT ae.metadata->>'visitorKey')::int AS unique_scans,
+         MAX(ae.created_at) AS last_scan_at
+       FROM links
+       LEFT JOIN analytics_events ae
+         ON ae.event_type = 'qr.public.scan'
+        AND ($3::timestamptz IS NULL OR ae.created_at >= $3::timestamptz)
+        AND ae.created_at >= $4::timestamptz
+        AND ae.created_at <= $5::timestamptz
+        AND (
+          ae.metadata->>'linkId' = links.id::text
+          OR ae.metadata->>'targetUrl' = links.url
+          OR regexp_replace(lower(split_part(COALESCE(ae.metadata->>'targetUrl', ''), '?exp=', 1)), '^https?://(www\\.)?', '') =
+             regexp_replace(lower(split_part(links.url, '?exp=', 1)), '^https?://(www\\.)?', '')
+        )`,
+      [job.managed_link_id, job.id, versionStartedAt, trendWindow.startDate, trendWindow.endDate],
+    );
+
     const scanTrendResult = await query(
       `WITH links AS (
          SELECT id, content AS url
@@ -1353,6 +1383,7 @@ bulkRouter.get("/jobs/:id/analysis", requireAuth, async (req, res, next) => {
     );
 
     const linkStats = linkStatsResult.rows[0] || {};
+    const filteredLinkStats = filteredLinkStatsResult.rows[0] || {};
     const lifetimeLinkStats = lifetimeLinkStatsResult.rows[0] || {};
     let totalScans = linkStats.total_scans || 0;
     let uniqueScans = linkStats.unique_scans || 0;
@@ -1360,6 +1391,9 @@ bulkRouter.get("/jobs/:id/analysis", requireAuth, async (req, res, next) => {
     let lifetimeTotalScans = lifetimeLinkStats.total_scans || 0;
     let lifetimeUniqueScans = lifetimeLinkStats.unique_scans || 0;
     let lifetimeRepeatedScans = Math.max(lifetimeTotalScans - lifetimeUniqueScans, 0);
+    let filteredTotalScans = filteredLinkStats.total_scans || 0;
+    let filteredUniqueScans = filteredLinkStats.unique_scans || 0;
+    let filteredRepeatedScans = Math.max(filteredTotalScans - filteredUniqueScans, 0);
     const targetKind = String(linkStats.target_kind || lifetimeLinkStats.target_kind || job.managed_qr_type || typeLabel || "").trim();
 
     let totalSubmissions = 0;
@@ -1539,6 +1573,11 @@ bulkRouter.get("/jobs/:id/analysis", requireAuth, async (req, res, next) => {
       lifetimeUniqueScans = Math.min(lifetimeUniqueScans, lifetimeTotalSubmissions);
       lifetimeRepeatedScans = Math.max(lifetimeTotalScans - lifetimeUniqueScans, 0);
     }
+    if ((targetKind === "Rating" || targetKind === "Feedback") && totalSubmissions > 0) {
+      filteredTotalScans = Math.min(filteredTotalScans, totalSubmissions);
+      filteredUniqueScans = Math.min(filteredUniqueScans, totalSubmissions);
+      filteredRepeatedScans = Math.max(filteredTotalScans - filteredUniqueScans, 0);
+    }
 
     const trackingMode = String(job.tracking_mode || "tracked").toLowerCase() === "tracked" ? "tracked" : "direct";
     const trackingEnabled = trackingMode === "tracked";
@@ -1616,6 +1655,12 @@ bulkRouter.get("/jobs/:id/analysis", requireAuth, async (req, res, next) => {
         currentEngagement: {
           ...engagement,
           versionStartedAt,
+        },
+        filteredEngagement: {
+          totalScans: filteredTotalScans,
+          uniqueScans: filteredUniqueScans,
+          repeatedScans: filteredRepeatedScans,
+          lastScanAt: filteredLinkStats.last_scan_at || null,
         },
         trendRange: trendWindow.preset,
         trendStartDate: trendWindow.startDate,

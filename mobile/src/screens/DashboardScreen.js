@@ -246,6 +246,37 @@ function CategoryBarChart({ items }) {
   );
 }
 
+function BreakdownBars({ items }) {
+  if (!items?.length) {
+    return <Text style={{ color: "#94a3b8", fontSize: 12 }}>No data</Text>;
+  }
+
+  const max = Math.max(...items.map((item) => item.value || 0), 1);
+
+  return (
+    <View style={{ gap: 10 }}>
+      <View style={{ flexDirection: "row", justifyContent: "center", alignItems: "flex-end", gap: 36, borderRadius: 16, backgroundColor: "#f8fafc", paddingHorizontal: 16, paddingVertical: 16 }}>
+        {items.map((item, index) => (
+          <View key={`${item.label}-${index}`} style={{ alignItems: "center", gap: 8 }}>
+            <Text style={{ color: "#64748b", fontSize: 12, fontWeight: "700" }}>{item.value}</Text>
+            <View
+              style={{
+                width: 28,
+                height: Math.max(((item.value || 0) / max) * 120, item.value > 0 ? 42 : 10),
+                borderTopLeftRadius: 20,
+                borderTopRightRadius: 20,
+                backgroundColor: item.color || "#10b981",
+              }}
+            />
+            <Text style={{ color: "#334155", fontWeight: "600" }}>{item.label}</Text>
+            <Text style={{ color: "#64748b", fontSize: 12 }}>{item.helper || "0%"}</Text>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
+
 function getThumbnailSource(job) {
   const filePath = job?.artifact?.filePath || "";
   if (!filePath) return "";
@@ -667,6 +698,11 @@ export function DashboardScreen() {
   const hasTrackedEngagement = Boolean(analysis?.engagement?.trackingEnabled);
   const lifetime = analysis?.lifetimeEngagement || analysis?.engagement || {};
   const current = analysis?.currentEngagement || analysis?.engagement || {};
+  const filtered = analysis?.filteredEngagement || {};
+  const trendPreset = (jobTrendFilters[job.id] || createTrendFilterState()).preset;
+  const displayedScans = trendPreset === "overall" ? (lifetime.totalScans || 0) : (filtered.totalScans || 0);
+  const displayedUnique = trendPreset === "overall" ? (lifetime.uniqueScans || 0) : (filtered.uniqueScans || 0);
+  const displayedRepeated = trendPreset === "overall" ? (lifetime.repeatedScans || 0) : (filtered.repeatedScans || 0);
               const typeAverageSuccessRate = analysis?.typePerformance
                 ? (analysis.typePerformance.successCount || 0) / Math.max(analysis.typePerformance.requestedCount || 1, 1)
                 : 0;
@@ -966,19 +1002,19 @@ export function DashboardScreen() {
                               <MiniSparkline points={analysis.scanTrend || []} />
                             </View>
                           )}
-                          <CategoryBarChart
+                          <BreakdownBars
                             items={[
                               {
-                                label: "Unique visitor share",
-                                value: current.uniqueScans || 0,
-                                helper: current.totalScans ? `${Math.round(((current.uniqueScans || 0) / Math.max(current.totalScans || 1, 1)) * 100)}%` : "0%",
-                                color: "#0ea5e9",
+                                label: "Unique scans",
+                                value: displayedUnique,
+                                helper: displayedScans ? `${Math.round((displayedUnique / Math.max(displayedScans, 1)) * 100)}%` : "0%",
+                                color: "#10b981",
                               },
                               {
-                                label: "Repeat visitor share",
-                                value: current.repeatedScans || 0,
-                                helper: current.totalScans ? `${Math.round(((current.repeatedScans || 0) / Math.max(current.totalScans || 1, 1)) * 100)}%` : "0%",
-                                color: "#8b5cf6",
+                                label: "Repeated users",
+                                value: displayedRepeated,
+                                helper: displayedScans ? `${Math.round((displayedRepeated / Math.max(displayedScans, 1)) * 100)}%` : "0%",
+                                color: "#ef4444",
                               },
                             ]}
                           />

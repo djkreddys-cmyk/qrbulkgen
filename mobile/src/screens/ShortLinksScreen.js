@@ -143,6 +143,37 @@ function CategoryBarChart({ items }) {
   );
 }
 
+function BreakdownBars({ items }) {
+  if (!items?.length) {
+    return <Text style={{ color: "#94a3b8", fontSize: 12 }}>No data</Text>;
+  }
+
+  const max = Math.max(...items.map((item) => item.value || 0), 1);
+
+  return (
+    <View style={{ gap: 10 }}>
+      <View style={{ flexDirection: "row", justifyContent: "center", alignItems: "flex-end", gap: 36, borderRadius: 16, backgroundColor: "#f8fafc", paddingHorizontal: 16, paddingVertical: 16 }}>
+        {items.map((item, index) => (
+          <View key={`${item.label}-${index}`} style={{ alignItems: "center", gap: 8 }}>
+            <Text style={{ color: "#64748b", fontSize: 12, fontWeight: "700" }}>{item.value}</Text>
+            <View
+              style={{
+                width: 28,
+                height: Math.max(((item.value || 0) / max) * 120, item.value > 0 ? 42 : 10),
+                borderTopLeftRadius: 20,
+                borderTopRightRadius: 20,
+                backgroundColor: item.color || "#10b981",
+              }}
+            />
+            <Text style={{ color: "#334155", fontWeight: "600" }}>{item.label}</Text>
+            <Text style={{ color: "#64748b", fontSize: 12 }}>{item.helper || "0%"}</Text>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
+
 function formatDateTime(value) {
   if (!value) return "Not set";
   const parsed = new Date(value);
@@ -755,19 +786,23 @@ export function ShortLinksScreen({ variant = "create" }) {
 
                       <Card style={{ padding: 14, gap: 10 }}>
                         <Text style={{ color: "#0f172a", fontWeight: "700" }}>Visit breakdown</Text>
-                        <CategoryBarChart
+                        <BreakdownBars
                           items={[
                             {
-                              label: "Unique visitors",
-                              value: analysis.uniqueVisits,
-                              helper: analysis.totalVisits ? `${Math.round((analysis.uniqueVisits / Math.max(analysis.totalVisits, 1)) * 100)}%` : "0%",
-                              color: "#0ea5e9",
+                              label: "Unique scans",
+                              value: (trendFiltersById[link.id] || createTrendFilterState()).preset === "overall" ? analysis.uniqueVisits : analysis.filteredUniqueVisits,
+                              helper: ((trendFiltersById[link.id] || createTrendFilterState()).preset === "overall" ? analysis.totalVisits : analysis.filteredTotalVisits)
+                                ? `${Math.round((((trendFiltersById[link.id] || createTrendFilterState()).preset === "overall" ? analysis.uniqueVisits : analysis.filteredUniqueVisits) / Math.max(((trendFiltersById[link.id] || createTrendFilterState()).preset === "overall" ? analysis.totalVisits : analysis.filteredTotalVisits), 1)) * 100)}%`
+                                : "0%",
+                              color: "#10b981",
                             },
                             {
-                              label: "Repeat visits",
-                              value: analysis.repeatVisits,
-                              helper: analysis.totalVisits ? `${Math.round((analysis.repeatVisits / Math.max(analysis.totalVisits, 1)) * 100)}%` : "0%",
-                              color: "#10b981",
+                              label: "Repeated users",
+                              value: (trendFiltersById[link.id] || createTrendFilterState()).preset === "overall" ? analysis.repeatVisits : analysis.filteredRepeatVisits,
+                              helper: ((trendFiltersById[link.id] || createTrendFilterState()).preset === "overall" ? analysis.totalVisits : analysis.filteredTotalVisits)
+                                ? `${Math.round((((trendFiltersById[link.id] || createTrendFilterState()).preset === "overall" ? analysis.repeatVisits : analysis.filteredRepeatVisits) / Math.max(((trendFiltersById[link.id] || createTrendFilterState()).preset === "overall" ? analysis.totalVisits : analysis.filteredTotalVisits), 1)) * 100)}%`
+                                : "0%",
+                              color: "#ef4444",
                             },
                           ]}
                         />

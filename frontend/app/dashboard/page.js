@@ -226,6 +226,36 @@ function CategoryBarChart({ items }) {
   )
 }
 
+function BreakdownBars({ items }) {
+  if (!items?.length) {
+    return <p className="text-xs text-slate-400">No data</p>
+  }
+
+  const max = Math.max(...items.map((item) => item.value || 0), 1)
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-end justify-center gap-10 rounded-2xl bg-slate-50 px-6 py-4">
+        {items.map((item, index) => (
+          <div key={`${item.label}-${index}`} className="flex flex-col items-center gap-3">
+            <span className="text-xs font-semibold text-slate-500">{item.value}</span>
+            <div
+              className={`w-14 rounded-t-[1.5rem] ${item.colorClass}`}
+              style={{ height: `${Math.max(((item.value || 0) / max) * 120, item.value > 0 ? 42 : 10)}px` }}
+              title={`${item.label}: ${item.value}`}
+            />
+            <span className="flex items-center gap-2 text-sm font-medium text-slate-700">
+              <span className={`h-2.5 w-2.5 rounded-full ${item.colorClass}`} />
+              {item.label}
+            </span>
+            <span className="text-xs text-slate-500">{item.helper || "0%"}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 function EmptyState({ title, body }) {
   return (
     <div className="rounded-[1.75rem] border border-dashed border-slate-300 bg-slate-50/80 px-6 py-8 text-center">
@@ -1265,6 +1295,10 @@ export default function Dashboard() {
                               const currentScans = current.totalScans || 0
                               const currentUnique = current.uniqueScans || 0
                               const currentRepeated = current.repeatedScans || 0
+                              const filtered = analysis.filteredEngagement || {}
+                              const displayedScans = jobTrendFilter.preset === "overall" ? lifetimeScans : Number(filtered.totalScans || 0)
+                              const displayedUnique = jobTrendFilter.preset === "overall" ? lifetimeUnique : Number(filtered.uniqueScans || 0)
+                              const displayedRepeated = jobTrendFilter.preset === "overall" ? lifetimeRepeated : Number(filtered.repeatedScans || 0)
                               const currentSubmissions = current.totalSubmissions || 0
                               const hasTrackedEngagement = Boolean(analysis.engagement?.trackingEnabled)
                               const currentTab = getAnalysisTab(job.id)
@@ -1459,19 +1493,19 @@ export default function Dashboard() {
                                     </div>
                                   </div>
                                   <div className="mt-4">
-                                    <CategoryBarChart
+                                    <BreakdownBars
                                       items={[
                                         {
-                                          label: "Unique visitor share",
-                                          value: currentUnique,
-                                          helper: currentScans ? `${Math.round((currentUnique / currentScans) * 100)}%` : "0%",
-                                          colorClass: "bg-sky-500",
+                                          label: "Unique scans",
+                                          value: displayedUnique,
+                                          helper: displayedScans ? `${Math.round((displayedUnique / Math.max(displayedScans, 1)) * 100)}%` : "0%",
+                                          colorClass: "bg-emerald-500",
                                         },
                                         {
-                                          label: "Repeat visitor share",
-                                          value: currentRepeated,
-                                          helper: currentScans ? `${Math.round((currentRepeated / currentScans) * 100)}%` : "0%",
-                                          colorClass: "bg-violet-500",
+                                          label: "Repeated users",
+                                          value: displayedRepeated,
+                                          helper: displayedScans ? `${Math.round((displayedRepeated / Math.max(displayedScans, 1)) * 100)}%` : "0%",
+                                          colorClass: "bg-rose-500",
                                         },
                                       ]}
                                     />
@@ -1985,9 +2019,9 @@ export default function Dashboard() {
                                 </div>
 
                                 <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                                  <AnalysisStat label="Total Visits" value={shortLinkAnalysisById[link.id].totalVisits} tone="accent" />
-                                  <AnalysisStat label="Unique Visits" value={shortLinkAnalysisById[link.id].uniqueVisits} tone="success" />
-                                  <AnalysisStat label="Repeat Visits" value={shortLinkAnalysisById[link.id].repeatVisits} />
+                                  <AnalysisStat label="Total Visits" value={(shortLinkTrendFilterById[link.id] || createTrendFilterState()).preset === "overall" ? shortLinkAnalysisById[link.id].totalVisits : shortLinkAnalysisById[link.id].filteredTotalVisits} tone="accent" />
+                                  <AnalysisStat label="Unique Visits" value={(shortLinkTrendFilterById[link.id] || createTrendFilterState()).preset === "overall" ? shortLinkAnalysisById[link.id].uniqueVisits : shortLinkAnalysisById[link.id].filteredUniqueVisits} tone="success" />
+                                  <AnalysisStat label="Repeat Visits" value={(shortLinkTrendFilterById[link.id] || createTrendFilterState()).preset === "overall" ? shortLinkAnalysisById[link.id].repeatVisits : shortLinkAnalysisById[link.id].filteredRepeatVisits} />
                                   <AnalysisStat
                                     label="Expiry State"
                                     value={shortLinkAnalysisById[link.id].isExpired ? "Expired" : shortLinkAnalysisById[link.id].expiresAt ? "Scheduled" : "Open"}
@@ -1999,23 +2033,39 @@ export default function Dashboard() {
                                   <div className="rounded-2xl border border-slate-200 bg-white p-5">
                                     <h4 className="text-base font-semibold text-slate-950">Visit breakdown</h4>
                                     <div className="mt-4">
-                                      <CategoryBarChart
+                                      <BreakdownBars
                                         items={[
                                           {
-                                            label: "Unique visitors",
-                                            value: shortLinkAnalysisById[link.id].uniqueVisits,
-                                            helper: shortLinkAnalysisById[link.id].totalVisits
-                                              ? `${Math.round((shortLinkAnalysisById[link.id].uniqueVisits / Math.max(shortLinkAnalysisById[link.id].totalVisits, 1)) * 100)}%`
-                                              : "0%",
-                                            colorClass: "bg-sky-500",
-                                          },
-                                          {
-                                            label: "Repeat visits",
-                                            value: shortLinkAnalysisById[link.id].repeatVisits,
-                                            helper: shortLinkAnalysisById[link.id].totalVisits
-                                              ? `${Math.round((shortLinkAnalysisById[link.id].repeatVisits / Math.max(shortLinkAnalysisById[link.id].totalVisits, 1)) * 100)}%`
+                                            label: "Unique scans",
+                                            value: (shortLinkTrendFilterById[link.id] || createTrendFilterState()).preset === "overall"
+                                              ? shortLinkAnalysisById[link.id].uniqueVisits
+                                              : shortLinkAnalysisById[link.id].filteredUniqueVisits,
+                                            helper: ((shortLinkTrendFilterById[link.id] || createTrendFilterState()).preset === "overall"
+                                              ? shortLinkAnalysisById[link.id].totalVisits
+                                              : shortLinkAnalysisById[link.id].filteredTotalVisits)
+                                              ? `${Math.round((((shortLinkTrendFilterById[link.id] || createTrendFilterState()).preset === "overall"
+                                                  ? shortLinkAnalysisById[link.id].uniqueVisits
+                                                  : shortLinkAnalysisById[link.id].filteredUniqueVisits) / Math.max(((shortLinkTrendFilterById[link.id] || createTrendFilterState()).preset === "overall"
+                                                  ? shortLinkAnalysisById[link.id].totalVisits
+                                                  : shortLinkAnalysisById[link.id].filteredTotalVisits), 1)) * 100)}%`
                                               : "0%",
                                             colorClass: "bg-emerald-500",
+                                          },
+                                          {
+                                            label: "Repeated users",
+                                            value: (shortLinkTrendFilterById[link.id] || createTrendFilterState()).preset === "overall"
+                                              ? shortLinkAnalysisById[link.id].repeatVisits
+                                              : shortLinkAnalysisById[link.id].filteredRepeatVisits,
+                                            helper: ((shortLinkTrendFilterById[link.id] || createTrendFilterState()).preset === "overall"
+                                              ? shortLinkAnalysisById[link.id].totalVisits
+                                              : shortLinkAnalysisById[link.id].filteredTotalVisits)
+                                              ? `${Math.round((((shortLinkTrendFilterById[link.id] || createTrendFilterState()).preset === "overall"
+                                                  ? shortLinkAnalysisById[link.id].repeatVisits
+                                                  : shortLinkAnalysisById[link.id].filteredRepeatVisits) / Math.max(((shortLinkTrendFilterById[link.id] || createTrendFilterState()).preset === "overall"
+                                                  ? shortLinkAnalysisById[link.id].totalVisits
+                                                  : shortLinkAnalysisById[link.id].filteredTotalVisits), 1)) * 100)}%`
+                                              : "0%",
+                                            colorClass: "bg-rose-500",
                                           },
                                         ]}
                                       />

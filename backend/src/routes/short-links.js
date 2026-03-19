@@ -296,6 +296,17 @@ shortLinksRouter.get("/short-links/:id/analysis", requireAuth, async (req, res, 
       [id],
     );
 
+    const filteredEventsResult = await query(
+      `${SHORT_LINK_DEDUPED_EVENTS_CTE}
+       SELECT
+         COUNT(*)::int AS total_visits,
+         COUNT(DISTINCT NULLIF(visitor_key, ''))::int AS unique_visits
+       FROM deduped_events
+       WHERE created_at >= $2::timestamptz
+         AND created_at <= $3::timestamptz`,
+      [id, trendWindow.startDate, trendWindow.endDate],
+    );
+
     const trendResult = await query(
       `${SHORT_LINK_DEDUPED_EVENTS_CTE},
        days AS (
@@ -332,9 +343,13 @@ shortLinksRouter.get("/short-links/:id/analysis", requireAuth, async (req, res, 
     );
 
     const totals = eventsResult.rows[0] || { total_visits: 0, unique_visits: 0 };
+    const filteredTotals = filteredEventsResult.rows[0] || { total_visits: 0, unique_visits: 0 };
     const totalVisits = Number(totals.total_visits || 0);
     const uniqueVisits = Number(totals.unique_visits || 0);
     const repeatVisits = Math.max(totalVisits - uniqueVisits, 0);
+    const filteredTotalVisits = Number(filteredTotals.total_visits || 0);
+    const filteredUniqueVisits = Number(filteredTotals.unique_visits || 0);
+    const filteredRepeatVisits = Math.max(filteredTotalVisits - filteredUniqueVisits, 0);
     const expiresAt = link.expires_at || null;
     const isExpired = expiresAt ? new Date(expiresAt).getTime() < Date.now() : false;
     const trend = trendResult.rows.map((row) => ({
@@ -364,6 +379,9 @@ shortLinksRouter.get("/short-links/:id/analysis", requireAuth, async (req, res, 
         totalVisits,
         uniqueVisits,
         repeatVisits,
+        filteredTotalVisits,
+        filteredUniqueVisits,
+        filteredRepeatVisits,
         clickCount: Number(link.click_count || 0),
         lastVisitedAt: link.last_visited_at,
         createdAt: link.created_at,
