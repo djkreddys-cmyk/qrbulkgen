@@ -123,7 +123,7 @@ function MobileShell() {
           <View style={{ flexDirection: "row", gap: 12 }}>
             <TabButton label="Bulk QR" route="bulk-jobs" activeRoute={activeRoute} navigate={navigate} />
             <TabButton
-              label="Short Links"
+              label="Short URL"
               route="short-links"
               activeRoute={activeRoute}
               navigate={navigate}

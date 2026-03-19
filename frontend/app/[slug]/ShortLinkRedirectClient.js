@@ -32,7 +32,7 @@ async function getPreciseLocationPayload() {
 }
 
 export default function ShortLinkRedirectClient({ slug, targetUrl }) {
-  const [message, setMessage] = useState("Opening short link...")
+  const [message, setMessage] = useState("Opening short URL...")
 
   useEffect(() => {
     let cancelled = false
@@ -70,7 +70,7 @@ export default function ShortLinkRedirectClient({ slug, targetUrl }) {
         }
       } catch (error) {
         if (!cancelled) {
-          setMessage(error?.message || "Opening short link...")
+          setMessage(error?.message || "Opening short URL...")
         }
         await continueToTarget()
       }

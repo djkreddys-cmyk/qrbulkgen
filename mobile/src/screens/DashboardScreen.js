@@ -458,7 +458,7 @@ export function DashboardScreen() {
               backgroundColor: workspace === "short-links" ? "#e0f2fe" : "#ffffff",
             }}
           >
-            <Text style={{ color: workspace === "short-links" ? "#0369a1" : "#0f172a", fontWeight: "700" }}>Short Links</Text>
+            <Text style={{ color: workspace === "short-links" ? "#0369a1" : "#0f172a", fontWeight: "700" }}>Short URL</Text>
           </TouchableOpacity>
         </View>
       </Card>

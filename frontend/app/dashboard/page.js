@@ -710,7 +710,7 @@ export default function Dashboard() {
 
       if (!response.ok) {
         const data = await response.json().catch(() => null)
-        throw new Error(data?.error?.message || "Failed to download short link analysis report")
+        throw new Error(data?.error?.message || "Failed to download short URL analysis report")
       }
 
       const blob = await response.blob()
@@ -724,7 +724,7 @@ export default function Dashboard() {
       document.body.removeChild(downloadLink)
       window.URL.revokeObjectURL(url)
     } catch (downloadError) {
-      setError(downloadError.message || "Failed to download short link analysis report.")
+      setError(downloadError.message || "Failed to download short URL analysis report.")
     } finally {
       setExportingShortLinkReportId("")
     }
@@ -891,7 +891,7 @@ export default function Dashboard() {
                     onClick={() => setActiveWorkspace("short-links")}
                     className={`rounded-2xl border px-4 py-3 text-left text-sm font-semibold transition ${activeWorkspace === "short-links" ? "border-sky-200 bg-sky-50 text-sky-700 shadow-sm" : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50"}`}
                   >
-                    Short Links
+                    Short URLs
                   </button>
                 </div>
               </div>
@@ -912,7 +912,7 @@ export default function Dashboard() {
             onClick={() => setActiveWorkspace("short-links")}
             className={`rounded-2xl border px-4 py-3 text-sm font-semibold transition ${activeWorkspace === "short-links" ? "border-sky-200 bg-sky-50 text-sky-700 shadow-sm" : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50"}`}
           >
-            Short Links
+            Short URLs
           </button>
         </div>
         <>
@@ -1314,7 +1314,7 @@ export default function Dashboard() {
                                           type="button"
                                           onClick={() => handleDownloadAnalysisReport(job)}
                                           disabled={exportingReportJobId === job.id}
-                                          className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 disabled:cursor-not-allowed disabled:opacity-60"
+                                          className="rounded-xl border border-slate-950 bg-slate-950 px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
                                         >
                                           {exportingReportJobId === job.id ? "Preparing Excel..." : "Download Excel"}
                                         </button>
@@ -1620,7 +1620,7 @@ export default function Dashboard() {
             <section className="mb-6 flex flex-col gap-5 rounded-[2rem] border border-slate-200 bg-gradient-to-br from-white to-slate-100 p-8 shadow-sm lg:flex-row lg:items-end lg:justify-between">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-500">Control Center</p>
-                <h1 className="mt-3 text-4xl font-semibold tracking-tight text-slate-950">Short Links Dashboard</h1>
+                <h1 className="mt-3 text-4xl font-semibold tracking-tight text-slate-950">Short URL Dashboard</h1>
                 {user && <p className="mt-3 max-w-4xl text-slate-600">Welcome back, {user.name || user.email}. Open analysis on each saved short URL to review clicks, visitors, expiry status, and related link performance in one focused dashboard.</p>}
               </div>
             </section>
@@ -1685,7 +1685,7 @@ export default function Dashboard() {
               </div>
 
               <div className="rounded-3xl bg-white p-5 shadow-sm md:p-6">
-                {isLoading ? <p className="text-slate-600">Loading short links...</p> : null}
+                {isLoading ? <p className="text-slate-600">Loading short URLs...</p> : null}
                 {!isLoading && error ? <p className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-rose-700">{error}</p> : null}
                 {!isLoading && !error && !filteredShortLinks.length ? (
                   <EmptyState
@@ -1812,7 +1812,7 @@ export default function Dashboard() {
                               <div className="space-y-5">
                                 <div className="flex flex-wrap items-start justify-between gap-4">
                                   <div>
-                                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Short Link Analytics</p>
+                                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Short URL Analytics</p>
                                     <h4 className="mt-2 text-xl font-semibold text-slate-950">{link.title || link.slug}</h4>
                                     <p className="mt-1 text-sm text-slate-500">Analysis has been moved to the dashboard so QR and short URL reporting stay in one workspace.</p>
                                   </div>
@@ -1821,7 +1821,7 @@ export default function Dashboard() {
                                       type="button"
                                       onClick={() => handleDownloadShortLinkAnalysisReport(link)}
                                       disabled={exportingShortLinkReportId === link.id}
-                                      className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 disabled:cursor-not-allowed disabled:opacity-60"
+                                      className="rounded-xl border border-slate-950 bg-slate-950 px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
                                     >
                                       {exportingShortLinkReportId === link.id ? "Preparing Excel..." : "Download Excel"}
                                     </button>

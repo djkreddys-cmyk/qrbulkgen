@@ -219,7 +219,7 @@ export default function ShortLinksPage() {
       })
 
       setCreatedLink(data.link)
-      setMessage("Short link created successfully.")
+      setMessage("Short URL created successfully.")
       setTitle("")
       setTargetUrl("")
       setSlug("")
@@ -242,8 +242,8 @@ export default function ShortLinksPage() {
     const force = Boolean(link.archivedAt)
     const confirmed = window.confirm(
       force
-        ? "Permanently delete this short link?"
-        : "Archive this short link? You can still review it later.",
+        ? "Permanently delete this short URL?"
+        : "Archive this short URL? You can still review it later.",
     )
     if (!confirmed) return
 
@@ -255,7 +255,7 @@ export default function ShortLinksPage() {
       })
       setSelectedLinkIds((prev) => prev.filter((id) => id !== link.id))
       await loadLinks()
-      setMessage(force ? "Short link deleted permanently." : "Short link archived.")
+      setMessage(force ? "Short URL deleted permanently." : "Short URL archived.")
     } catch (requestError) {
       setError(requestError.message)
     } finally {
@@ -266,10 +266,10 @@ export default function ShortLinksPage() {
   async function copyLink(url) {
     try {
       await navigator.clipboard.writeText(url)
-      setMessage("Short link copied.")
+      setMessage("Short URL copied.")
       setError("")
     } catch {
-      setError("Unable to copy short link.")
+      setError("Unable to copy short URL.")
     }
   }
 
@@ -289,11 +289,11 @@ export default function ShortLinksPage() {
   async function handleBulkArchive() {
     const activeSelected = selectedLinks.filter((link) => !link.archivedAt)
     if (!activeSelected.length) {
-      setError("Select at least one active short link to archive.")
+      setError("Select at least one active short URL to archive.")
       return
     }
 
-    const confirmed = window.confirm(`Archive ${activeSelected.length} selected short link${activeSelected.length === 1 ? "" : "s"}?`)
+    const confirmed = window.confirm(`Archive ${activeSelected.length} selected short URL${activeSelected.length === 1 ? "" : "s"}?`)
     if (!confirmed) return
 
     try {
@@ -313,7 +313,7 @@ export default function ShortLinksPage() {
 
       setSelectedLinkIds((prev) => prev.filter((id) => !activeSelected.some((link) => link.id === id)))
       await loadLinks()
-      setMessage(`Archived ${activeSelected.length} short link${activeSelected.length === 1 ? "" : "s"}.`)
+      setMessage(`Archived ${activeSelected.length} short URL${activeSelected.length === 1 ? "" : "s"}.`)
     } catch (requestError) {
       setError(requestError.message)
     } finally {
@@ -324,11 +324,11 @@ export default function ShortLinksPage() {
   async function handleBulkDelete() {
     const archivedSelected = selectedLinks.filter((link) => link.archivedAt)
     if (!archivedSelected.length) {
-      setError("Select at least one archived short link to delete.")
+      setError("Select at least one archived short URL to delete.")
       return
     }
 
-    const confirmed = window.confirm(`Delete ${archivedSelected.length} archived short link${archivedSelected.length === 1 ? "" : "s"} permanently?`)
+    const confirmed = window.confirm(`Delete ${archivedSelected.length} archived short URL${archivedSelected.length === 1 ? "" : "s"} permanently?`)
     if (!confirmed) return
 
     try {
@@ -348,7 +348,7 @@ export default function ShortLinksPage() {
 
       setSelectedLinkIds((prev) => prev.filter((id) => !archivedSelected.some((link) => link.id === id)))
       await loadLinks()
-      setMessage(`Deleted ${archivedSelected.length} archived short link${archivedSelected.length === 1 ? "" : "s"}.`)
+      setMessage(`Deleted ${archivedSelected.length} archived short URL${archivedSelected.length === 1 ? "" : "s"}.`)
     } catch (requestError) {
       setError(requestError.message)
     } finally {
@@ -443,7 +443,7 @@ export default function ShortLinksPage() {
                 </div>
                 <div className="flex items-end xl:min-w-[11rem]">
                   <button disabled={isSubmitting} className="w-full rounded-xl bg-slate-950 px-4 py-3 font-semibold text-white disabled:opacity-60">
-                    {isSubmitting ? "Creating..." : "Create Short Link"}
+                    {isSubmitting ? "Creating..." : "Create Short URL"}
                   </button>
                 </div>
               </form>

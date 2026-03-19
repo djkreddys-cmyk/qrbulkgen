@@ -157,7 +157,7 @@ export function ShortLinksScreen({ variant = "create" }) {
       setLinks(data.links || []);
       setError("");
     } catch (requestError) {
-      setError(requestError.message || "Failed to load short links");
+      setError(requestError.message || "Failed to load short URLs");
     } finally {
       setIsLoading(false);
     }
@@ -226,14 +226,14 @@ export function ShortLinksScreen({ variant = "create" }) {
       });
 
       setCreatedLink(data.link || null);
-      setMessage("Short link created successfully.");
+      setMessage("Short URL created successfully.");
       setTitle("");
       setTargetUrl("");
       setSlug("");
       setExpiresAt("");
       await loadLinks(showArchived);
     } catch (requestError) {
-      setError(requestError.message || "Unable to create short link");
+      setError(requestError.message || "Unable to create short URL");
     } finally {
       setIsSubmitting(false);
     }
@@ -242,7 +242,7 @@ export function ShortLinksScreen({ variant = "create" }) {
   async function handleShareLink(url) {
     try {
       await Share.share({ message: url, url });
-      setMessage("Short link ready to share.");
+      setMessage("Short URL ready to share.");
       setError("");
     } catch (_error) {
       setError("Unable to open the share sheet right now.");
@@ -253,7 +253,7 @@ export function ShortLinksScreen({ variant = "create" }) {
     try {
       await Linking.openURL(url);
     } catch (_error) {
-      setError("Unable to open this short link right now.");
+      setError("Unable to open this short URL right now.");
     }
   }
 
@@ -269,20 +269,20 @@ export function ShortLinksScreen({ variant = "create" }) {
         delete next[link.id];
         return next;
       });
-      setMessage(forceDelete ? "Short link deleted permanently." : "Short link archived.");
+      setMessage(forceDelete ? "Short URL deleted permanently." : "Short URL archived.");
       await loadLinks(showArchived || !forceDelete);
     } catch (requestError) {
-      setError(requestError.message || "Unable to update this short link right now.");
+      setError(requestError.message || "Unable to update this short URL right now.");
     }
   }
 
   function handleDelete(link) {
     const forceDelete = Boolean(link.archivedAt);
     Alert.alert(
-      forceDelete ? "Delete Permanently" : "Archive Short Link",
+      forceDelete ? "Delete Permanently" : "Archive Short URL",
       forceDelete
-        ? "This will permanently remove the short link and its visit data."
-        : "This short link will move to Archived. You can permanently delete it later.",
+        ? "This will permanently remove the short URL and its visit data."
+        : "This short URL will move to Archived. You can permanently delete it later.",
       [
         { text: "Cancel", style: "cancel" },
         {
@@ -315,7 +315,7 @@ export function ShortLinksScreen({ variant = "create" }) {
         [linkId]: data.analysis || null,
       }));
     } catch (requestError) {
-      setError(requestError.message || "Failed to load short link analysis");
+      setError(requestError.message || "Failed to load short URL analysis");
     } finally {
       setAnalysisLoadingId("");
     }
@@ -333,7 +333,7 @@ export function ShortLinksScreen({ variant = "create" }) {
       setMessage(`Excel saved: ${savedPath}`);
       setError("");
     } catch (requestError) {
-      setError(requestError.message || "Failed to download short link analysis report");
+      setError(requestError.message || "Failed to download short URL analysis report");
     } finally {
       setDownloadingReportId("");
     }
@@ -345,7 +345,7 @@ export function ShortLinksScreen({ variant = "create" }) {
     <View style={{ gap: 16, paddingBottom: 36 }}>
       <Card>
         <SectionEyebrow>CONTROL CENTER</SectionEyebrow>
-        <Text style={{ fontSize: 24, fontWeight: "700", color: "#0f172a" }}>{isDashboardVariant ? "Short Links Dashboard" : "Short URL"}</Text>
+        <Text style={{ fontSize: 24, fontWeight: "700", color: "#0f172a" }}>{isDashboardVariant ? "Short URL Dashboard" : "Short URL"}</Text>
         <Text style={{ color: "#64748b", lineHeight: 22 }}>
           {isDashboardVariant
             ? "Open analysis on each saved short URL to review clicks, visitors, expiry status, and related link performance from mobile."
@@ -367,12 +367,12 @@ export function ShortLinksScreen({ variant = "create" }) {
 
       {isDashboardVariant ? (
       <Card>
-        <Text style={{ fontSize: 20, fontWeight: "700", color: "#0f172a" }}>Short link analytics</Text>
+        <Text style={{ fontSize: 20, fontWeight: "700", color: "#0f172a" }}>Short URL analytics</Text>
         <Text style={{ color: "#64748b", lineHeight: 21 }}>
           Monitor active links, click activity, expiry watch, and top-performing destinations in one dashboard-style view.
         </Text>
         <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}>
-          <MetricCard label="Total Links" value={analytics.totalLinks} helper="All short links under this account." />
+          <MetricCard label="Total URLs" value={analytics.totalLinks} helper="All short URLs under this account." />
           <MetricCard label="Active Links" value={analytics.activeLinks} tone="#047857" helper="Available for sharing now." />
           <MetricCard label="Total Clicks" value={analytics.totalClicks} tone="#1d4ed8" helper="Combined visits across your links." />
           <MetricCard label="Archived" value={analytics.archivedLinks} tone="#b91c1c" helper="Reviewable or deletable later." />
@@ -404,8 +404,8 @@ export function ShortLinksScreen({ variant = "create" }) {
         <Text style={{ fontSize: 20, fontWeight: "700", color: "#0f172a" }}>{isDashboardVariant ? "Create short URL" : "New short URL"}</Text>
         <Text style={{ color: "#64748b", lineHeight: 21 }}>
           {isDashboardVariant
-            ? "Create a short URL here, then review saved short links and analysis below."
-            : "Open the dashboard workspace to review saved short links and analysis."}
+            ? "Create a short URL here, then review saved short URLs and analysis below."
+            : "Open the dashboard workspace to review saved short URLs and analysis."}
         </Text>
         <View style={{ gap: 6 }}>
           <Text style={{ color: "#64748b", fontSize: 12, fontWeight: "700" }}>TITLE</Text>
@@ -487,7 +487,7 @@ export function ShortLinksScreen({ variant = "create" }) {
           }}
         >
           <Text style={{ color: "#ffffff", textAlign: "center", fontWeight: "700" }}>
-            {isSubmitting ? "Creating..." : "Create Short Link"}
+            {isSubmitting ? "Creating..." : "Create Short URL"}
           </Text>
         </TouchableOpacity>
         {createdLink ? (
@@ -505,7 +505,7 @@ export function ShortLinksScreen({ variant = "create" }) {
         <SectionEyebrow>ANALYTICS</SectionEyebrow>
         <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
           <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 20, fontWeight: "700", color: "#0f172a" }}>Saved short links</Text>
+            <Text style={{ fontSize: 20, fontWeight: "700", color: "#0f172a" }}>Saved short URLs</Text>
             <Text style={{ marginTop: 4, color: "#64748b", lineHeight: 21 }}>
               Track click counts and manage active or archived links separately.
             </Text>
@@ -516,15 +516,15 @@ export function ShortLinksScreen({ variant = "create" }) {
           </View>
         </View>
 
-        {isLoading ? <Text style={{ color: "#64748b" }}>Loading short links...</Text> : null}
+        {isLoading ? <Text style={{ color: "#64748b" }}>Loading short URLs...</Text> : null}
 
         {!isLoading && !visibleLinks.length ? (
           <EmptyState
-            title={showArchived ? "No archived short links yet" : "No short links yet"}
+            title={showArchived ? "No archived short URLs yet" : "No short URLs yet"}
             body={
               showArchived
-                ? "Archived links will appear here after you archive them from the active list."
-                : "Create your first short link above and it will appear here at the top of the list."
+                ? "Archived URLs will appear here after you archive them from the active list."
+                : "Create your first short URL above and it will appear here at the top of the list."
             }
           />
         ) : null}
@@ -636,11 +636,11 @@ export function ShortLinksScreen({ variant = "create" }) {
                           borderRadius: 14,
                           paddingHorizontal: 14,
                           paddingVertical: 10,
-                          backgroundColor: "#ffffff",
+                          backgroundColor: "#0f172a",
                           opacity: downloadingReportId === link.id ? 0.7 : 1,
                         }}
                       >
-                        <Text style={{ color: "#0f172a", fontWeight: "700" }}>
+                        <Text style={{ color: "#ffffff", fontWeight: "700" }}>
                           {downloadingReportId === link.id ? "Preparing Excel..." : "Download Excel"}
                         </Text>
                       </TouchableOpacity>
@@ -702,7 +702,7 @@ export function ShortLinksScreen({ variant = "create" }) {
                             </View>
                           ))
                         ) : (
-                          <Text style={{ color: "#64748b" }}>No visitor log has been recorded yet for this short link.</Text>
+                          <Text style={{ color: "#64748b" }}>No visitor log has been recorded yet for this short URL.</Text>
                         )}
                       </Card>
                     </View>
