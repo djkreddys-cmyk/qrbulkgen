@@ -9,6 +9,7 @@ export default function HomePageClient() {
   const [activeMobileFeature, setActiveMobileFeature] = useState("shared-dashboard")
   const [activeFeatureCard, setActiveFeatureCard] = useState("analysis")
   const [activeStatCard, setActiveStatCard] = useState("types")
+  const [activeBlogPost, setActiveBlogPost] = useState(blogPosts[0]?.slug || "")
 
   const operatingModes = [
     {
@@ -22,14 +23,14 @@ export default function HomePageClient() {
       detail: "Upload spreadsheets, queue jobs, process in the worker, and fetch artifacts later.",
     },
     {
-      label: "Analytics Layer",
-      value: "Tracked",
-      detail: "Job health, scan tracking, rating distributions, feedback summaries, and QR-type reports.",
+      label: "Short URL Workspace",
+      value: "Links + Reports",
+      detail: "Create branded Short URLs, monitor visitors, export location-aware reports, and review trend analysis.",
     },
     {
       label: "Mobile Companion",
       value: "Live",
-      detail: "Dashboard, scanner, single generation, bulk monitoring, and password recovery on phone.",
+      detail: "Dashboard, scanner, single generation, Short URL visibility, bulk monitoring, and password recovery on phone.",
     },
   ]
 
@@ -56,23 +57,23 @@ export default function HomePageClient() {
     {
       id: "analysis",
       title: "Analysis-ready dashboard",
-      body: "Your best assets are not just generated. They are tracked with job summaries, scan trends, QR type reports, and engagement snapshots.",
+      body: "Your best assets are not just generated. They are tracked with QR summaries, Short URL trends, visitor breakdowns, and engagement snapshots.",
       stat: "100%",
-      statLabel: "scan-aware product feedback",
+      statLabel: "QR + Short URL analysis",
     },
     {
       id: "mobile",
       title: "Mobile app for real operations",
-      body: "Open the same account on mobile and web, monitor bulk jobs, scan QR codes, generate single QR assets, and recover passwords without friction.",
+      body: "Open the same account on mobile and web, monitor bulk jobs, scan QR codes, review Short URLs, generate single QR assets, and recover passwords without friction.",
       stat: "1 app",
       statLabel: "shared history across devices",
     },
     {
       id: "types",
-      title: "18+ QR workflows in one system",
-      body: "From contact cards and WiFi to public rating, feedback, PDF, and gallery experiences, teams can stay in one platform instead of combining tools.",
-      stat: "18+",
-      statLabel: "production QR types",
+      title: "QR codes and Short URLs in one system",
+      body: "From contact cards and WiFi to public rating, feedback, PDF, gallery experiences, and tracked Short URLs, teams can stay in one platform instead of combining tools.",
+      stat: "18+ + URLs",
+      statLabel: "production-ready flows",
     },
   ]
 
@@ -80,9 +81,10 @@ export default function HomePageClient() {
     analysis: {
       title: "Job reports that feel like operating metrics, not raw logs.",
       body:
-        "Teams can inspect generation success, failure counts, rating breakdowns, feedback summaries, per-job analysis, and QR-type performance from the same dashboard style.",
+        "Teams can inspect generation success, failure counts, rating breakdowns, feedback summaries, per-job analysis, Short URL visitor reports, and QR-type performance from the same dashboard style.",
       bullets: [
         "Per-job analysis under each created QR",
+        "Short URL trend, export, and visitor reporting",
         "QR type performance and scan tracking",
         "Rating and feedback reports with engagement summaries",
       ],
@@ -98,11 +100,12 @@ export default function HomePageClient() {
       ],
     },
     types: {
-      title: "A single generator that covers marketing, operations, and service flows.",
+      title: "A single workspace that covers QR, Short URL, marketing, operations, and service flows.",
       body:
-        "The same product supports direct QR payloads, trackable landing experiences, customer-response flows, and download-ready assets with one consistent styling layer.",
+        "The same product supports direct QR payloads, trackable landing experiences, customer-response flows, branded Short URLs, and download-ready assets with one consistent operating layer.",
       bullets: [
         "Structured forms by QR type",
+        "Short URL creation with analytics",
         "Logo, styling, expiry, and public-flow support",
         "Bulk CSV workflows with guided sample templates",
       ],
@@ -113,12 +116,12 @@ export default function HomePageClient() {
     {
       id: "shared-dashboard",
       label: "Shared dashboard and job list",
-      title: "Track the same QR history on phone and web.",
+      title: "Track the same QR and Short URL history on phone and web.",
       body:
-        "Teams can sign into the same account on mobile and desktop and see the same generated jobs, analytics panels, and monitoring states without manually syncing anything.",
+        "Teams can sign into the same account on mobile and desktop and see the same generated QR jobs, Short URL analytics panels, and monitoring states without manually syncing anything.",
       bullets: [
         "Same account history across web and mobile",
-        "Recent jobs and counts visible on both screens",
+        "Recent QR and Short URL counts visible on both screens",
         "Per-job analysis for generation and engagement",
       ],
     },
@@ -164,21 +167,22 @@ export default function HomePageClient() {
   const activeStatContent = homepageStats.find((stat) => stat.id === activeStatCard) || homepageStats[0]
   const activeMobileFeatureContent =
     mobileFeatureDetails.find((feature) => feature.id === activeMobileFeature) || mobileFeatureDetails[0]
+  const featuredBlogPost = blogPosts.find((post) => post.slug === activeBlogPost) || blogPosts[0]
 
   return (
     <main className="mx-auto flex max-w-[88rem] flex-col gap-20 px-4 py-14 md:px-6 md:py-16 xl:px-8">
       <section className="grid gap-10 xl:grid-cols-[1.02fr_0.98fr] xl:items-start">
         <div className="space-y-7 xl:pt-3">
           <p className="inline-flex rounded-full border border-sky-300/70 bg-white/85 px-4 py-2 text-xs font-semibold uppercase tracking-[0.24em] text-sky-900 shadow-sm">
-            Web + mobile QR operating system
+            Blog, guides, QR codes, and Short URLs
           </p>
           <h1 className="max-w-3xl text-[clamp(3.2rem,7vw,6.2rem)] font-black leading-[0.92] tracking-tight text-slate-950">
-            Build branded QR journeys, bulk delivery, and scan analysis in one polished product.
+            Learn the QR and Short URL workflows first, then launch them from the same product.
           </h1>
           <p className="max-w-[58rem] text-[1.05rem] leading-8 text-slate-600 md:text-lg">
-            QRBulkGen gives teams one place for single QR creation, bulk CSV operations, tracked public
-            scan experiences, mobile visibility, and dashboard reporting. No more one tool for design,
-            one for feedback, and another for monitoring.
+            QRBulkGen now leads with practical content for bulk QR generation, Short URL tracking,
+            marketing campaigns, events, packaging, rating flows, and feedback capture. Once visitors
+            understand the use case, they can move straight into the generator, dashboard, and mobile workflow.
           </p>
         </div>
 
@@ -221,6 +225,82 @@ export default function HomePageClient() {
             >
               Create Account
             </Link>
+          </div>
+        </div>
+      </section>
+
+      <section className="grid gap-6 xl:grid-cols-[0.92fr_1.08fr] xl:items-start">
+        <div className="rounded-[2rem] border border-slate-200 bg-slate-950 px-7 py-8 text-white shadow-[0_22px_60px_rgba(15,23,42,0.18)]">
+          <p className="text-sm font-semibold uppercase tracking-[0.22em] text-slate-300">Featured guide</p>
+          <h2 className="mt-4 max-w-[13ch] text-[2.4rem] font-black leading-[1.02] tracking-tight">
+            {featuredBlogPost.title}
+          </h2>
+          <div className="mt-4 flex flex-wrap gap-3 text-sm text-slate-300">
+            <span>{featuredBlogPost.category}</span>
+            <span>{featuredBlogPost.date}</span>
+            <span>{featuredBlogPost.readTime}</span>
+          </div>
+          <p className="mt-5 leading-8 text-slate-200">{featuredBlogPost.description}</p>
+          <div className="mt-6 rounded-[1.5rem] border border-white/10 bg-white/5 p-5">
+            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-300">
+              {featuredBlogPost.sections[0]?.heading || "Guide summary"}
+            </p>
+            <p className="mt-3 text-sm leading-7 text-slate-200">
+              {featuredBlogPost.sections[0]?.paragraphs?.[0] || "Read the guide to see the full workflow."}
+            </p>
+          </div>
+          <div className="mt-7 flex flex-wrap gap-3">
+            <Link
+              href={`/blog/${featuredBlogPost.slug}`}
+              className="rounded-full bg-white px-5 py-3 text-sm font-semibold text-slate-950 transition hover:bg-slate-200"
+            >
+              Read Featured Article
+            </Link>
+            {featuredBlogPost.relatedLandingHref ? (
+              <Link
+                href={featuredBlogPost.relatedLandingHref}
+                className="rounded-full border border-white/20 bg-transparent px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/10"
+              >
+                Open Related Page
+              </Link>
+            ) : null}
+          </div>
+        </div>
+
+        <div className="rounded-[2rem] border border-white/80 bg-white/85 p-7 shadow-sm backdrop-blur">
+          <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+            <div>
+              <p className="text-sm font-semibold uppercase tracking-[0.22em] text-slate-500">Blog topics</p>
+              <h2 className="mt-3 text-[2.2rem] font-black tracking-tight text-slate-950">
+                Home page content now follows your real QR and Short URL use cases.
+              </h2>
+            </div>
+            <Link href="/blog" className="text-sm font-semibold text-slate-950">
+              View all articles
+            </Link>
+          </div>
+          <div className="mt-6 grid gap-4 md:grid-cols-2">
+            {blogPosts.slice(0, 6).map((post) => (
+              <button
+                key={post.slug}
+                type="button"
+                onClick={() => setActiveBlogPost(post.slug)}
+                className={`rounded-[1.5rem] border px-5 py-5 text-left transition ${
+                  activeBlogPost === post.slug
+                    ? "border-slate-950 bg-slate-950 text-white shadow-[0_18px_45px_rgba(15,23,42,0.12)]"
+                    : "border-slate-200 bg-slate-50 text-slate-950 hover:-translate-y-1 hover:bg-white"
+                }`}
+              >
+                <div className={`flex flex-wrap gap-3 text-xs font-semibold uppercase tracking-[0.18em] ${activeBlogPost === post.slug ? "text-slate-300" : "text-slate-500"}`}>
+                  <span>{post.category}</span>
+                  <span>{post.readTime}</span>
+                </div>
+                <h3 className="mt-4 text-xl font-bold leading-tight">{post.title}</h3>
+                <p className={`mt-3 text-sm leading-7 ${activeBlogPost === post.slug ? "text-slate-200" : "text-slate-600"}`}>
+                  {post.description}
+                </p>
+              </button>
+            ))}
           </div>
         </div>
       </section>
@@ -298,6 +378,60 @@ export default function HomePageClient() {
               {page.title}
             </Link>
           ))}
+        </div>
+      </section>
+
+      <section className="grid gap-6 xl:grid-cols-[0.92fr_1.08fr] xl:items-start">
+        <div className="rounded-[2rem] border border-slate-200 bg-white/90 p-8 shadow-sm backdrop-blur">
+          <p className="text-sm font-semibold uppercase tracking-[0.22em] text-slate-500">Analysis reports</p>
+          <h2 className="mt-3 text-[2.5rem] font-black tracking-tight text-slate-950">
+            Reporting that explains performance, not just output volume.
+          </h2>
+          <p className="mt-5 leading-8 text-slate-600">
+            QRBulkGen analysis reports are built for teams that need to understand what happened after
+            generation. That includes scan counts, unique and repeated users, date-range trends, rating
+            response charts, feedback summaries, export-ready Excel files, and Short URL visitor reports
+            with location details.
+          </p>
+          <div className="mt-6 grid gap-3">
+            {[
+              "QR job analysis with overall history and latest-version reporting",
+              "Unique scans, repeated users, and trend filters like Overall, 7 days, 15 days, and Last month",
+              "Rating and feedback reports with response breakdowns and engagement context",
+              "Short URL analysis with visits, visitor trends, export filters, and location-aware downloads",
+            ].map((item) => (
+              <div
+                key={item}
+                className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm font-medium text-slate-700"
+              >
+                {item}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="rounded-[1.75rem] border border-white/80 bg-white/90 p-6 shadow-sm">
+            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">QR reports</p>
+            <h3 className="mt-3 text-2xl font-black tracking-tight text-slate-950">
+              Job-by-job analysis for single and bulk QR workflows.
+            </h3>
+            <p className="mt-4 text-sm leading-7 text-slate-600">
+              Teams can review output success, scan history, repeated-user behavior, rating charts,
+              feedback summaries, expiry state, and downloadable reports from one dashboard layout.
+            </p>
+          </div>
+          <div className="rounded-[1.75rem] border border-white/80 bg-white/90 p-6 shadow-sm">
+            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">Short URL reports</p>
+            <h3 className="mt-3 text-2xl font-black tracking-tight text-slate-950">
+              Visitor reporting with trend filters and location-rich exports.
+            </h3>
+            <p className="mt-4 text-sm leading-7 text-slate-600">
+              Short URL analysis includes total, unique, and repeated visits, date-range trend views,
+              downloadable Excel reports, and visitor location fields like city, region, country,
+              latitude, and longitude where available.
+            </p>
+          </div>
         </div>
       </section>
 
@@ -427,11 +561,11 @@ export default function HomePageClient() {
         <div className="max-w-3xl">
           <p className="text-sm font-semibold uppercase tracking-[0.22em] text-slate-500">Insights and launch content</p>
           <h2 className="mt-3 text-4xl font-black tracking-tight text-slate-950">
-            Product thinking, launch guidance, and QR strategy now live right on the homepage.
+            Articles that explain how to use QRBulkGen for real work, not just demos.
           </h2>
           <p className="mt-5 text-lg leading-8 text-slate-600">
-            Instead of hiding product education on a separate blog index, the strongest articles are now
-            surfaced where visitors first decide whether QRBulkGen fits their workflow.
+            These guides cover bulk production, single generation, Short URL tracking, packaging,
+            campaigns, events, ratings, and feedback so visitors can enter the product with the right context.
           </p>
         </div>
         <div className="grid gap-6 lg:grid-cols-3">

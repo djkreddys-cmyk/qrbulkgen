@@ -5,9 +5,9 @@ import StructuredData from "../components/StructuredData"
 import { pricingTiers, siteUrl } from "../lib/content"
 
 export const metadata = {
-  title: "QRBulkGen | Bulk and Single QR Code Generator for Teams",
+  title: "QRBulkGen | QR Code, Short URL, Blog, and Generator for Teams",
   description:
-    "Create single QR codes, run bulk CSV jobs, monitor worker status, and launch feedback-ready scan experiences from one platform.",
+    "Explore QR code and Short URL guides for bulk generation, campaigns, events, packaging, ratings, feedback, and analytics, then launch both workflows from one platform.",
   alternates: {
     canonical: siteUrl,
   },
