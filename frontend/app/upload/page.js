@@ -33,10 +33,12 @@ export function BulkGenerateContent({ embedded = false }) {
   const previewRef = useRef(null)
   const qrCodeRef = useRef(null)
   const csvInputRef = useRef(null)
+  const assetsZipInputRef = useRef(null)
   const size = 512
   const margin = 2
 
   const [file, setFile] = useState(null)
+  const [assetsZip, setAssetsZip] = useState(null)
   const [qrType, setQrType] = useState("URL")
   const [format, setFormat] = useState("png")
   const [errorCorrectionLevel, setErrorCorrectionLevel] = useState("M")
@@ -60,6 +62,7 @@ export function BulkGenerateContent({ embedded = false }) {
   const [analysisLoading, setAnalysisLoading] = useState(false)
   const [expiryOverride, setExpiryOverride] = useState("")
   const [trackingMode, setTrackingMode] = useState(getDefaultTrackingMode("URL"))
+  const requiresAssetsZip = qrType === "PDF" || qrType === "Image Gallery"
 
   function formatExpiryDateForInput(value) {
     const raw = String(value || "").trim()
@@ -76,6 +79,7 @@ export function BulkGenerateContent({ embedded = false }) {
     setPreviewContent(previewFromSampleType(qrType))
     if (!editingJobId) {
       setFile(null)
+      setAssetsZip(null)
       setTrackingMode(getDefaultTrackingMode(qrType))
       setUploadStatus("")
     }
@@ -83,6 +87,9 @@ export function BulkGenerateContent({ embedded = false }) {
     setSuccess("")
     if (csvInputRef.current) {
       csvInputRef.current.value = ""
+    }
+    if (assetsZipInputRef.current) {
+      assetsZipInputRef.current.value = ""
     }
   }, [qrType])
 
@@ -300,8 +307,12 @@ export function BulkGenerateContent({ embedded = false }) {
     setError("")
     setSuccess("")
 
-    if (!file) {
+    if (!file && !editingJobId) {
       setError("Please select a CSV file.")
+      return
+    }
+    if (requiresAssetsZip && !assetsZip && !editingJobId) {
+      setError("Please select the assets ZIP for this QR type.")
       return
     }
 
@@ -309,7 +320,12 @@ export function BulkGenerateContent({ embedded = false }) {
       setIsSubmitting(true)
       setUploadStatus(editingJobId ? "Uploading updated bulk settings..." : `Uploading ${file.name}...`)
       const formData = new FormData()
-      formData.append("file", file)
+      if (file) {
+        formData.append("file", file)
+      }
+      if (assetsZip) {
+        formData.append("assetsZip", assetsZip)
+      }
       formData.append("qrType", qrType)
       formData.append("size", String(size))
       formData.append("margin", String(margin))
@@ -332,8 +348,12 @@ export function BulkGenerateContent({ embedded = false }) {
       setSuccess(editingJobId ? `Bulk job updated: ${nextJobId}` : `Bulk QR generation started: ${nextJobId || "created"}`)
       setUploadStatus(editingJobId ? "Bulk job updated and generation restarted." : "CSV uploaded and bulk QR generation started.")
       setFile(null)
+      setAssetsZip(null)
       if (csvInputRef.current) {
         csvInputRef.current.value = ""
+      }
+      if (assetsZipInputRef.current) {
+        assetsZipInputRef.current.value = ""
       }
       fetchBulkJobs()
       if (editingJobId) {
@@ -348,7 +368,11 @@ export function BulkGenerateContent({ embedded = false }) {
       if (csvInputRef.current) {
         csvInputRef.current.value = ""
       }
+      if (assetsZipInputRef.current) {
+        assetsZipInputRef.current.value = ""
+      }
       setFile(null)
+      setAssetsZip(null)
     } finally {
       setIsSubmitting(false)
     }
@@ -358,6 +382,11 @@ export function BulkGenerateContent({ embedded = false }) {
     const nextFile = event.target.files?.[0] || null
     setFile(nextFile)
     setUploadStatus(nextFile ? `Selected CSV: ${nextFile.name}` : "")
+  }
+
+  function handleAssetsZipChange(event) {
+    const nextFile = event.target.files?.[0] || null
+    setAssetsZip(nextFile)
   }
 
   function downloadSampleCsv() {
@@ -435,6 +464,31 @@ export function BulkGenerateContent({ embedded = false }) {
               <p className="mt-2 text-xs text-gray-600">
                 CSV must include a <code>filename</code> column. Each row uses that value as the downloaded QR file name.
               </p>
+              {requiresAssetsZip && (
+                <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                  <label className="block mb-1 text-sm font-medium text-slate-900">Assets ZIP</label>
+                  <input
+                    ref={assetsZipInputRef}
+                    type="file"
+                    accept=".zip"
+                    onClick={(e) => {
+                      e.currentTarget.value = ""
+                    }}
+                    onChange={handleAssetsZipChange}
+                    className="w-full border p-2"
+                  />
+                  <p className="mt-2 text-xs text-slate-600">
+                    {qrType === "PDF"
+                      ? "Put source PDFs in a zip. Each CSV row can use fileKey or the url column file name to match a PDF inside the archive."
+                      : "Put gallery folders in a zip. Each CSV row can use galleryKey or the url column folder name to match a folder inside the archive."}
+                  </p>
+                  {editingJobId && (
+                    <p className="mt-2 text-xs text-slate-500">
+                      Leave this empty to reuse the ZIP already attached to this bulk job.
+                    </p>
+                  )}
+                </div>
+              )}
               <div className="mt-3 p-3 border rounded bg-gray-50">
                 <p className="text-xs font-semibold text-gray-800">Required CSV columns for {qrType}</p>
                 <div className="mt-2 flex flex-wrap gap-2">

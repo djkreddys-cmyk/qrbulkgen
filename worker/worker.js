@@ -2,6 +2,7 @@ const fs = require("fs");
 const fsp = require("fs/promises");
 const path = require("path");
 
+const AdmZip = require("adm-zip");
 const archiver = require("archiver");
 const { Worker } = require("bullmq");
 const IORedis = require("ioredis");
@@ -23,6 +24,16 @@ const uploadsRoot = process.env.BULK_STORAGE_DIR
   ? path.resolve(process.env.BULK_STORAGE_DIR)
   : path.join(path.resolve(__dirname, ".."), "backend", "uploads");
 const frontendBaseUrl = String(process.env.FRONTEND_URL || "http://localhost:3000").replace(/\/$/, "");
+const backendBaseUrl = String(process.env.BACKEND_URL || "http://localhost:4000").replace(/\/$/, "");
+const pdfUploadsRoot = path.join(uploadsRoot, "pdf");
+const galleryUploadsRoot = path.join(uploadsRoot, "gallery");
+const bulkAssetsRoot = path.join(uploadsRoot, "bulk", "assets");
+
+for (const dir of [uploadsRoot, pdfUploadsRoot, galleryUploadsRoot, bulkAssetsRoot]) {
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+}
 
 function getCell(row, name) {
   return String(row?.[String(name).toLowerCase()] || "").trim();
@@ -36,6 +47,55 @@ function sanitizeFileBaseName(value, fallback) {
     .replace(/[. ]+$/g, "")
     .trim();
   return (safe || fallback).slice(0, 120);
+}
+
+function isHttpUrl(value) {
+  return /^https?:\/\//i.test(String(value || "").trim());
+}
+
+function getBulkAssetsZipPath(jobId) {
+  return path.join(bulkAssetsRoot, jobId, "assets.zip");
+}
+
+function normalizeAssetKey(value, { stripExtension = false } = {}) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  const normalized = raw.replace(/\\/g, "/").replace(/\/+$/, "");
+  const baseName = path.posix.basename(normalized);
+  if (!stripExtension) return baseName;
+  const ext = path.posix.extname(baseName);
+  return ext ? baseName.slice(0, -ext.length) : baseName;
+}
+
+function buildStoredUploadFileName(originalName, fallbackBase) {
+  const ext = path.extname(originalName || "").toLowerCase();
+  const safeBase = sanitizeFileBaseName(
+    path.basename(originalName || fallbackBase, ext),
+    fallbackBase,
+  )
+    .replace(/\s+/g, "-")
+    .toLowerCase();
+  const uniquePart = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  return `${uniquePart}-${safeBase || fallbackBase}${ext}`;
+}
+
+function listImageFiles(directoryPath) {
+  if (!fs.existsSync(directoryPath)) return [];
+  return fs
+    .readdirSync(directoryPath, { withFileTypes: true })
+    .filter((entry) => entry.isFile() && /\.(jpg|jpeg|png|webp|gif)$/i.test(entry.name))
+    .map((entry) => path.join(directoryPath, entry.name));
+}
+
+function findExistingAssetPath(candidates, { expectDirectory = false } = {}) {
+  for (const candidate of candidates) {
+    if (!candidate || !fs.existsSync(candidate)) continue;
+    const stat = fs.statSync(candidate);
+    if ((expectDirectory && stat.isDirectory()) || (!expectDirectory && stat.isFile())) {
+      return candidate;
+    }
+  }
+  return "";
 }
 
 
@@ -117,6 +177,92 @@ function getExpiryForRow(row) {
     toExpiryIso(getCell(row, "expiresAt") || getCell(row, "expiry") || getCell(row, "expiryDate")) ||
     addMonths(new Date(), 6).toISOString()
   );
+}
+
+function buildBulkTargetPayload(qrType, row, content) {
+  const trackingMode = "tracked";
+  switch (qrType) {
+    case "URL":
+      return { qrType, trackingMode, fields: { url: content } };
+    case "Youtube":
+      return { qrType, trackingMode, fields: { youtubeUrl: content } };
+    case "App Store":
+      return { qrType, trackingMode, fields: { appStoreUrl: content } };
+    case "PDF":
+      return { qrType, trackingMode, fields: { pdfUrl: content } };
+    case "Image Gallery":
+      return { qrType, trackingMode, fields: { galleryUrl: content } };
+    case "Email":
+      return {
+        qrType,
+        trackingMode,
+        fields: {
+          email: getCell(row, "email"),
+          subject: getCell(row, "subject"),
+          body: getCell(row, "body"),
+        },
+      };
+    case "Phone":
+      return { qrType, trackingMode, fields: { phone: getCell(row, "phone") } };
+    case "SMS":
+      return {
+        qrType,
+        trackingMode,
+        fields: {
+          phone: getCell(row, "phone"),
+          message: getCell(row, "message"),
+        },
+      };
+    case "WhatsApp":
+      return {
+        qrType,
+        trackingMode,
+        fields: {
+          phone: getCell(row, "phone"),
+          message: getCell(row, "message"),
+        },
+      };
+    case "Location":
+      return {
+        qrType,
+        trackingMode,
+        fields: {
+          latitude: getCell(row, "latitude"),
+          longitude: getCell(row, "longitude"),
+          mapsUrl: getCell(row, "mapsurl") || content,
+        },
+      };
+    case "Event":
+      return {
+        qrType,
+        trackingMode,
+        fields: {
+          eventTitle: getCell(row, "title"),
+          eventStart: getCell(row, "start"),
+          eventEnd: getCell(row, "end"),
+          eventLocation: getCell(row, "location"),
+          eventDescription: getCell(row, "description"),
+        },
+      };
+    case "Social Media": {
+      const socialLinks = String(content || "")
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter(Boolean)
+        .map((line) => {
+          const [platformPart, ...rest] = line.split(":");
+          const url = rest.join(":").trim();
+          return {
+            platform: String(platformPart || "").trim(),
+            url,
+          };
+        })
+        .filter((item) => item.url);
+      return { qrType, trackingMode, socialLinks };
+    }
+    default:
+      return { qrType, trackingMode, fields: {} };
+  }
 }
 
 function buildBulkContent(qrType, row) {
@@ -213,7 +359,171 @@ function buildBulkContent(qrType, row) {
   }
 }
 
-async function createManagedBulkLink(job, content, row) {
+function getPdfAssetKey(row) {
+  const explicitKey = getCell(row, "filekey");
+  if (explicitKey) return normalizeAssetKey(explicitKey);
+  const urlValue = getCell(row, "url");
+  return isHttpUrl(urlValue) ? "" : normalizeAssetKey(urlValue);
+}
+
+function getGalleryAssetKey(row) {
+  const explicitKey = getCell(row, "gallerykey");
+  if (explicitKey) return normalizeAssetKey(explicitKey, { stripExtension: true });
+  const urlValue = getCell(row, "url");
+  return isHttpUrl(urlValue) ? "" : normalizeAssetKey(urlValue, { stripExtension: true });
+}
+
+async function prepareBulkAssets(jobId) {
+  const zipPath = getBulkAssetsZipPath(jobId);
+  if (!fs.existsSync(zipPath)) {
+    return null;
+  }
+
+  const extractRoot = path.join(bulkAssetsRoot, jobId, "extracted");
+  await fsp.rm(extractRoot, { recursive: true, force: true });
+  await fsp.mkdir(extractRoot, { recursive: true });
+
+  const archive = new AdmZip(zipPath);
+  archive.extractAllTo(extractRoot, true);
+
+  return { extractRoot };
+}
+
+function resolvePdfAssetPath(assetContext, row) {
+  if (!assetContext) return "";
+  const assetKey = getPdfAssetKey(row);
+  if (!assetKey) return "";
+  const candidates = [
+    path.join(assetContext.extractRoot, "pdfs", assetKey),
+    path.join(assetContext.extractRoot, assetKey),
+  ];
+  if (!path.extname(assetKey)) {
+    candidates.push(path.join(assetContext.extractRoot, "pdfs", `${assetKey}.pdf`));
+    candidates.push(path.join(assetContext.extractRoot, `${assetKey}.pdf`));
+  }
+  return findExistingAssetPath(candidates);
+}
+
+function resolveGalleryAssetPath(assetContext, row) {
+  if (!assetContext) return "";
+  const assetKey = getGalleryAssetKey(row);
+  if (!assetKey) return "";
+  const candidates = [
+    path.join(assetContext.extractRoot, "galleries", assetKey),
+    path.join(assetContext.extractRoot, assetKey),
+  ];
+  return findExistingAssetPath(candidates, { expectDirectory: true });
+}
+
+async function createBulkPdfPublicLink(job, row, pdfPath) {
+  const originalName = path.basename(pdfPath);
+  if (path.extname(originalName).toLowerCase() !== ".pdf") {
+    throw new Error(`Bulk PDF asset must be a .pdf file: ${originalName}`);
+  }
+
+  const storedName = buildStoredUploadFileName(originalName, "bulk-pdf");
+  const destination = path.join(pdfUploadsRoot, storedName);
+  await fsp.copyFile(pdfPath, destination);
+
+  const payload = {
+    url: `${backendBaseUrl}/uploads/pdf/${storedName}`,
+    fileName: originalName,
+  };
+  const title =
+    getCell(row, "title") ||
+    path.basename(originalName, path.extname(originalName)) ||
+    "PDF Document";
+  const result = await db.query(
+    `INSERT INTO public_links (user_id, link_type, title, payload)
+     VALUES ($1, 'pdf', $2, $3::jsonb)
+     RETURNING id`,
+    [job.user_id, String(title).slice(0, 255), JSON.stringify(payload)],
+  );
+  return `${frontendBaseUrl}/pdf/${result.rows[0].id}`;
+}
+
+async function createBulkGalleryPublicLink(job, row, galleryDir) {
+  const imagePaths = listImageFiles(galleryDir);
+  if (imagePaths.length === 0) {
+    throw new Error(`Image Gallery asset folder is empty: ${path.basename(galleryDir)}`);
+  }
+  if (imagePaths.length > 10) {
+    throw new Error(`Image Gallery asset folder exceeds 10 images: ${path.basename(galleryDir)}`);
+  }
+
+  const images = [];
+  for (const imagePath of imagePaths) {
+    const originalName = path.basename(imagePath);
+    const storedName = buildStoredUploadFileName(originalName, "bulk-gallery");
+    const destination = path.join(galleryUploadsRoot, storedName);
+    await fsp.copyFile(imagePath, destination);
+    images.push({
+      url: `${backendBaseUrl}/uploads/gallery/${storedName}`,
+      fileName: originalName,
+    });
+  }
+
+  const title = getCell(row, "title") || path.basename(galleryDir) || "Image Gallery";
+  const result = await db.query(
+    `INSERT INTO public_links (user_id, link_type, title, payload)
+     VALUES ($1, 'gallery', $2, $3::jsonb)
+     RETURNING id`,
+    [job.user_id, String(title).slice(0, 255), JSON.stringify({ images })],
+  );
+  return `${frontendBaseUrl}/gallery/${result.rows[0].id}`;
+}
+
+async function buildBulkRow(job, row, assetContext) {
+  const qrType = String(job.bulk_qr_type || "URL").trim();
+
+  if (qrType === "PDF") {
+    const directUrl = getCell(row, "url");
+    if (isHttpUrl(directUrl)) {
+      return {
+        content: directUrl,
+        targetPayload: buildBulkTargetPayload(qrType, row, directUrl),
+      };
+    }
+
+    const pdfPath = resolvePdfAssetPath(assetContext, row);
+    if (!pdfPath) {
+      throw new Error(`Bulk PDF asset not found for row key: ${getPdfAssetKey(row) || "missing"}`);
+    }
+    const content = await createBulkPdfPublicLink(job, row, pdfPath);
+    return {
+      content,
+      targetPayload: buildBulkTargetPayload(qrType, row, content),
+    };
+  }
+
+  if (qrType === "Image Gallery") {
+    const directUrl = getCell(row, "url");
+    if (isHttpUrl(directUrl)) {
+      return {
+        content: directUrl,
+        targetPayload: buildBulkTargetPayload(qrType, row, directUrl),
+      };
+    }
+
+    const galleryDir = resolveGalleryAssetPath(assetContext, row);
+    if (!galleryDir) {
+      throw new Error(`Bulk Image Gallery asset folder not found for row key: ${getGalleryAssetKey(row) || "missing"}`);
+    }
+    const content = await createBulkGalleryPublicLink(job, row, galleryDir);
+    return {
+      content,
+      targetPayload: buildBulkTargetPayload(qrType, row, content),
+    };
+  }
+
+  const content = buildBulkContent(qrType, row);
+  return {
+    content,
+    targetPayload: buildBulkTargetPayload(qrType, row, content),
+  };
+}
+
+async function createManagedBulkLink(job, content, row, targetPayload) {
   const title =
     getCell(row, "title") ||
     getCell(row, "filename") ||
@@ -229,7 +539,12 @@ async function createManagedBulkLink(job, content, row) {
       job.bulk_qr_type || "URL",
       String(title || "").trim().slice(0, 255) || null,
       content,
-      JSON.stringify({ qrType: job.bulk_qr_type || "URL", trackingMode: String(job.tracking_mode || "tracked").toLowerCase() }),
+      JSON.stringify(
+        targetPayload || {
+          qrType: job.bulk_qr_type || "URL",
+          trackingMode: String(job.tracking_mode || "tracked").toLowerCase(),
+        },
+      ),
       expiresAt,
     ],
   );
@@ -334,6 +649,7 @@ async function processBulkJob(jobId, queuedRows = null) {
   if (!rows || rows.length === 0) {
     throw new Error("Queued bulk rows missing from worker payload");
   }
+  const assetContext = await prepareBulkAssets(jobId);
   const outputDir = path.join(uploadsRoot, "bulk", "jobs", jobId, "files");
   await fsp.mkdir(outputDir, { recursive: true });
 
@@ -341,7 +657,22 @@ async function processBulkJob(jobId, queuedRows = null) {
   let failureCount = 0;
 
   for (let i = 0; i < rows.length; i += 1) {
-    const content = buildBulkContent(job.bulk_qr_type || "URL", rows[i]);
+    let content = "";
+    let targetPayload = null;
+    try {
+      const builtRow = await buildBulkRow(job, rows[i], assetContext);
+      content = builtRow.content;
+      targetPayload = builtRow.targetPayload;
+    } catch (error) {
+      failureCount += 1;
+      await db.query(
+        `INSERT INTO qr_job_items (job_id, row_index, content, tracking_mode, status, error_message)
+         VALUES ($1, $2, $3, $4, 'failed', $5)`,
+        [jobId, i, "", String(job.tracking_mode || "tracked").toLowerCase(), error.message || "Unable to build QR content from CSV row"],
+      );
+      await updateJobProgress(jobId, successCount, failureCount);
+      continue;
+    }
     if (!content) {
       failureCount += 1;
       await db.query(
@@ -383,12 +714,14 @@ async function processBulkJob(jobId, queuedRows = null) {
       let qrEncodedContent = content;
       const trackingMode = String(job.tracking_mode || "tracked").toLowerCase() === "tracked" ? "tracked" : "direct";
       if (trackingMode === "tracked") {
-        managedLink = await createManagedBulkLink(job, content, rows[i]);
+        managedLink = await createManagedBulkLink(job, content, rows[i], targetPayload);
         const trackedContent = appendManagedLinkIdToUrl(content, managedLink.id);
         if (trackedContent !== content) {
-          await db.query(`UPDATE managed_qr_links SET content = $2, updated_at = NOW() WHERE id = $1`, [
+          const nextPayload = buildBulkTargetPayload(String(job.bulk_qr_type || "").trim(), rows[i], trackedContent);
+          await db.query(`UPDATE managed_qr_links SET content = $2, target_payload = $3::jsonb, updated_at = NOW() WHERE id = $1`, [
             managedLink.id,
             trackedContent,
+            JSON.stringify(nextPayload),
           ]);
           managedLink.content = trackedContent;
         }
@@ -435,12 +768,19 @@ async function processBulkJob(jobId, queuedRows = null) {
         ],
       );
       await updateJobProgress(jobId, successCount, failureCount);
-    } catch {
+    } catch (error) {
       failureCount += 1;
       await db.query(
         `INSERT INTO qr_job_items (job_id, row_index, content, tracking_mode, status, output_file_name, error_message)
          VALUES ($1, $2, $3, $4, 'failed', $5, $6)`,
-        [jobId, i, content, String(job.tracking_mode || "tracked").toLowerCase(), fileName, "QR generation failed for row"],
+        [
+          jobId,
+          i,
+          content,
+          String(job.tracking_mode || "tracked").toLowerCase(),
+          fileName,
+          String(error?.message || "QR generation failed for row").slice(0, 2000),
+        ],
       );
       await updateJobProgress(jobId, successCount, failureCount);
     }

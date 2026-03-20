@@ -264,7 +264,8 @@ export const BULK_SAMPLE_ROWS_BY_TYPE = {
     expiresAt: "",
   },
   PDF: {
-    url: "https://www.qrbulkgen.com/pdf/your-public-id",
+    fileKey: "brochure-01.pdf",
+    url: "",
     filename: "qr-pdf-1",
     expiresAt: "30-04-2026",
   },
@@ -279,7 +280,8 @@ export const BULK_SAMPLE_ROWS_BY_TYPE = {
     expiresAt: "",
   },
   "Image Gallery": {
-    url: "https://www.qrbulkgen.com/gallery/your-public-id",
+    galleryKey: "gallery-a",
+    url: "",
     filename: "qr-gallery-1",
     expiresAt: "30-04-2026",
   },
@@ -320,10 +322,10 @@ export const BULK_REQUIRED_COLUMNS_BY_TYPE = {
   Youtube: ["url", "filename"],
   WIFI: ["ssid", "password", "wifiType", "hidden", "filename"],
   Event: ["title", "start", "end", "location", "description", "filename"],
-  PDF: ["url", "filename"],
+  PDF: ["filename"],
   "Social Media": ["content", "filename"],
   "App Store": ["url", "filename"],
-  "Image Gallery": ["url", "filename"],
+  "Image Gallery": ["filename"],
   Rating: ["title", "style", "scale", "filename"],
   Feedback: ["title", "questions", "filename"],
 };

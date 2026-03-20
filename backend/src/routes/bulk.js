@@ -1,4 +1,5 @@
 const fs = require("fs");
+const fsp = require("fs/promises");
 const path = require("path");
 const express = require("express");
 const multer = require("multer");
@@ -65,24 +66,25 @@ const REQUIRED_HEADERS_BY_TYPE = {
   Youtube: ["url", "filename"],
   WIFI: ["ssid", "filename"],
   Event: ["title", "filename"],
-  PDF: ["url", "filename"],
+  PDF: ["filename"],
   "Social Media": ["content", "filename"],
   "App Store": ["url", "filename"],
-  "Image Gallery": ["url", "filename"],
+  "Image Gallery": ["filename"],
   Rating: ["title", "filename"],
   Feedback: ["title", "questions", "filename"],
 };
 
 const uploadsRoot = path.join(process.cwd(), "uploads");
 const bulkSourceRoot = path.join(uploadsRoot, "bulk", "source");
+const bulkAssetsRoot = path.join(uploadsRoot, "bulk", "assets");
 
-for (const dir of [uploadsRoot, bulkSourceRoot]) {
+for (const dir of [uploadsRoot, bulkSourceRoot, bulkAssetsRoot]) {
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
   }
 }
 
-const upload = multer({
+const bulkUpload = multer({
   storage: multer.diskStorage({
     destination: (_req, _file, cb) => cb(null, bulkSourceRoot),
     filename: (_req, file, cb) => {
@@ -95,10 +97,37 @@ const upload = multer({
     },
   }),
   limits: {
-    fileSize: 10 * 1024 * 1024,
-    files: 1,
+    fileSize: 100 * 1024 * 1024,
+    files: 2,
   },
 });
+
+function getUploadedFile(req, fieldName) {
+  const files = req.files?.[fieldName];
+  return Array.isArray(files) ? files[0] || null : null;
+}
+
+function requiresBulkAssetsZip(qrType) {
+  const type = String(qrType || "").trim();
+  return type === "PDF" || type === "Image Gallery";
+}
+
+function getBulkAssetsZipPath(jobId) {
+  return path.join(bulkAssetsRoot, jobId, "assets.zip");
+}
+
+async function persistBulkAssetsZip(jobId, uploadedFile) {
+  if (!uploadedFile) return null;
+  const destination = getBulkAssetsZipPath(jobId);
+  await fsp.mkdir(path.dirname(destination), { recursive: true });
+  await fsp.copyFile(uploadedFile.path, destination);
+  await fsp.unlink(uploadedFile.path).catch(() => {});
+  return destination;
+}
+
+function hasBulkAssetsZip(jobId) {
+  return fs.existsSync(getBulkAssetsZipPath(jobId));
+}
 
 function parseNumber(value, fallback) {
   const n = Number(value);
@@ -363,9 +392,17 @@ async function parseCsvRows(csvPath) {
   });
 }
 
-bulkRouter.post("/bulk/upload", requireAuth, upload.single("file"), async (req, res, next) => {
+bulkRouter.post(
+  "/bulk/upload",
+  requireAuth,
+  bulkUpload.fields([
+    { name: "file", maxCount: 1 },
+    { name: "assetsZip", maxCount: 1 },
+  ]),
+  async (req, res, next) => {
   try {
-    const file = req.file;
+    const file = getUploadedFile(req, "file");
+    const assetsZip = getUploadedFile(req, "assetsZip");
     if (!file) {
       throw createHttpError(400, "VALIDATION_ERROR", "CSV file is required");
     }
@@ -375,6 +412,14 @@ bulkRouter.post("/bulk/upload", requireAuth, upload.single("file"), async (req, 
     }
 
     const options = normalizeBulkOptions(req.body || {});
+    if (requiresBulkAssetsZip(options.qrType)) {
+      if (!assetsZip) {
+        throw createHttpError(400, "VALIDATION_ERROR", "Assets ZIP is required for bulk PDF and Image Gallery jobs");
+      }
+      if (path.extname(assetsZip.originalname || "").toLowerCase() !== ".zip") {
+        throw createHttpError(400, "VALIDATION_ERROR", "Assets file must be a .zip archive");
+      }
+    }
     const csvInfo = await inspectCsv(file.path);
     const csvRows = await parseCsvRows(file.path);
 
@@ -426,6 +471,7 @@ bulkRouter.post("/bulk/upload", requireAuth, upload.single("file"), async (req, 
     );
 
     const job = created.rows[0];
+    await persistBulkAssetsZip(job.id, assetsZip);
 
     try {
       await enqueueBulkQrJob(job.id, { rows: csvRows });
@@ -466,7 +512,14 @@ bulkRouter.post("/bulk/upload", requireAuth, upload.single("file"), async (req, 
   }
 });
 
-bulkRouter.put("/jobs/:id/bulk", requireAuth, upload.single("file"), async (req, res, next) => {
+bulkRouter.put(
+  "/jobs/:id/bulk",
+  requireAuth,
+  bulkUpload.fields([
+    { name: "file", maxCount: 1 },
+    { name: "assetsZip", maxCount: 1 },
+  ]),
+  async (req, res, next) => {
   try {
     const jobId = String(req.params.id || "").trim();
     if (!jobId) {
@@ -493,10 +546,18 @@ bulkRouter.put("/jobs/:id/bulk", requireAuth, upload.single("file"), async (req,
       qrType: existing.bulk_qr_type,
       trackingMode: req.body?.trackingMode || existing.tracking_mode,
     });
-    const file = req.file;
+    const file = getUploadedFile(req, "file");
+    const assetsZip = getUploadedFile(req, "assetsZip");
     const csvAbsolutePath = file
       ? file.path
       : path.join(uploadsRoot, String(existing.source_file_path || "").replace(/\//g, path.sep));
+
+    if (assetsZip && path.extname(assetsZip.originalname || "").toLowerCase() !== ".zip") {
+      throw createHttpError(400, "VALIDATION_ERROR", "Assets file must be a .zip archive");
+    }
+    if (requiresBulkAssetsZip(options.qrType) && !assetsZip && !hasBulkAssetsZip(jobId)) {
+      throw createHttpError(400, "VALIDATION_ERROR", "Assets ZIP is required for bulk PDF and Image Gallery jobs");
+    }
 
     if (!fs.existsSync(csvAbsolutePath)) {
       throw createHttpError(400, "VALIDATION_ERROR", "Bulk source CSV is no longer available for this job");
@@ -571,6 +632,7 @@ bulkRouter.put("/jobs/:id/bulk", requireAuth, upload.single("file"), async (req,
     );
 
     const job = updated.rows[0];
+    await persistBulkAssetsZip(job.id, assetsZip);
 
     try {
       await enqueueBulkQrJob(job.id, { rows: csvRows });
