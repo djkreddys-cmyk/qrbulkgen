@@ -2,7 +2,6 @@ const fs = require("fs");
 const fsp = require("fs/promises");
 const path = require("path");
 
-const AdmZip = require("adm-zip");
 const archiver = require("archiver");
 const { Worker } = require("bullmq");
 const IORedis = require("ioredis");
@@ -27,9 +26,8 @@ const frontendBaseUrl = String(process.env.FRONTEND_URL || "http://localhost:300
 const backendBaseUrl = String(process.env.BACKEND_URL || "http://localhost:4000").replace(/\/$/, "");
 const pdfUploadsRoot = path.join(uploadsRoot, "pdf");
 const galleryUploadsRoot = path.join(uploadsRoot, "gallery");
-const bulkAssetsRoot = path.join(uploadsRoot, "bulk", "assets");
 
-for (const dir of [uploadsRoot, pdfUploadsRoot, galleryUploadsRoot, bulkAssetsRoot]) {
+for (const dir of [uploadsRoot, pdfUploadsRoot, galleryUploadsRoot]) {
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
   }
@@ -53,26 +51,48 @@ function isHttpUrl(value) {
   return /^https?:\/\//i.test(String(value || "").trim());
 }
 
-function getBulkAssetsZipPath(jobId) {
-  return path.join(bulkAssetsRoot, jobId, "assets.zip");
+function looksLikeWindowsDrivePath(value) {
+  return /^[a-zA-Z]:[\\/]/.test(String(value || "").trim());
 }
 
-function normalizeAssetKey(value, { stripExtension = false } = {}) {
+function looksLikeUncPath(value) {
+  return /^\\\\[^\\]+\\[^\\]+/.test(String(value || "").trim());
+}
+
+function isFileUrl(value) {
+  return /^file:\/\//i.test(String(value || "").trim());
+}
+
+function looksLikeLocalAssetPath(value) {
+  const raw = String(value || "").trim();
+  return looksLikeWindowsDrivePath(raw) || looksLikeUncPath(raw) || isFileUrl(raw);
+}
+
+function normalizeLocalAssetPath(value) {
   const raw = String(value || "").trim();
   if (!raw) return "";
-  const normalized = raw.replace(/\\/g, "/").replace(/\/+$/, "");
-  const baseName = path.posix.basename(normalized);
-  if (!stripExtension) return baseName;
-  const ext = path.posix.extname(baseName);
-  return ext ? baseName.slice(0, -ext.length) : baseName;
+  if (looksLikeWindowsDrivePath(raw) || looksLikeUncPath(raw)) {
+    return raw;
+  }
+  if (isFileUrl(raw)) {
+    try {
+      const parsed = new URL(raw);
+      const pathname = decodeURIComponent(parsed.pathname || "");
+      if (process.platform === "win32") {
+        const withoutLeadingSlash = pathname.replace(/^\/+/, "");
+        return withoutLeadingSlash.replace(/\//g, "\\");
+      }
+      return pathname || raw;
+    } catch {
+      return raw;
+    }
+  }
+  return raw;
 }
 
 function buildStoredUploadFileName(originalName, fallbackBase) {
   const ext = path.extname(originalName || "").toLowerCase();
-  const safeBase = sanitizeFileBaseName(
-    path.basename(originalName || fallbackBase, ext),
-    fallbackBase,
-  )
+  const safeBase = sanitizeFileBaseName(path.basename(originalName || fallbackBase, ext), fallbackBase)
     .replace(/\s+/g, "-")
     .toLowerCase();
   const uniquePart = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -86,18 +106,6 @@ function listImageFiles(directoryPath) {
     .filter((entry) => entry.isFile() && /\.(jpg|jpeg|png|webp|gif)$/i.test(entry.name))
     .map((entry) => path.join(directoryPath, entry.name));
 }
-
-function findExistingAssetPath(candidates, { expectDirectory = false } = {}) {
-  for (const candidate of candidates) {
-    if (!candidate || !fs.existsSync(candidate)) continue;
-    const stat = fs.statSync(candidate);
-    if ((expectDirectory && stat.isDirectory()) || (!expectDirectory && stat.isFile())) {
-      return candidate;
-    }
-  }
-  return "";
-}
-
 
 function toUtcDateTime(value) {
   if (!value) return "";
@@ -177,6 +185,64 @@ function getExpiryForRow(row) {
     toExpiryIso(getCell(row, "expiresAt") || getCell(row, "expiry") || getCell(row, "expiryDate")) ||
     addMonths(new Date(), 6).toISOString()
   );
+}
+
+async function createBulkPdfPublicLink(job, row, pdfPath) {
+  const originalName = path.basename(pdfPath);
+  if (path.extname(originalName).toLowerCase() !== ".pdf") {
+    throw new Error(`Bulk PDF source must be a .pdf file: ${originalName}`);
+  }
+
+  const storedName = buildStoredUploadFileName(originalName, "bulk-pdf");
+  const destination = path.join(pdfUploadsRoot, storedName);
+  await fsp.copyFile(pdfPath, destination);
+
+  const payload = {
+    url: `${backendBaseUrl}/uploads/pdf/${storedName}`,
+    fileName: originalName,
+  };
+  const title =
+    getCell(row, "title") ||
+    path.basename(originalName, path.extname(originalName)) ||
+    "PDF Document";
+  const result = await db.query(
+    `INSERT INTO public_links (user_id, link_type, title, payload)
+     VALUES ($1, 'pdf', $2, $3::jsonb)
+     RETURNING id`,
+    [job.user_id, String(title).slice(0, 255), JSON.stringify(payload)],
+  );
+  return `${frontendBaseUrl}/pdf/${result.rows[0].id}`;
+}
+
+async function createBulkGalleryPublicLink(job, row, directoryPath) {
+  const imagePaths = listImageFiles(directoryPath);
+  if (imagePaths.length === 0) {
+    throw new Error(`Image Gallery folder has no supported images: ${directoryPath}`);
+  }
+  if (imagePaths.length > 10) {
+    throw new Error(`Image Gallery folder exceeds 10 images: ${directoryPath}`);
+  }
+
+  const images = [];
+  for (const imagePath of imagePaths) {
+    const originalName = path.basename(imagePath);
+    const storedName = buildStoredUploadFileName(originalName, "bulk-gallery");
+    const destination = path.join(galleryUploadsRoot, storedName);
+    await fsp.copyFile(imagePath, destination);
+    images.push({
+      url: `${backendBaseUrl}/uploads/gallery/${storedName}`,
+      fileName: originalName,
+    });
+  }
+
+  const title = getCell(row, "title") || path.basename(directoryPath) || "Image Gallery";
+  const result = await db.query(
+    `INSERT INTO public_links (user_id, link_type, title, payload)
+     VALUES ($1, 'gallery', $2, $3::jsonb)
+     RETURNING id`,
+    [job.user_id, String(title).slice(0, 255), JSON.stringify({ images })],
+  );
+  return `${frontendBaseUrl}/gallery/${result.rows[0].id}`;
 }
 
 function buildBulkTargetPayload(qrType, row, content) {
@@ -359,164 +425,54 @@ function buildBulkContent(qrType, row) {
   }
 }
 
-function getPdfAssetKey(row) {
-  const explicitKey = getCell(row, "filekey");
-  if (explicitKey) return normalizeAssetKey(explicitKey);
-  const urlValue = getCell(row, "url");
-  return isHttpUrl(urlValue) ? "" : normalizeAssetKey(urlValue);
-}
-
-function getGalleryAssetKey(row) {
-  const explicitKey = getCell(row, "gallerykey");
-  if (explicitKey) return normalizeAssetKey(explicitKey, { stripExtension: true });
-  const urlValue = getCell(row, "url");
-  return isHttpUrl(urlValue) ? "" : normalizeAssetKey(urlValue, { stripExtension: true });
-}
-
-async function prepareBulkAssets(jobId) {
-  const zipPath = getBulkAssetsZipPath(jobId);
-  if (!fs.existsSync(zipPath)) {
-    return null;
-  }
-
-  const extractRoot = path.join(bulkAssetsRoot, jobId, "extracted");
-  await fsp.rm(extractRoot, { recursive: true, force: true });
-  await fsp.mkdir(extractRoot, { recursive: true });
-
-  const archive = new AdmZip(zipPath);
-  archive.extractAllTo(extractRoot, true);
-
-  return { extractRoot };
-}
-
-function resolvePdfAssetPath(assetContext, row) {
-  if (!assetContext) return "";
-  const assetKey = getPdfAssetKey(row);
-  if (!assetKey) return "";
-  const candidates = [
-    path.join(assetContext.extractRoot, "pdfs", assetKey),
-    path.join(assetContext.extractRoot, assetKey),
-  ];
-  if (!path.extname(assetKey)) {
-    candidates.push(path.join(assetContext.extractRoot, "pdfs", `${assetKey}.pdf`));
-    candidates.push(path.join(assetContext.extractRoot, `${assetKey}.pdf`));
-  }
-  return findExistingAssetPath(candidates);
-}
-
-function resolveGalleryAssetPath(assetContext, row) {
-  if (!assetContext) return "";
-  const assetKey = getGalleryAssetKey(row);
-  if (!assetKey) return "";
-  const candidates = [
-    path.join(assetContext.extractRoot, "galleries", assetKey),
-    path.join(assetContext.extractRoot, assetKey),
-  ];
-  return findExistingAssetPath(candidates, { expectDirectory: true });
-}
-
-async function createBulkPdfPublicLink(job, row, pdfPath) {
-  const originalName = path.basename(pdfPath);
-  if (path.extname(originalName).toLowerCase() !== ".pdf") {
-    throw new Error(`Bulk PDF asset must be a .pdf file: ${originalName}`);
-  }
-
-  const storedName = buildStoredUploadFileName(originalName, "bulk-pdf");
-  const destination = path.join(pdfUploadsRoot, storedName);
-  await fsp.copyFile(pdfPath, destination);
-
-  const payload = {
-    url: `${backendBaseUrl}/uploads/pdf/${storedName}`,
-    fileName: originalName,
-  };
-  const title =
-    getCell(row, "title") ||
-    path.basename(originalName, path.extname(originalName)) ||
-    "PDF Document";
-  const result = await db.query(
-    `INSERT INTO public_links (user_id, link_type, title, payload)
-     VALUES ($1, 'pdf', $2, $3::jsonb)
-     RETURNING id`,
-    [job.user_id, String(title).slice(0, 255), JSON.stringify(payload)],
-  );
-  return `${frontendBaseUrl}/pdf/${result.rows[0].id}`;
-}
-
-async function createBulkGalleryPublicLink(job, row, galleryDir) {
-  const imagePaths = listImageFiles(galleryDir);
-  if (imagePaths.length === 0) {
-    throw new Error(`Image Gallery asset folder is empty: ${path.basename(galleryDir)}`);
-  }
-  if (imagePaths.length > 10) {
-    throw new Error(`Image Gallery asset folder exceeds 10 images: ${path.basename(galleryDir)}`);
-  }
-
-  const images = [];
-  for (const imagePath of imagePaths) {
-    const originalName = path.basename(imagePath);
-    const storedName = buildStoredUploadFileName(originalName, "bulk-gallery");
-    const destination = path.join(galleryUploadsRoot, storedName);
-    await fsp.copyFile(imagePath, destination);
-    images.push({
-      url: `${backendBaseUrl}/uploads/gallery/${storedName}`,
-      fileName: originalName,
-    });
-  }
-
-  const title = getCell(row, "title") || path.basename(galleryDir) || "Image Gallery";
-  const result = await db.query(
-    `INSERT INTO public_links (user_id, link_type, title, payload)
-     VALUES ($1, 'gallery', $2, $3::jsonb)
-     RETURNING id`,
-    [job.user_id, String(title).slice(0, 255), JSON.stringify({ images })],
-  );
-  return `${frontendBaseUrl}/gallery/${result.rows[0].id}`;
-}
-
-async function buildBulkRow(job, row, assetContext) {
+async function buildBulkRow(job, row) {
   const qrType = String(job.bulk_qr_type || "URL").trim();
 
+  if (qrType !== "PDF" && qrType !== "Image Gallery") {
+    const content = buildBulkContent(qrType, row);
+    return {
+      content,
+      targetPayload: buildBulkTargetPayload(qrType, row, content),
+    };
+  }
+
+  const source = getCell(row, "url");
+  if (!source) {
+    throw new Error(`${qrType} bulk rows require a url value`);
+  }
+
+  if (isHttpUrl(source)) {
+    return {
+      content: source,
+      targetPayload: buildBulkTargetPayload(qrType, row, source),
+    };
+  }
+
+  if (!looksLikeLocalAssetPath(source)) {
+    throw new Error(`${qrType} source must be a public URL or a local file path`);
+  }
+
+  const localPath = normalizeLocalAssetPath(source);
+  if (!fs.existsSync(localPath)) {
+    throw new Error(`Local ${qrType} source is not accessible from this worker: ${localPath}`);
+  }
+
+  const stat = await fsp.stat(localPath);
   if (qrType === "PDF") {
-    const directUrl = getCell(row, "url");
-    if (isHttpUrl(directUrl)) {
-      return {
-        content: directUrl,
-        targetPayload: buildBulkTargetPayload(qrType, row, directUrl),
-      };
+    if (!stat.isFile()) {
+      throw new Error(`PDF source must be a file: ${localPath}`);
     }
-
-    const pdfPath = resolvePdfAssetPath(assetContext, row);
-    if (!pdfPath) {
-      throw new Error(`Bulk PDF asset not found for row key: ${getPdfAssetKey(row) || "missing"}`);
-    }
-    const content = await createBulkPdfPublicLink(job, row, pdfPath);
+    const content = await createBulkPdfPublicLink(job, row, localPath);
     return {
       content,
       targetPayload: buildBulkTargetPayload(qrType, row, content),
     };
   }
 
-  if (qrType === "Image Gallery") {
-    const directUrl = getCell(row, "url");
-    if (isHttpUrl(directUrl)) {
-      return {
-        content: directUrl,
-        targetPayload: buildBulkTargetPayload(qrType, row, directUrl),
-      };
-    }
-
-    const galleryDir = resolveGalleryAssetPath(assetContext, row);
-    if (!galleryDir) {
-      throw new Error(`Bulk Image Gallery asset folder not found for row key: ${getGalleryAssetKey(row) || "missing"}`);
-    }
-    const content = await createBulkGalleryPublicLink(job, row, galleryDir);
-    return {
-      content,
-      targetPayload: buildBulkTargetPayload(qrType, row, content),
-    };
+  if (!stat.isDirectory()) {
+    throw new Error(`Image Gallery source must be a folder: ${localPath}`);
   }
-
-  const content = buildBulkContent(qrType, row);
+  const content = await createBulkGalleryPublicLink(job, row, localPath);
   return {
     content,
     targetPayload: buildBulkTargetPayload(qrType, row, content),
@@ -649,7 +605,6 @@ async function processBulkJob(jobId, queuedRows = null) {
   if (!rows || rows.length === 0) {
     throw new Error("Queued bulk rows missing from worker payload");
   }
-  const assetContext = await prepareBulkAssets(jobId);
   const outputDir = path.join(uploadsRoot, "bulk", "jobs", jobId, "files");
   await fsp.mkdir(outputDir, { recursive: true });
 
@@ -660,7 +615,7 @@ async function processBulkJob(jobId, queuedRows = null) {
     let content = "";
     let targetPayload = null;
     try {
-      const builtRow = await buildBulkRow(job, rows[i], assetContext);
+      const builtRow = await buildBulkRow(job, rows[i]);
       content = builtRow.content;
       targetPayload = builtRow.targetPayload;
     } catch (error) {
@@ -668,7 +623,7 @@ async function processBulkJob(jobId, queuedRows = null) {
       await db.query(
         `INSERT INTO qr_job_items (job_id, row_index, content, tracking_mode, status, error_message)
          VALUES ($1, $2, $3, $4, 'failed', $5)`,
-        [jobId, i, "", String(job.tracking_mode || "tracked").toLowerCase(), error.message || "Unable to build QR content from CSV row"],
+        [jobId, i, "", String(job.tracking_mode || "tracked").toLowerCase(), String(error?.message || "Unable to build QR content from CSV row").slice(0, 2000)],
       );
       await updateJobProgress(jobId, successCount, failureCount);
       continue;
