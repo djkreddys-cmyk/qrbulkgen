@@ -488,6 +488,23 @@ export function DashboardScreen() {
     await loadJobAnalysis(jobId, filter);
   }
 
+  useEffect(() => {
+    if (!expandedJobId) {
+      return;
+    }
+
+    const timer = setInterval(() => {
+      const filter = jobTrendFilters[expandedJobId] || createTrendFilterState();
+      loadJobAnalysis(expandedJobId, filter);
+      const job = jobs.find((entry) => entry.id === expandedJobId);
+      if (job?.jobType === "bulk" && Number(job.failureCount || 0) > 0) {
+        loadJobFailureItems(expandedJobId);
+      }
+    }, 30000);
+
+    return () => clearInterval(timer);
+  }, [expandedJobId, jobTrendFilters, jobs]);
+
   function getAnalysisTab(jobId) {
     return analysisTabByJobId[jobId] || "overview";
   }

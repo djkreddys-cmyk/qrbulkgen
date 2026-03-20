@@ -78,9 +78,6 @@ export function BulkJobsScreen() {
         if (!mounted) return;
         const nextJobs = data.jobs || [];
         setJobs(nextJobs);
-        if (nextJobs.length && !selectedJobId) {
-          setSelectedJobId(nextJobs[0].id);
-        }
       } catch (requestError) {
         if (mounted) {
           setError(requestError.message || "Failed to load bulk jobs");
@@ -108,7 +105,7 @@ export function BulkJobsScreen() {
 
     const exists = jobs.some((job) => job.id === selectedJobId);
     if (!exists) {
-      setSelectedJobId(jobs[0].id);
+      setSelectedJobId("");
     }
   }, [jobs, selectedJobId]);
 

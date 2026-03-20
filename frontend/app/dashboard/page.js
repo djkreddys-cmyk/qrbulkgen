@@ -487,6 +487,21 @@ export default function Dashboard() {
     await loadJobAnalysis(jobId, filter)
   }
 
+  useEffect(() => {
+    if (!analysisJobId) return
+
+    const timer = setInterval(() => {
+      const filter = jobTrendFilterById[analysisJobId] || createTrendFilterState()
+      loadJobAnalysis(analysisJobId, filter, true)
+      const job = jobs.find((entry) => entry.id === analysisJobId)
+      if (job?.jobType === "bulk" && Number(job.failureCount || 0) > 0) {
+        loadJobFailureItems(analysisJobId, true)
+      }
+    }, 30000)
+
+    return () => clearInterval(timer)
+  }, [analysisJobId, jobTrendFilterById, jobs])
+
   function getAnalysisTab(jobId) {
     return analysisTabByJobId[jobId] || "overview"
   }
@@ -938,6 +953,17 @@ export default function Dashboard() {
     await loadShortLinkAnalysis(linkId, filter)
   }
 
+  useEffect(() => {
+    if (!analysisLinkId) return
+
+    const timer = setInterval(() => {
+      const filter = shortLinkTrendFilterById[analysisLinkId] || createTrendFilterState()
+      loadShortLinkAnalysis(analysisLinkId, filter)
+    }, 30000)
+
+    return () => clearInterval(timer)
+  }, [analysisLinkId, shortLinkTrendFilterById])
+
   async function handleBulkArchiveShortLinks() {
     const token = getAuthToken()
     if (!token) return
@@ -1255,7 +1281,7 @@ export default function Dashboard() {
                             onClick={() => handleEditJob(job)}
                             className="rounded-2xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow"
                           >
-                            {job.jobType === "single" ? "Edit QR" : "Open Bulk"}
+                            {job.jobType === "single" ? "Edit QR" : "Edit Bulk QR"}
                           </button>
                           {job.artifact?.filePath && (
                             <a

@@ -426,6 +426,19 @@ export function ShortLinksScreen({ variant = "create" }) {
     await loadAnalysis(linkId, filter);
   }
 
+  useEffect(() => {
+    if (!expandedLinkId) {
+      return;
+    }
+
+    const timer = setInterval(() => {
+      const filter = trendFiltersById[expandedLinkId] || createTrendFilterState();
+      loadAnalysis(expandedLinkId, filter);
+    }, 30000);
+
+    return () => clearInterval(timer);
+  }, [expandedLinkId, trendFiltersById]);
+
   async function handleDownloadAnalysisReport(link) {
     try {
       setDownloadingReportId(link.id);

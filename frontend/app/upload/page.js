@@ -236,12 +236,6 @@ export function BulkGenerateContent({ embedded = false }) {
   }, [])
 
   useEffect(() => {
-    if (!activeBulkJobId && recentJobs[0]?.id) {
-      setActiveBulkJobId(recentJobs[0].id)
-    }
-  }, [activeBulkJobId, recentJobs])
-
-  useEffect(() => {
     if (!previewRef.current || !previewContent.trim()) {
       if (previewRef.current) previewRef.current.innerHTML = ""
       return
