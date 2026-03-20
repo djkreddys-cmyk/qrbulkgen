@@ -161,6 +161,12 @@ export function BulkJobsScreen() {
     };
   }, [selectedJob]);
   const isSelectedZipReady = Boolean(selectedJob?.artifact?.filePath?.startsWith("data:"));
+  const selectedBulkPercent = Math.max(0, Math.min(activeBulkProgress.percent || 0, 100));
+  const isSelectedFinishedWithoutZip =
+    Boolean(selectedJob) &&
+    activeBulkProgress.total > 0 &&
+    activeBulkProgress.processed >= activeBulkProgress.total &&
+    !isSelectedZipReady;
 
   useEffect(() => {
     if (!editingJobId) {
@@ -548,57 +554,108 @@ export function BulkJobsScreen() {
           <>
             <Text style={{ color: "#64748b" }}>Source file: {selectedJob.sourceFileName}</Text>
             <Text style={{ color: "#64748b", fontSize: 12 }}>{selectedJob.id}</Text>
-            {!isSelectedZipReady ? (
-              <View
-                style={{
-                  borderWidth: 1,
-                  borderColor: "#dbe3f0",
-                  borderRadius: 16,
-                  paddingHorizontal: 14,
-                  paddingVertical: 12,
-                  backgroundColor: "#f8fafc",
-                }}
-              >
+            <View
+              style={{
+                borderWidth: 1,
+                borderColor: "#dbe3f0",
+                borderRadius: 16,
+                paddingHorizontal: 14,
+                paddingVertical: 12,
+                backgroundColor: "#f8fafc",
+                gap: 10,
+              }}
+            >
+              <View style={{ flexDirection: "row", justifyContent: "space-between", gap: 8 }}>
                 <Text style={{ color: "#334155", fontWeight: "600" }}>
-                  Bulk QR generation {activeBulkProgress.percent}% complete, {activeBulkProgress.processed} of {activeBulkProgress.total} processed.
+                  Bulk QR generation {selectedBulkPercent}% complete
+                </Text>
+                <Text style={{ color: "#64748b", fontWeight: "600" }}>
+                  {activeBulkProgress.processed} / {activeBulkProgress.total}
                 </Text>
               </View>
-            ) : null}
-            {selectedJob.errorMessage ? (
-              <Text style={{ color: "#b91c1c" }}>{selectedJob.errorMessage}</Text>
-            ) : null}
-            {isSelectedZipReady ? (
-              <View style={{ flexDirection: "row", gap: 12 }}>
-                <TouchableOpacity
-                  onPress={handleDownloadArtifact}
-                  disabled={!isSelectedZipReady}
+              <View
+                style={{
+                  height: 8,
+                  borderRadius: 999,
+                  backgroundColor: "#e2e8f0",
+                  overflow: "hidden",
+                }}
+              >
+                <View
                   style={{
-                    flex: 1,
-                    backgroundColor: isSelectedZipReady ? "#e2e8f0" : "#cbd5e1",
-                    paddingVertical: 14,
-                    borderRadius: 16,
+                    width: `${selectedBulkPercent}%`,
+                    height: "100%",
+                    borderRadius: 999,
+                    backgroundColor: isSelectedZipReady ? "#10b981" : isSelectedFinishedWithoutZip ? "#f43f5e" : "#0ea5e9",
                   }}
-                >
-                  <Text style={{ color: "#0f172a", textAlign: "center", fontWeight: "700" }}>
-                    Share ZIP
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={handleSaveArtifact}
-                  disabled={!isSelectedZipReady}
-                  style={{
-                    flex: 1,
-                    backgroundColor: isSelectedZipReady ? "#0f172a" : "#cbd5e1",
-                    paddingVertical: 14,
-                    borderRadius: 16,
-                  }}
-                >
-                  <Text style={{ color: "#ffffff", textAlign: "center", fontWeight: "700" }}>
-                    Download ZIP
-                  </Text>
-                </TouchableOpacity>
+                />
               </View>
-            ) : null}
+              <Text style={{ color: "#475569" }}>
+                {selectedJob.successCount || 0} succeeded and {selectedJob.failureCount || 0} failed out of {activeBulkProgress.total || 0}.
+              </Text>
+              {selectedJob.errorMessage ? (
+                <View
+                  style={{
+                    borderWidth: 1,
+                    borderColor: "#fecdd3",
+                    borderRadius: 14,
+                    paddingHorizontal: 12,
+                    paddingVertical: 10,
+                    backgroundColor: "#fff1f2",
+                  }}
+                >
+                  <Text style={{ color: "#b91c1c" }}>{selectedJob.errorMessage}</Text>
+                </View>
+              ) : null}
+              {isSelectedFinishedWithoutZip && !selectedJob.errorMessage ? (
+                <View
+                  style={{
+                    borderWidth: 1,
+                    borderColor: "#fecdd3",
+                    borderRadius: 14,
+                    paddingHorizontal: 12,
+                    paddingVertical: 10,
+                    backgroundColor: "#fff1f2",
+                  }}
+                >
+                  <Text style={{ color: "#b91c1c" }}>
+                    Bulk QR generation finished with {selectedJob.successCount || 0} success and {selectedJob.failureCount || 0} failure. No ZIP is available.
+                  </Text>
+                </View>
+              ) : null}
+            </View>
+            <View style={{ flexDirection: "row", gap: 12 }}>
+              <TouchableOpacity
+                onPress={handleDownloadArtifact}
+                disabled={!isSelectedZipReady}
+                style={{
+                  flex: 1,
+                  backgroundColor: isSelectedZipReady ? "#e2e8f0" : "#cbd5e1",
+                  paddingVertical: 14,
+                  borderRadius: 16,
+                  opacity: isSelectedZipReady ? 1 : 0.7,
+                }}
+              >
+                <Text style={{ color: "#0f172a", textAlign: "center", fontWeight: "700" }}>
+                  Share ZIP
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={handleSaveArtifact}
+                disabled={!isSelectedZipReady}
+                style={{
+                  flex: 1,
+                  backgroundColor: isSelectedZipReady ? "#0f172a" : "#cbd5e1",
+                  paddingVertical: 14,
+                  borderRadius: 16,
+                  opacity: isSelectedZipReady ? 1 : 0.7,
+                }}
+              >
+                <Text style={{ color: "#ffffff", textAlign: "center", fontWeight: "700" }}>
+                  Download ZIP
+                </Text>
+              </TouchableOpacity>
+            </View>
 
             <View style={{ gap: 8 }}>
               <Text style={{ fontWeight: "700", color: "#0f172a" }}>Recent failed rows</Text>

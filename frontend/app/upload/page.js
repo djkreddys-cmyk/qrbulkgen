@@ -395,6 +395,10 @@ export function BulkGenerateContent({ embedded = false }) {
     activeBulkProgress.total > 0 &&
     activeBulkProgress.processed >= activeBulkProgress.total &&
     !isActiveBulkZipReady
+  const activeBulkPercent = Math.max(0, Math.min(activeBulkProgress.percent || 0, 100))
+  const shouldShowActiveBulkError =
+    Boolean(activeBulkJob?.errorMessage) &&
+    (!activeBulkJob?.qrType || activeBulkJob.qrType === qrType)
 
   const content = (
     <main className="mx-auto max-w-[90rem] px-4 py-10 md:px-5">
@@ -443,7 +447,7 @@ export function BulkGenerateContent({ embedded = false }) {
               </p>
               {(qrType === "PDF" || qrType === "Image Gallery") && (
                 <p className="mt-2 text-xs text-gray-600">
-                  Use the <code>url</code> column for either a public <code>https://</code> link or a local path that is readable by the worker machine. Local paths only work when the worker runs on the same machine or shared drive.
+                  Use the <code>url</code> column with a public <code>http://</code> or <code>https://</code> link. Local drive paths are not supported for bulk PDF or Image Gallery jobs.
                 </p>
               )}
               <div className="mt-3 p-3 border rounded bg-gray-50">
@@ -614,36 +618,51 @@ export function BulkGenerateContent({ embedded = false }) {
             {loadingJobs && !activeBulkJob ? (
               <p className="text-sm text-slate-500">Loading bulk generation status...</p>
             ) : null}
-            {isActiveBulkFinishedWithoutZip ? (
-              <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-medium text-rose-700">
-                {activeBulkJob?.errorMessage
-                  ? activeBulkJob.errorMessage
-                  : `Bulk QR generation finished with ${activeBulkJob?.successCount || 0} success and ${activeBulkJob?.failureCount || 0} failure. No ZIP is available.`}
+            {activeBulkJob ? (
+              <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                <div className="flex items-center justify-between gap-3 text-sm font-medium text-slate-700">
+                  <span>Bulk QR generation {activeBulkPercent}% complete</span>
+                  <span>{activeBulkProgress.processed} / {activeBulkProgress.total || 0}</span>
+                </div>
+                <div className="h-2 overflow-hidden rounded-full bg-slate-200">
+                  <div
+                    className={`h-full rounded-full ${isActiveBulkZipReady ? "bg-emerald-500" : isActiveBulkFinishedWithoutZip ? "bg-rose-500" : "bg-sky-500"}`}
+                    style={{ width: `${activeBulkPercent}%` }}
+                  />
+                </div>
+                <p className="text-sm text-slate-600">
+                  {activeBulkJob?.successCount || 0} succeeded and {activeBulkJob?.failureCount || 0} failed out of {activeBulkProgress.total || 0}.
+                </p>
+                {shouldShowActiveBulkError ? (
+                  <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-medium text-rose-700">
+                    {activeBulkJob.errorMessage}
+                  </div>
+                ) : null}
+                {isActiveBulkFinishedWithoutZip && !shouldShowActiveBulkError ? (
+                  <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-medium text-rose-700">
+                    Bulk QR generation finished with {activeBulkJob?.successCount || 0} success and {activeBulkJob?.failureCount || 0} failure. No ZIP is available.
+                  </div>
+                ) : null}
               </div>
             ) : null}
-            {activeBulkJob && !isActiveBulkZipReady && !isActiveBulkFinishedWithoutZip ? (
-              <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-700">
-                Bulk QR generation {activeBulkProgress.percent}% complete, {activeBulkJob?.successCount || 0} succeeded and {activeBulkJob?.failureCount || 0} failed out of {activeBulkProgress.total}.
-              </div>
-            ) : null}
-            {isActiveBulkZipReady ? (
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <button
-                  type="button"
-                  onClick={() => handleArtifactDownload(activeBulkJob)}
-                  className="rounded-xl bg-black px-4 py-3 text-sm font-semibold text-white"
-                >
-                  Download ZIP
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleArtifactShare(activeBulkJob)}
-                  className="rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-900"
-                >
-                  Share ZIP
-                </button>
-              </div>
-            ) : null}
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <button
+                type="button"
+                onClick={() => handleArtifactDownload(activeBulkJob)}
+                disabled={!isActiveBulkZipReady}
+                className="rounded-xl bg-black px-4 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Download ZIP
+              </button>
+              <button
+                type="button"
+                onClick={() => handleArtifactShare(activeBulkJob)}
+                disabled={!isActiveBulkZipReady}
+                className="rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-900 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Share ZIP
+              </button>
+            </div>
           </section>
         </div>
 

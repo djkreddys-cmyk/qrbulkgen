@@ -23,15 +23,6 @@ const uploadsRoot = process.env.BULK_STORAGE_DIR
   ? path.resolve(process.env.BULK_STORAGE_DIR)
   : path.join(path.resolve(__dirname, ".."), "backend", "uploads");
 const frontendBaseUrl = String(process.env.FRONTEND_URL || "http://localhost:3000").replace(/\/$/, "");
-const backendBaseUrl = String(process.env.BACKEND_URL || "http://localhost:4000").replace(/\/$/, "");
-const pdfUploadsRoot = path.join(uploadsRoot, "pdf");
-const galleryUploadsRoot = path.join(uploadsRoot, "gallery");
-
-for (const dir of [uploadsRoot, pdfUploadsRoot, galleryUploadsRoot]) {
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
-}
 
 function getCell(row, name) {
   return String(row?.[String(name).toLowerCase()] || "").trim();
@@ -49,62 +40,6 @@ function sanitizeFileBaseName(value, fallback) {
 
 function isHttpUrl(value) {
   return /^https?:\/\//i.test(String(value || "").trim());
-}
-
-function looksLikeWindowsDrivePath(value) {
-  return /^[a-zA-Z]:[\\/]/.test(String(value || "").trim());
-}
-
-function looksLikeUncPath(value) {
-  return /^\\\\[^\\]+\\[^\\]+/.test(String(value || "").trim());
-}
-
-function isFileUrl(value) {
-  return /^file:\/\//i.test(String(value || "").trim());
-}
-
-function looksLikeLocalAssetPath(value) {
-  const raw = String(value || "").trim();
-  return looksLikeWindowsDrivePath(raw) || looksLikeUncPath(raw) || isFileUrl(raw);
-}
-
-function normalizeLocalAssetPath(value) {
-  const raw = String(value || "").trim();
-  if (!raw) return "";
-  if (looksLikeWindowsDrivePath(raw) || looksLikeUncPath(raw)) {
-    return raw;
-  }
-  if (isFileUrl(raw)) {
-    try {
-      const parsed = new URL(raw);
-      const pathname = decodeURIComponent(parsed.pathname || "");
-      if (process.platform === "win32") {
-        const withoutLeadingSlash = pathname.replace(/^\/+/, "");
-        return withoutLeadingSlash.replace(/\//g, "\\");
-      }
-      return pathname || raw;
-    } catch {
-      return raw;
-    }
-  }
-  return raw;
-}
-
-function buildStoredUploadFileName(originalName, fallbackBase) {
-  const ext = path.extname(originalName || "").toLowerCase();
-  const safeBase = sanitizeFileBaseName(path.basename(originalName || fallbackBase, ext), fallbackBase)
-    .replace(/\s+/g, "-")
-    .toLowerCase();
-  const uniquePart = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-  return `${uniquePart}-${safeBase || fallbackBase}${ext}`;
-}
-
-function listImageFiles(directoryPath) {
-  if (!fs.existsSync(directoryPath)) return [];
-  return fs
-    .readdirSync(directoryPath, { withFileTypes: true })
-    .filter((entry) => entry.isFile() && /\.(jpg|jpeg|png|webp|gif)$/i.test(entry.name))
-    .map((entry) => path.join(directoryPath, entry.name));
 }
 
 function toUtcDateTime(value) {
@@ -185,64 +120,6 @@ function getExpiryForRow(row) {
     toExpiryIso(getCell(row, "expiresAt") || getCell(row, "expiry") || getCell(row, "expiryDate")) ||
     addMonths(new Date(), 6).toISOString()
   );
-}
-
-async function createBulkPdfPublicLink(job, row, pdfPath) {
-  const originalName = path.basename(pdfPath);
-  if (path.extname(originalName).toLowerCase() !== ".pdf") {
-    throw new Error(`Bulk PDF source must be a .pdf file: ${originalName}`);
-  }
-
-  const storedName = buildStoredUploadFileName(originalName, "bulk-pdf");
-  const destination = path.join(pdfUploadsRoot, storedName);
-  await fsp.copyFile(pdfPath, destination);
-
-  const payload = {
-    url: `${backendBaseUrl}/uploads/pdf/${storedName}`,
-    fileName: originalName,
-  };
-  const title =
-    getCell(row, "title") ||
-    path.basename(originalName, path.extname(originalName)) ||
-    "PDF Document";
-  const result = await db.query(
-    `INSERT INTO public_links (user_id, link_type, title, payload)
-     VALUES ($1, 'pdf', $2, $3::jsonb)
-     RETURNING id`,
-    [job.user_id, String(title).slice(0, 255), JSON.stringify(payload)],
-  );
-  return `${frontendBaseUrl}/pdf/${result.rows[0].id}`;
-}
-
-async function createBulkGalleryPublicLink(job, row, directoryPath) {
-  const imagePaths = listImageFiles(directoryPath);
-  if (imagePaths.length === 0) {
-    throw new Error(`Image Gallery folder has no supported images: ${directoryPath}`);
-  }
-  if (imagePaths.length > 10) {
-    throw new Error(`Image Gallery folder exceeds 10 images: ${directoryPath}`);
-  }
-
-  const images = [];
-  for (const imagePath of imagePaths) {
-    const originalName = path.basename(imagePath);
-    const storedName = buildStoredUploadFileName(originalName, "bulk-gallery");
-    const destination = path.join(galleryUploadsRoot, storedName);
-    await fsp.copyFile(imagePath, destination);
-    images.push({
-      url: `${backendBaseUrl}/uploads/gallery/${storedName}`,
-      fileName: originalName,
-    });
-  }
-
-  const title = getCell(row, "title") || path.basename(directoryPath) || "Image Gallery";
-  const result = await db.query(
-    `INSERT INTO public_links (user_id, link_type, title, payload)
-     VALUES ($1, 'gallery', $2, $3::jsonb)
-     RETURNING id`,
-    [job.user_id, String(title).slice(0, 255), JSON.stringify({ images })],
-  );
-  return `${frontendBaseUrl}/gallery/${result.rows[0].id}`;
 }
 
 function buildBulkTargetPayload(qrType, row, content) {
@@ -448,35 +325,7 @@ async function buildBulkRow(job, row) {
     };
   }
 
-  if (!looksLikeLocalAssetPath(source)) {
-    throw new Error(`${qrType} source must be a public URL or a local file path`);
-  }
-
-  const localPath = normalizeLocalAssetPath(source);
-  if (!fs.existsSync(localPath)) {
-    throw new Error(`Local ${qrType} source is not accessible from this worker: ${localPath}`);
-  }
-
-  const stat = await fsp.stat(localPath);
-  if (qrType === "PDF") {
-    if (!stat.isFile()) {
-      throw new Error(`PDF source must be a file: ${localPath}`);
-    }
-    const content = await createBulkPdfPublicLink(job, row, localPath);
-    return {
-      content,
-      targetPayload: buildBulkTargetPayload(qrType, row, content),
-    };
-  }
-
-  if (!stat.isDirectory()) {
-    throw new Error(`Image Gallery source must be a folder: ${localPath}`);
-  }
-  const content = await createBulkGalleryPublicLink(job, row, localPath);
-  return {
-    content,
-    targetPayload: buildBulkTargetPayload(qrType, row, content),
-  };
+  throw new Error(`${qrType} source must be a public URL starting with http:// or https://`);
 }
 
 async function createManagedBulkLink(job, content, row, targetPayload) {
