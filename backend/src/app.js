@@ -75,10 +75,16 @@ function createApp() {
   app.use("/api", shortLinksRouter);
   app.use("/api/public", publicRouter);
 
-  app.use((err, _req, res, _next) => {
-    console.error(err);
+  app.use((err, req, res, _next) => {
+    const statusCode = err.statusCode || 500;
 
-    res.status(err.statusCode || 500).json({
+    if (statusCode >= 500) {
+      console.error(err);
+    } else if (statusCode >= 400 && statusCode !== 404) {
+      console.warn(`[${req.method} ${req.originalUrl}] ${err.code || "REQUEST_ERROR"}: ${err.message}`);
+    }
+
+    res.status(statusCode).json({
       error: {
         code: err.code || "INTERNAL_SERVER_ERROR",
         message: err.message || "Unexpected server error",
