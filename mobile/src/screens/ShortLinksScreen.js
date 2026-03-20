@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Alert, Linking, Share, Switch, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { Picker } from "@react-native-picker/picker";
 
 import { useAuth } from "../context/AuthContext";
 import { API_BASE_URL, apiRequest, createAuthHeaders } from "../lib/api";
@@ -212,11 +213,23 @@ function SectionEyebrow({ children }) {
 
 function createTrendFilterState(overrides = {}) {
   return {
-    preset: "7d",
+    preset: "overall",
     startDate: "",
     endDate: "",
     ...overrides,
   };
+}
+
+const ANALYSIS_RANGE_OPTIONS = [
+  { value: "overall", label: "Overall" },
+  { value: "7d", label: "7 days" },
+  { value: "15d", label: "15 days" },
+  { value: "30d", label: "Last month" },
+  { value: "custom", label: "Custom range" },
+];
+
+function getTrendRangeLabel(preset) {
+  return ANALYSIS_RANGE_OPTIONS.find((option) => option.value === preset)?.label || "Overall";
 }
 
 function buildTrendQuery(filter = {}) {
@@ -766,27 +779,27 @@ export function ShortLinksScreen({ variant = "create" }) {
                       <View style={{ borderWidth: 1, borderColor: "#dbe3f0", borderRadius: 16, padding: 12, backgroundColor: "#ffffff", gap: 8 }}>
                         <Text style={{ color: "#64748b", fontSize: 12, fontWeight: "700" }}>ANALYSIS FILTER</Text>
                         <Text style={{ color: "#475569", lineHeight: 20 }}>Overall report is shown first. Choose a range to refresh only the filtered trend below.</Text>
-                        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
-                          {[
-                            ["7d", "7 days"],
-                            ["15d", "15 days"],
-                            ["30d", "Last month"],
-                          ].map(([value, label]) => {
-                            const active = (trendFiltersById[link.id] || createTrendFilterState()).preset === value;
-                            return (
-                              <TouchableOpacity
-                                key={`m-short-filter-${link.id}-${value}`}
-                                onPress={() => {
-                                  const next = { ...(trendFiltersById[link.id] || createTrendFilterState()), preset: value };
-                                  setTrendFiltersById((prev) => ({ ...prev, [link.id]: next }));
-                                  loadAnalysis(link.id, next);
-                                }}
-                                style={{ borderWidth: 1, borderColor: active ? "#0f172a" : "#dbe3f0", borderRadius: 999, paddingHorizontal: 12, paddingVertical: 8, backgroundColor: active ? "#0f172a" : "#ffffff" }}
-                              >
-                                <Text style={{ color: active ? "#ffffff" : "#334155", fontWeight: "700", fontSize: 12 }}>{label}</Text>
-                              </TouchableOpacity>
-                            );
-                          })}
+                        <View style={{ borderWidth: 1, borderColor: "#dbe3f0", borderRadius: 12, backgroundColor: "#ffffff", overflow: "hidden" }}>
+                          <Picker
+                            selectedValue={(trendFiltersById[link.id] || createTrendFilterState()).preset}
+                            onValueChange={(value) => {
+                              const currentFilter = trendFiltersById[link.id] || createTrendFilterState();
+                              const next = {
+                                ...currentFilter,
+                                preset: value,
+                                startDate: value === "overall" ? "" : currentFilter.startDate,
+                                endDate: value === "overall" ? "" : currentFilter.endDate,
+                              };
+                              setTrendFiltersById((prev) => ({ ...prev, [link.id]: next }));
+                              if (value !== "custom") {
+                                loadAnalysis(link.id, next);
+                              }
+                            }}
+                          >
+                            {ANALYSIS_RANGE_OPTIONS.map((option) => (
+                              <Picker.Item key={`m-short-filter-${link.id}-${option.value}`} label={option.label} value={option.value} />
+                            ))}
+                          </Picker>
                         </View>
                       </View>
 
@@ -827,34 +840,12 @@ export function ShortLinksScreen({ variant = "create" }) {
 
                       <Card style={{ padding: 14, gap: 10 }}>
                         <Text style={{ color: "#0f172a", fontWeight: "700" }}>Trend</Text>
-                        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
-                          {[
-                            ["7d", "7 days"],
-                            ["15d", "15 days"],
-                            ["30d", "Last month"],
-                          ].map(([value, label]) => {
-                            const active = (trendFiltersById[link.id] || createTrendFilterState()).preset === value;
-                            return (
-                              <TouchableOpacity
-                                key={`${link.id}-${value}`}
-                                onPress={() => {
-                                  const next = { ...(trendFiltersById[link.id] || createTrendFilterState()), preset: value };
-                                  setTrendFiltersById((prev) => ({ ...prev, [link.id]: next }));
-                                  loadAnalysis(link.id, next);
-                                }}
-                                style={{
-                                  borderWidth: 1,
-                                  borderColor: active ? "#0f172a" : "#dbe3f0",
-                                  borderRadius: 999,
-                                  paddingHorizontal: 12,
-                                  paddingVertical: 8,
-                                  backgroundColor: active ? "#0f172a" : "#ffffff",
-                                }}
-                              >
-                                <Text style={{ color: active ? "#ffffff" : "#334155", fontWeight: "700", fontSize: 12 }}>{label}</Text>
-                              </TouchableOpacity>
-                            );
-                          })}
+                        <View style={{ alignSelf: "flex-start" }}>
+                          <View style={{ borderRadius: 999, backgroundColor: "#eff6ff", paddingHorizontal: 10, paddingVertical: 5 }}>
+                            <Text style={{ color: "#1d4ed8", fontSize: 12, fontWeight: "700" }}>
+                              Range: {getTrendRangeLabel((trendFiltersById[link.id] || createTrendFilterState()).preset)}
+                            </Text>
+                          </View>
                         </View>
                         <View style={{ flexDirection: "row", gap: 8 }}>
                           <TextInput

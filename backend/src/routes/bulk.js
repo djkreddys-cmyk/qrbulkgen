@@ -1168,6 +1168,48 @@ bulkRouter.get("/reports/public-engagement", requireAuth, async (req, res, next)
   }
 });
 
+function buildBulkAnalysisLinksScope(job, selectedItem = null) {
+  if (selectedItem) {
+    if (selectedItem.managed_link_id) {
+      return {
+        cte: `WITH links AS (
+          SELECT id, content AS url, qr_type, title, expires_at
+          FROM managed_qr_links
+          WHERE id = $1
+        )`,
+        params: [selectedItem.managed_link_id],
+      };
+    }
+
+    return {
+      cte: `WITH links AS (
+        SELECT
+          NULL::uuid AS id,
+          NULL::text AS url,
+          NULL::text AS qr_type,
+          NULL::text AS title,
+          NULL::timestamptz AS expires_at
+        WHERE false
+      )`,
+      params: [],
+    };
+  }
+
+  return {
+    cte: `WITH links AS (
+      SELECT id, content AS url, qr_type, title, expires_at
+      FROM managed_qr_links
+      WHERE id = $1
+      UNION
+      SELECT m.id, m.content AS url, m.qr_type, m.title, m.expires_at
+      FROM qr_job_items i
+      INNER JOIN managed_qr_links m ON m.id = i.managed_link_id
+      WHERE i.job_id = $2
+    )`,
+    params: [job.managed_link_id, job.id],
+  };
+}
+
 bulkRouter.get("/jobs/:id/analysis", requireAuth, async (req, res, next) => {
   try {
     const jobId = String(req.params.id || "").trim();
@@ -1204,21 +1246,30 @@ bulkRouter.get("/jobs/:id/analysis", requireAuth, async (req, res, next) => {
       throw createHttpError(404, "NOT_FOUND", "Job not found");
     }
 
+    const selectedItemFileName = String(req.query.itemFileName || "").trim();
+    let selectedItem = null;
+    if (selectedItemFileName) {
+      const selectedItemResult = await query(
+        `SELECT row_index, output_file_name, managed_link_id, content
+         FROM qr_job_items
+         WHERE job_id = $1
+           AND output_file_name = $2
+         LIMIT 1`,
+        [job.id, selectedItemFileName],
+      );
+      selectedItem = selectedItemResult.rows[0] || null;
+      if (!selectedItem) {
+        throw createHttpError(404, "NOT_FOUND", "QR file not found for this bulk job");
+      }
+    }
+
     const typeLabel = getQrTypeLabel(job);
     const versionStartedAt = job.completed_at || job.created_at || null;
     const trendWindow = resolveTrendWindow(req.query, job.created_at);
+    const linksScope = buildBulkAnalysisLinksScope(job, selectedItem);
 
     const lifetimeLinkStatsResult = await query(
-      `WITH links AS (
-         SELECT id, content AS url, qr_type, title, expires_at
-         FROM managed_qr_links
-         WHERE id = $1
-         UNION
-         SELECT m.id, m.content AS url, m.qr_type, m.title, m.expires_at
-         FROM qr_job_items i
-         INNER JOIN managed_qr_links m ON m.id = i.managed_link_id
-         WHERE i.job_id = $2
-       )
+      `${linksScope.cte}
        SELECT
          COUNT(ae.id)::int AS total_scans,
          COUNT(DISTINCT ae.metadata->>'visitorKey')::int AS unique_scans,
@@ -1243,7 +1294,7 @@ bulkRouter.get("/jobs/:id/analysis", requireAuth, async (req, res, next) => {
           OR regexp_replace(lower(split_part(COALESCE(ae.metadata->>'targetUrl', ''), '?exp=', 1)), '^https?://(www\\.)?', '') =
              regexp_replace(lower(split_part(links.url, '?exp=', 1)), '^https?://(www\\.)?', '')
         )`,
-      [job.managed_link_id, job.id],
+      linksScope.params,
     );
 
     const typePerformanceResult = await query(
@@ -1274,16 +1325,7 @@ bulkRouter.get("/jobs/:id/analysis", requireAuth, async (req, res, next) => {
     let rating = null;
     let feedback = null;
     const linkStatsResult = await query(
-      `WITH links AS (
-         SELECT id, content AS url, qr_type, title, expires_at
-         FROM managed_qr_links
-         WHERE id = $1
-         UNION
-         SELECT m.id, m.content AS url, m.qr_type, m.title, m.expires_at
-         FROM qr_job_items i
-         INNER JOIN managed_qr_links m ON m.id = i.managed_link_id
-         WHERE i.job_id = $2
-       )
+      `${linksScope.cte}
        SELECT
          COUNT(ae.id)::int AS total_scans,
          COUNT(DISTINCT ae.metadata->>'visitorKey')::int AS unique_scans,
@@ -1297,32 +1339,23 @@ bulkRouter.get("/jobs/:id/analysis", requireAuth, async (req, res, next) => {
          )::int AS expiring_soon_links,
          MIN(links.expires_at) FILTER (WHERE links.expires_at >= NOW()) AS next_expiry_at,
          MAX(links.expires_at) AS last_expiry_at,
-         MIN(links.url) AS sample_url,
-         MIN(links.qr_type) AS target_kind
+       MIN(links.url) AS sample_url,
+        MIN(links.qr_type) AS target_kind
        FROM links
        LEFT JOIN analytics_events ae
          ON ae.event_type = 'qr.public.scan'
-        AND ($3::timestamptz IS NULL OR ae.created_at >= $3::timestamptz)
+        AND ($${linksScope.params.length + 1}::timestamptz IS NULL OR ae.created_at >= $${linksScope.params.length + 1}::timestamptz)
         AND (
           ae.metadata->>'linkId' = links.id::text
           OR ae.metadata->>'targetUrl' = links.url
           OR regexp_replace(lower(split_part(COALESCE(ae.metadata->>'targetUrl', ''), '?exp=', 1)), '^https?://(www\\.)?', '') =
              regexp_replace(lower(split_part(links.url, '?exp=', 1)), '^https?://(www\\.)?', '')
         )`,
-      [job.managed_link_id, job.id, versionStartedAt],
+      [...linksScope.params, versionStartedAt],
     );
 
     const filteredLinkStatsResult = await query(
-      `WITH links AS (
-         SELECT id, content AS url, qr_type, title, expires_at
-         FROM managed_qr_links
-         WHERE id = $1
-         UNION
-         SELECT m.id, m.content AS url, m.qr_type, m.title, m.expires_at
-         FROM qr_job_items i
-         INNER JOIN managed_qr_links m ON m.id = i.managed_link_id
-         WHERE i.job_id = $2
-       )
+      `${linksScope.cte}
        SELECT
          COUNT(ae.id)::int AS total_scans,
          COUNT(DISTINCT ae.metadata->>'visitorKey')::int AS unique_scans,
@@ -1330,31 +1363,22 @@ bulkRouter.get("/jobs/:id/analysis", requireAuth, async (req, res, next) => {
        FROM links
        LEFT JOIN analytics_events ae
          ON ae.event_type = 'qr.public.scan'
-        AND ($3::timestamptz IS NULL OR ae.created_at >= $3::timestamptz)
-        AND ae.created_at >= $4::timestamptz
-        AND ae.created_at <= $5::timestamptz
+        AND ($${linksScope.params.length + 1}::timestamptz IS NULL OR ae.created_at >= $${linksScope.params.length + 1}::timestamptz)
+        AND ae.created_at >= $${linksScope.params.length + 2}::timestamptz
+        AND ae.created_at <= $${linksScope.params.length + 3}::timestamptz
         AND (
           ae.metadata->>'linkId' = links.id::text
           OR ae.metadata->>'targetUrl' = links.url
           OR regexp_replace(lower(split_part(COALESCE(ae.metadata->>'targetUrl', ''), '?exp=', 1)), '^https?://(www\\.)?', '') =
              regexp_replace(lower(split_part(links.url, '?exp=', 1)), '^https?://(www\\.)?', '')
         )`,
-      [job.managed_link_id, job.id, versionStartedAt, trendWindow.startDate, trendWindow.endDate],
+      [...linksScope.params, versionStartedAt, trendWindow.startDate, trendWindow.endDate],
     );
 
     const scanTrendResult = await query(
-      `WITH links AS (
-         SELECT id, content AS url
-         FROM managed_qr_links
-         WHERE id = $1
-         UNION
-         SELECT m.id, m.content AS url
-         FROM qr_job_items i
-         INNER JOIN managed_qr_links m ON m.id = i.managed_link_id
-         WHERE i.job_id = $2
-       ),
+      `${linksScope.cte},
        days AS (
-         SELECT generate_series($3::date, $4::date, INTERVAL '1 day')::date AS day
+         SELECT generate_series($${linksScope.params.length + 1}::date, $${linksScope.params.length + 2}::date, INTERVAL '1 day')::date AS day
        ),
        counts AS (
          SELECT
@@ -1367,9 +1391,9 @@ bulkRouter.get("/jobs/:id/analysis", requireAuth, async (req, res, next) => {
            OR regexp_replace(lower(split_part(COALESCE(ae.metadata->>'targetUrl', ''), '?exp=', 1)), '^https?://(www\\.)?', '') =
               regexp_replace(lower(split_part(links.url, '?exp=', 1)), '^https?://(www\\.)?', '')
          WHERE ae.event_type = 'qr.public.scan'
-           AND ($5::timestamptz IS NULL OR ae.created_at >= $5::timestamptz)
-           AND ae.created_at >= $6::timestamptz
-           AND ae.created_at <= $7::timestamptz
+           AND ($${linksScope.params.length + 3}::timestamptz IS NULL OR ae.created_at >= $${linksScope.params.length + 3}::timestamptz)
+           AND ae.created_at >= $${linksScope.params.length + 4}::timestamptz
+           AND ae.created_at <= $${linksScope.params.length + 5}::timestamptz
          GROUP BY DATE(ae.created_at)
        )
        SELECT
@@ -1378,15 +1402,7 @@ bulkRouter.get("/jobs/:id/analysis", requireAuth, async (req, res, next) => {
        FROM days
        LEFT JOIN counts ON counts.day = days.day
        ORDER BY days.day ASC`,
-      [
-        job.managed_link_id,
-        job.id,
-        trendWindow.startDaySql,
-        trendWindow.endDaySql,
-        versionStartedAt,
-        trendWindow.startDate,
-        trendWindow.endDate,
-      ],
+      [...linksScope.params, trendWindow.startDaySql, trendWindow.endDaySql, versionStartedAt, trendWindow.startDate, trendWindow.endDate],
     );
 
     const linkStats = linkStatsResult.rows[0] || {};
@@ -1407,19 +1423,11 @@ bulkRouter.get("/jobs/:id/analysis", requireAuth, async (req, res, next) => {
     let lastSubmissionAt = null;
     let lifetimeTotalSubmissions = 0;
     let lifetimeLastSubmissionAt = null;
+    const responseLinksScope = buildBulkAnalysisLinksScope(job, selectedItem);
 
     if (targetKind === "Rating") {
       const lifetimeRatingRows = await query(
-        `WITH links AS (
-           SELECT content AS url, title
-           FROM managed_qr_links
-           WHERE id = $1
-           UNION
-           SELECT m.content AS url, m.title
-           FROM qr_job_items i
-           INNER JOIN managed_qr_links m ON m.id = i.managed_link_id
-           WHERE i.job_id = $2
-         )
+        `${responseLinksScope.cte}
          SELECT
            COALESCE(MAX(NULLIF(rs.title, '')), MAX(links.title), 'Untitled rating form') AS title,
            MAX(rs.style) AS style,
@@ -1435,20 +1443,11 @@ bulkRouter.get("/jobs/:id/analysis", requireAuth, async (req, res, next) => {
               regexp_replace(lower(split_part(rs.source_url, '?exp=', 1)), '^https?://(www\\.)?', '')
          GROUP BY rs.rating
          ORDER BY rs.rating ASC`,
-        [job.managed_link_id, job.id],
+        responseLinksScope.params,
       );
 
       const ratingRows = await query(
-        `WITH links AS (
-           SELECT content AS url, title
-           FROM managed_qr_links
-           WHERE id = $1
-           UNION
-           SELECT m.content AS url, m.title
-           FROM qr_job_items i
-           INNER JOIN managed_qr_links m ON m.id = i.managed_link_id
-           WHERE i.job_id = $2
-         )
+        `${responseLinksScope.cte}
          SELECT
            COALESCE(MAX(NULLIF(rs.title, '')), MAX(links.title), 'Untitled rating form') AS title,
            MAX(rs.style) AS style,
@@ -1462,10 +1461,10 @@ bulkRouter.get("/jobs/:id/analysis", requireAuth, async (req, res, next) => {
            ON links.url = rs.source_url
            OR regexp_replace(lower(split_part(links.url, '?exp=', 1)), '^https?://(www\\.)?', '') =
               regexp_replace(lower(split_part(rs.source_url, '?exp=', 1)), '^https?://(www\\.)?', '')
-         WHERE ($3::timestamptz IS NULL OR rs.created_at >= $3::timestamptz)
+         WHERE ($${responseLinksScope.params.length + 1}::timestamptz IS NULL OR rs.created_at >= $${responseLinksScope.params.length + 1}::timestamptz)
          GROUP BY rs.rating
          ORDER BY rs.rating ASC`,
-        [job.managed_link_id, job.id, versionStartedAt],
+        [...responseLinksScope.params, versionStartedAt],
       );
 
       if (ratingRows.rows.length) {
@@ -1495,16 +1494,7 @@ bulkRouter.get("/jobs/:id/analysis", requireAuth, async (req, res, next) => {
 
     if (targetKind === "Feedback") {
       const lifetimeFeedbackRows = await query(
-        `WITH links AS (
-           SELECT content AS url, title
-           FROM managed_qr_links
-           WHERE id = $1
-           UNION
-           SELECT m.content AS url, m.title
-           FROM qr_job_items i
-           INNER JOIN managed_qr_links m ON m.id = i.managed_link_id
-           WHERE i.job_id = $2
-         )
+        `${responseLinksScope.cte}
          SELECT fs.title, fs.questions, fs.answers, fs.created_at
          FROM feedback_submissions fs
          INNER JOIN links
@@ -1512,29 +1502,20 @@ bulkRouter.get("/jobs/:id/analysis", requireAuth, async (req, res, next) => {
            OR regexp_replace(lower(split_part(links.url, '?exp=', 1)), '^https?://(www\\.)?', '') =
               regexp_replace(lower(split_part(fs.source_url, '?exp=', 1)), '^https?://(www\\.)?', '')
          ORDER BY fs.created_at DESC`,
-        [job.managed_link_id, job.id],
+        responseLinksScope.params,
       );
 
       const feedbackRows = await query(
-        `WITH links AS (
-           SELECT content AS url, title
-           FROM managed_qr_links
-           WHERE id = $1
-           UNION
-           SELECT m.content AS url, m.title
-           FROM qr_job_items i
-           INNER JOIN managed_qr_links m ON m.id = i.managed_link_id
-           WHERE i.job_id = $2
-         )
+        `${responseLinksScope.cte}
          SELECT fs.title, fs.questions, fs.answers, fs.created_at
          FROM feedback_submissions fs
          INNER JOIN links
            ON links.url = fs.source_url
            OR regexp_replace(lower(split_part(links.url, '?exp=', 1)), '^https?://(www\\.)?', '') =
               regexp_replace(lower(split_part(fs.source_url, '?exp=', 1)), '^https?://(www\\.)?', '')
-         WHERE ($3::timestamptz IS NULL OR fs.created_at >= $3::timestamptz)
+         WHERE ($${responseLinksScope.params.length + 1}::timestamptz IS NULL OR fs.created_at >= $${responseLinksScope.params.length + 1}::timestamptz)
          ORDER BY fs.created_at DESC`,
-        [job.managed_link_id, job.id, versionStartedAt],
+        [...responseLinksScope.params, versionStartedAt],
       );
 
       totalSubmissions = feedbackRows.rows.length;
@@ -1629,6 +1610,14 @@ bulkRouter.get("/jobs/:id/analysis", requireAuth, async (req, res, next) => {
           successCount: job.success_count,
           failureCount: job.failure_count,
         },
+        selectedItem: selectedItem
+          ? {
+              rowIndex: selectedItem.row_index,
+              outputFileName: selectedItem.output_file_name,
+              managedLinkId: selectedItem.managed_link_id,
+              content: selectedItem.content,
+            }
+          : null,
         typePerformance: typePerformanceRow
           ? {
               label: typeLabel,
@@ -1727,18 +1716,26 @@ bulkRouter.get("/jobs/:id/analysis-report.csv", requireAuth, async (req, res, ne
     const trackingMode = String(job.tracking_mode || "tracked").toLowerCase() === "tracked" ? "tracked" : "direct";
     const versionStartedAt = job.completed_at || job.created_at || null;
     const trendWindow = resolveTrendWindow(req.query, job.created_at);
+    const selectedItemFileName = String(req.query.itemFileName || "").trim();
+    let selectedItem = null;
+    if (selectedItemFileName) {
+      const selectedItemResult = await query(
+        `SELECT row_index, output_file_name, managed_link_id, content
+         FROM qr_job_items
+         WHERE job_id = $1
+           AND output_file_name = $2
+         LIMIT 1`,
+        [job.id, selectedItemFileName],
+      );
+      selectedItem = selectedItemResult.rows[0] || null;
+      if (!selectedItem) {
+        throw createHttpError(404, "NOT_FOUND", "QR file not found for this bulk job");
+      }
+    }
+    const linksScope = buildBulkAnalysisLinksScope(job, selectedItem);
 
     const scanRowsResult = await query(
-      `WITH links AS (
-         SELECT id, content AS url, qr_type, title
-         FROM managed_qr_links
-         WHERE id = $1
-         UNION
-         SELECT m.id, m.content AS url, m.qr_type, m.title
-         FROM qr_job_items i
-         INNER JOIN managed_qr_links m ON m.id = i.managed_link_id
-         WHERE i.job_id = $2
-       )
+      `${linksScope.cte}
        SELECT
          ae.created_at,
          COALESCE(ae.metadata->>'targetUrl', links.url, '') AS scan_output,
@@ -1762,11 +1759,11 @@ bulkRouter.get("/jobs/:id/analysis-report.csv", requireAuth, async (req, res, ne
          OR regexp_replace(lower(split_part(COALESCE(ae.metadata->>'targetUrl', ''), '?exp=', 1)), '^https?://(www\\.)?', '') =
             regexp_replace(lower(split_part(links.url, '?exp=', 1)), '^https?://(www\\.)?', '')
        WHERE ae.event_type = 'qr.public.scan'
-         AND ($3::timestamptz IS NULL OR ae.created_at >= $3::timestamptz)
-         AND ae.created_at >= $4::timestamptz
-         AND ae.created_at <= $5::timestamptz
+         AND ($${linksScope.params.length + 1}::timestamptz IS NULL OR ae.created_at >= $${linksScope.params.length + 1}::timestamptz)
+         AND ae.created_at >= $${linksScope.params.length + 2}::timestamptz
+         AND ae.created_at <= $${linksScope.params.length + 3}::timestamptz
        ORDER BY ae.created_at DESC`,
-      [job.managed_link_id, job.id, versionStartedAt, trendWindow.startDate, trendWindow.endDate],
+      [...linksScope.params, versionStartedAt, trendWindow.startDate, trendWindow.endDate],
     );
 
     const columns = [
@@ -1833,16 +1830,7 @@ bulkRouter.get("/jobs/:id/analysis-report.csv", requireAuth, async (req, res, ne
 
     if (typeLabel === "Rating") {
       const ratingExportResult = await query(
-        `WITH links AS (
-           SELECT id, content AS url
-           FROM managed_qr_links
-           WHERE id = $1
-           UNION
-           SELECT m.id, m.content AS url
-           FROM qr_job_items i
-           INNER JOIN managed_qr_links m ON m.id = i.managed_link_id
-           WHERE i.job_id = $2
-         )
+        `${linksScope.cte}
          SELECT
            rs.created_at,
            rs.rating,
@@ -1860,7 +1848,7 @@ bulkRouter.get("/jobs/:id/analysis-report.csv", requireAuth, async (req, res, ne
            ON links.url = rs.source_url
            OR regexp_replace(lower(split_part(links.url, '?exp=', 1)), '^https?://(www\\.)?', '') =
               regexp_replace(lower(split_part(rs.source_url, '?exp=', 1)), '^https?://(www\\.)?', '')
-         WHERE ($3::timestamptz IS NULL OR rs.created_at >= $3::timestamptz)
+         WHERE ($${linksScope.params.length + 1}::timestamptz IS NULL OR rs.created_at >= $${linksScope.params.length + 1}::timestamptz)
          LEFT JOIN LATERAL (
            SELECT
              COALESCE(ae.metadata->>'location', '') AS location,
@@ -1883,7 +1871,7 @@ bulkRouter.get("/jobs/:id/analysis-report.csv", requireAuth, async (req, res, ne
            LIMIT 1
          ) matched ON true
          ORDER BY rs.created_at DESC`,
-        [job.managed_link_id, job.id, versionStartedAt],
+        [...linksScope.params, versionStartedAt],
       );
 
       rows = await Promise.all(ratingExportResult.rows.map(async (row) => {
@@ -1908,16 +1896,7 @@ bulkRouter.get("/jobs/:id/analysis-report.csv", requireAuth, async (req, res, ne
       }));
     } else if (typeLabel === "Feedback") {
       const feedbackExportResult = await query(
-        `WITH links AS (
-           SELECT id, content AS url
-           FROM managed_qr_links
-           WHERE id = $1
-           UNION
-           SELECT m.id, m.content AS url
-           FROM qr_job_items i
-           INNER JOIN managed_qr_links m ON m.id = i.managed_link_id
-           WHERE i.job_id = $2
-         )
+        `${linksScope.cte}
          SELECT
            fs.created_at,
            fs.title,
@@ -1936,7 +1915,7 @@ bulkRouter.get("/jobs/:id/analysis-report.csv", requireAuth, async (req, res, ne
            ON links.url = fs.source_url
            OR regexp_replace(lower(split_part(links.url, '?exp=', 1)), '^https?://(www\\.)?', '') =
               regexp_replace(lower(split_part(fs.source_url, '?exp=', 1)), '^https?://(www\\.)?', '')
-         WHERE ($3::timestamptz IS NULL OR fs.created_at >= $3::timestamptz)
+         WHERE ($${linksScope.params.length + 1}::timestamptz IS NULL OR fs.created_at >= $${linksScope.params.length + 1}::timestamptz)
          LEFT JOIN LATERAL (
            SELECT
              COALESCE(ae.metadata->>'location', '') AS location,
@@ -1959,7 +1938,7 @@ bulkRouter.get("/jobs/:id/analysis-report.csv", requireAuth, async (req, res, ne
            LIMIT 1
          ) matched ON true
          ORDER BY fs.created_at DESC`,
-        [job.managed_link_id, job.id, versionStartedAt],
+        [...linksScope.params, versionStartedAt],
       );
 
       rows = await Promise.all(feedbackExportResult.rows.map(async (row) => {

@@ -79,6 +79,7 @@ export function BulkGenerateContent({ embedded = false }) {
       setTrackingMode(getDefaultTrackingMode(qrType))
       setUploadStatus("")
     }
+    setActiveBulkJobId("")
     setError("")
     setSuccess("")
     if (csvInputRef.current) {
@@ -378,10 +379,7 @@ export function BulkGenerateContent({ embedded = false }) {
     URL.revokeObjectURL(url)
   }
 
-  const activeBulkJob =
-    recentJobs.find((job) => job.id === activeBulkJobId) ||
-    recentJobs[0] ||
-    null
+  const activeBulkJob = recentJobs.find((job) => job.id === activeBulkJobId) || null
   const activeBulkProgress = getBulkJobProgress(activeBulkJob)
   const isActiveBulkZipReady = Boolean(activeBulkJob?.artifact?.filePath)
   const isActiveBulkFinishedWithoutZip =

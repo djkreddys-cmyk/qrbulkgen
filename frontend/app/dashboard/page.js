@@ -126,8 +126,21 @@ function createTrendFilterState(overrides = {}) {
     preset: "overall",
     startDate: "",
     endDate: "",
+    itemFileName: "",
     ...overrides,
   }
+}
+
+const ANALYSIS_RANGE_OPTIONS = [
+  { value: "overall", label: "Overall" },
+  { value: "7d", label: "7 days" },
+  { value: "15d", label: "15 days" },
+  { value: "30d", label: "Last month" },
+  { value: "custom", label: "Custom range" },
+]
+
+function getTrendRangeLabel(preset) {
+  return ANALYSIS_RANGE_OPTIONS.find((option) => option.value === preset)?.label || "7 days"
 }
 
 function buildTrendQuery(filter = {}) {
@@ -135,6 +148,7 @@ function buildTrendQuery(filter = {}) {
   if (filter?.preset) params.set("trendRange", filter.preset)
   if (filter?.startDate) params.set("startDate", filter.startDate)
   if (filter?.endDate) params.set("endDate", filter.endDate)
+  if (filter?.itemFileName) params.set("itemFileName", filter.itemFileName)
   const text = params.toString()
   return text ? `?${text}` : ""
 }
@@ -326,9 +340,9 @@ export default function Dashboard() {
   const [busyJobId, setBusyJobId] = useState("")
   const [analysisJobId, setAnalysisJobId] = useState("")
   const [jobAnalysisById, setJobAnalysisById] = useState({})
-  const [jobFailureItemsById, setJobFailureItemsById] = useState({})
+  const [jobItemsById, setJobItemsById] = useState({})
   const [analysisLoadingId, setAnalysisLoadingId] = useState("")
-  const [failureItemsLoadingId, setFailureItemsLoadingId] = useState("")
+  const [jobItemsLoadingId, setJobItemsLoadingId] = useState("")
   const [analysisTabByJobId, setAnalysisTabByJobId] = useState({})
   const [jobTrendFilterById, setJobTrendFilterById] = useState({})
   const [selectedJobIds, setSelectedJobIds] = useState([])
@@ -437,29 +451,27 @@ export default function Dashboard() {
     }
   }
 
-  async function loadJobFailureItems(jobId, force = false) {
+  async function loadJobItems(jobId, force = false) {
     const token = getAuthToken()
     if (!token) return
-    if (!force && jobFailureItemsById[jobId]) {
+    if (!force && jobItemsById[jobId]) {
       return
     }
 
     try {
-      setFailureItemsLoadingId(jobId)
+      setJobItemsLoadingId(jobId)
       const data = await apiRequest(`/qr/jobs/${jobId}/items`, {
         headers: { Authorization: `Bearer ${token}` },
       })
-      const failedItems = Array.isArray(data?.items)
-        ? data.items.filter((item) => item.status === "failed").slice(0, 5)
-        : []
-      setJobFailureItemsById((prev) => ({
+      const items = Array.isArray(data?.items) ? data.items : []
+      setJobItemsById((prev) => ({
         ...prev,
-        [jobId]: failedItems,
+        [jobId]: items,
       }))
     } catch (requestError) {
       setError(requestError.message)
     } finally {
-      setFailureItemsLoadingId("")
+      setJobItemsLoadingId("")
     }
   }
 
@@ -476,8 +488,8 @@ export default function Dashboard() {
     }
 
     const job = jobs.find((entry) => entry.id === jobId)
-    if (job?.jobType === "bulk" && Number(job.failureCount || 0) > 0) {
-      await loadJobFailureItems(jobId)
+    if (job?.jobType === "bulk") {
+      await loadJobItems(jobId)
     }
 
     if (jobAnalysisById[jobId]) {
@@ -494,8 +506,8 @@ export default function Dashboard() {
       const filter = jobTrendFilterById[analysisJobId] || createTrendFilterState()
       loadJobAnalysis(analysisJobId, filter, true)
       const job = jobs.find((entry) => entry.id === analysisJobId)
-      if (job?.jobType === "bulk" && Number(job.failureCount || 0) > 0) {
-        loadJobFailureItems(analysisJobId, true)
+      if (job?.jobType === "bulk") {
+        loadJobItems(analysisJobId, true)
       }
     }, 30000)
 
@@ -1343,7 +1355,9 @@ export default function Dashboard() {
                           ) : jobAnalysisById[job.id] ? (
                             (() => {
                               const analysis = jobAnalysisById[job.id]
-                              const failedItems = jobFailureItemsById[job.id] || []
+                              const jobItems = jobItemsById[job.id] || []
+                              const failedItems = jobItems.filter((item) => item.status === "failed").slice(0, 5)
+                              const generatedItems = jobItems.filter((item) => item.status === "completed" && item.outputFileName)
                               const totalRequested = analysis.job?.totalCount || job.totalCount || 0
                               const totalSuccess = analysis.job?.successCount || job.successCount || 0
                               const totalFailure = analysis.job?.failureCount || job.failureCount || 0
@@ -1380,7 +1394,7 @@ export default function Dashboard() {
                                   <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4">
                                     <div className="flex items-center justify-between gap-3">
                                       <p className="text-sm font-semibold text-rose-800">Failed bulk rows</p>
-                                      {failureItemsLoadingId === job.id ? (
+                                      {jobItemsLoadingId === job.id ? (
                                         <span className="text-xs font-medium text-rose-600">Loading...</span>
                                       ) : null}
                                     </div>
@@ -1428,29 +1442,47 @@ export default function Dashboard() {
                                   <div className="flex flex-wrap items-center justify-between gap-3">
                                     <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Analysis Filter</p>
                                     <div className="flex flex-wrap items-center justify-end gap-2">
-                                      {[
-                                        ["overall", "Overall"],
-                                        ["7d", "7 days"],
-                                        ["15d", "15 days"],
-                                        ["30d", "Last month"],
-                                      ].map(([value, label]) => (
-                                        <button
-                                          key={`qr-filter-${job.id}-${value}`}
-                                          type="button"
-                                              onClick={() => {
-                                                const next = { ...jobTrendFilter, preset: value, startDate: value === "overall" ? "" : jobTrendFilter.startDate, endDate: value === "overall" ? "" : jobTrendFilter.endDate }
-                                                setJobTrendFilterById((prev) => ({ ...prev, [job.id]: next }))
-                                                loadJobAnalysis(job.id, next)
-                                              }}
-                                          className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${
-                                            jobTrendFilter.preset === value
-                                              ? "border-slate-950 bg-slate-950 text-white"
-                                              : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"
-                                          }`}
+                                      <select
+                                        value={jobTrendFilter.preset}
+                                        onChange={(e) => {
+                                          const nextPreset = e.target.value
+                                          const next = {
+                                            ...jobTrendFilter,
+                                            preset: nextPreset,
+                                            startDate: nextPreset === "overall" ? "" : jobTrendFilter.startDate,
+                                            endDate: nextPreset === "overall" ? "" : jobTrendFilter.endDate,
+                                          }
+                                          setJobTrendFilterById((prev) => ({ ...prev, [job.id]: next }))
+                                          if (nextPreset !== "custom") {
+                                            loadJobAnalysis(job.id, next)
+                                          }
+                                        }}
+                                        className="h-11 rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-900 outline-none transition focus:border-slate-400"
+                                      >
+                                        {ANALYSIS_RANGE_OPTIONS.map((option) => (
+                                          <option key={`qr-filter-${job.id}-${option.value}`} value={option.value}>
+                                            {option.label}
+                                          </option>
+                                        ))}
+                                      </select>
+                                      {job.jobType === "bulk" ? (
+                                        <select
+                                          value={jobTrendFilter.itemFileName || ""}
+                                          onChange={(e) => {
+                                            const next = { ...jobTrendFilter, itemFileName: e.target.value }
+                                            setJobTrendFilterById((prev) => ({ ...prev, [job.id]: next }))
+                                            loadJobAnalysis(job.id, next)
+                                          }}
+                                          className="h-11 rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-900 outline-none transition focus:border-slate-400"
                                         >
-                                          {label}
-                                        </button>
-                                      ))}
+                                          <option value="">All generated QR files</option>
+                                          {generatedItems.map((item) => (
+                                            <option key={`${job.id}-${item.outputFileName}`} value={item.outputFileName}>
+                                              {item.outputFileName}
+                                            </option>
+                                          ))}
+                                        </select>
+                                      ) : null}
                                       <input
                                         type="date"
                                         value={jobTrendFilter.startDate}
@@ -1623,7 +1655,7 @@ export default function Dashboard() {
                                         <div>
                                           <p className="font-medium text-slate-900">Scan trend</p>
                                         </div>
-                                        <MetricPill label="Range" value={jobTrendFilter.preset === "overall" ? "Overall" : jobTrendFilter.preset === "30d" ? "Last month" : jobTrendFilter.preset === "15d" ? "15 days" : jobTrendFilter.preset === "custom" ? "Custom" : "7 days"} tone="accent" />
+                                        <MetricPill label="Range" value={getTrendRangeLabel(jobTrendFilter.preset)} tone="accent" />
                                       </div>
                                       <div className="mt-4">
                                         <Sparkline points={scanTrendPoints} />
@@ -1996,33 +2028,30 @@ export default function Dashboard() {
                                     <div className="flex flex-wrap items-center justify-between gap-3">
                                       <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Analysis Filter</p>
                                       <div className="flex flex-wrap items-center justify-end gap-2">
-                                      {[
-                                          ["overall", "Overall"],
-                                          ["7d", "7 days"],
-                                          ["15d", "15 days"],
-                                          ["30d", "Last month"],
-                                        ].map(([value, label]) => {
-                                          const active = (shortLinkTrendFilterById[link.id] || createTrendFilterState()).preset === value
-                                          return (
-                                            <button
-                                              key={`short-filter-${link.id}-${value}`}
-                                              type="button"
-                                              onClick={() => {
-                                                const currentFilter = shortLinkTrendFilterById[link.id] || createTrendFilterState()
-                                                const next = { ...currentFilter, preset: value, startDate: value === "overall" ? "" : currentFilter.startDate, endDate: value === "overall" ? "" : currentFilter.endDate }
-                                                setShortLinkTrendFilterById((prev) => ({ ...prev, [link.id]: next }))
-                                                loadShortLinkAnalysis(link.id, next)
-                                              }}
-                                              className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${
-                                                active
-                                                  ? "border-slate-950 bg-slate-950 text-white"
-                                                  : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"
-                                              }`}
-                                            >
-                                              {label}
-                                            </button>
-                                          )
-                                        })}
+                                        <select
+                                          value={(shortLinkTrendFilterById[link.id] || createTrendFilterState()).preset}
+                                          onChange={(e) => {
+                                            const currentFilter = shortLinkTrendFilterById[link.id] || createTrendFilterState()
+                                            const nextPreset = e.target.value
+                                            const next = {
+                                              ...currentFilter,
+                                              preset: nextPreset,
+                                              startDate: nextPreset === "overall" ? "" : currentFilter.startDate,
+                                              endDate: nextPreset === "overall" ? "" : currentFilter.endDate,
+                                            }
+                                            setShortLinkTrendFilterById((prev) => ({ ...prev, [link.id]: next }))
+                                            if (nextPreset !== "custom") {
+                                              loadShortLinkAnalysis(link.id, next)
+                                            }
+                                          }}
+                                          className="h-11 rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-900 outline-none transition focus:border-slate-400"
+                                        >
+                                          {ANALYSIS_RANGE_OPTIONS.map((option) => (
+                                            <option key={`short-filter-${link.id}-${option.value}`} value={option.value}>
+                                              {option.label}
+                                            </option>
+                                          ))}
+                                        </select>
                                         <input
                                           type="date"
                                           value={(shortLinkTrendFilterById[link.id] || createTrendFilterState()).startDate}
@@ -2118,7 +2147,7 @@ export default function Dashboard() {
                                   <div className="rounded-2xl border border-slate-200 bg-white p-5">
                                     <div className="flex flex-wrap items-start justify-between gap-3">
                                       <h4 className="text-base font-semibold text-slate-950">Trend</h4>
-                                      <MetricPill label="Range" value={(shortLinkTrendFilterById[link.id] || createTrendFilterState()).preset === "overall" ? "Overall" : (shortLinkTrendFilterById[link.id] || createTrendFilterState()).preset === "30d" ? "Last month" : (shortLinkTrendFilterById[link.id] || createTrendFilterState()).preset === "15d" ? "15 days" : (shortLinkTrendFilterById[link.id] || createTrendFilterState()).preset === "custom" ? "Custom" : "7 days"} tone="accent" />
+                                      <MetricPill label="Range" value={getTrendRangeLabel((shortLinkTrendFilterById[link.id] || createTrendFilterState()).preset)} tone="accent" />
                                     </div>
                                     <div className="mt-4">
                                       <Sparkline points={shortLinkAnalysisById[link.id].trend || []} />

@@ -28,12 +28,31 @@ function openStructuredContent(content, mimeType) {
   window.setTimeout(() => URL.revokeObjectURL(url), 1500)
 }
 
+async function shareStructuredContent(content, fileName, mimeType, fallbackText = "") {
+  const blob = new Blob([content], { type: mimeType })
+  const file = new File([blob], fileName, { type: mimeType })
+
+  if (!navigator?.share) {
+    return false
+  }
+
+  if (navigator.canShare?.({ files: [file] })) {
+    await navigator.share({
+      title: fileName,
+      files: [file],
+    })
+    return true
+  }
+
+  await navigator.share({
+    title: fileName,
+    text: fallbackText || content,
+  })
+  return true
+}
+
 export default function ManagedQrClient({ link, kind, resolvedContent, openHref, error = "" }) {
   const heading = useMemo(() => link?.title || `${link?.qrType || "QR"} QR`, [link])
-  const isMobileDevice = useMemo(
-    () => /android|iphone|ipad|ipod|mobile/i.test(typeof navigator !== "undefined" ? navigator.userAgent : ""),
-    [],
-  )
   const socialDestinations = useMemo(() => {
     if (link?.qrType !== "Social Media") return []
 
@@ -97,10 +116,6 @@ export default function ManagedQrClient({ link, kind, resolvedContent, openHref,
 
   function openStructuredAction() {
     if (!resolvedContent) return
-    if (link.qrType === "vCard") {
-      openStructuredContent(resolvedContent, "text/vcard")
-      return
-    }
     if (link.qrType === "WIFI") {
       copyContent()
       return
@@ -111,6 +126,19 @@ export default function ManagedQrClient({ link, kind, resolvedContent, openHref,
     }
     if (link.qrType === "Event") {
       downloadTextFile(resolvedContent, "event.ics", "text/calendar")
+    }
+  }
+
+  async function shareStructuredAction() {
+    if (!resolvedContent || link.qrType !== "vCard") return
+
+    try {
+      const shared = await shareStructuredContent(resolvedContent, "contact.vcf", "text/vcard", resolvedContent)
+      if (!shared) {
+        copyContent()
+      }
+    } catch {
+      copyContent()
     }
   }
 
@@ -206,15 +234,6 @@ export default function ManagedQrClient({ link, kind, resolvedContent, openHref,
                   </div>
                 ) : null}
                 <div className="mt-4 flex flex-wrap gap-3">
-                  {link.qrType === "vCard" && (
-                    <button
-                      type="button"
-                      onClick={openStructuredAction}
-                      className="rounded-xl bg-slate-950 px-4 py-3 text-sm font-medium text-white"
-                    >
-                      {isMobileDevice ? "Open in Contacts" : "Open contact card"}
-                    </button>
-                  )}
                   {link.qrType === "WIFI" && (
                     <button
                       type="button"
@@ -226,10 +245,16 @@ export default function ManagedQrClient({ link, kind, resolvedContent, openHref,
                   )}
                   <button
                     type="button"
-                    onClick={copyContent}
+                    onClick={link.qrType === "vCard" ? shareStructuredAction : copyContent}
                     className={`rounded-xl px-4 py-3 text-sm font-medium ${link.qrType === "vCard" || link.qrType === "Social Media" || link.qrType === "WIFI" ? "border border-slate-300 text-slate-700" : "bg-slate-950 text-white"}`}
                   >
-                    {link.qrType === "Text" ? "Copy text" : link.qrType === "WIFI" ? "Copy raw content" : "Copy content"}
+                    {link.qrType === "vCard"
+                      ? "Share contact"
+                      : link.qrType === "Text"
+                        ? "Copy text"
+                        : link.qrType === "WIFI"
+                          ? "Copy raw content"
+                          : "Copy content"}
                   </button>
                   <button
                     type="button"

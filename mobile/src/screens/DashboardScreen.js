@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Alert, Image, ScrollView, Share, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { Picker } from "@react-native-picker/picker";
 
 import { useAuth } from "../context/AuthContext";
 import { apiRequest, createAuthHeaders, API_BASE_URL } from "../lib/api";
@@ -301,11 +302,24 @@ function getJobTitle(job) {
 
 function createTrendFilterState(overrides = {}) {
   return {
-    preset: "7d",
+    preset: "overall",
     startDate: "",
     endDate: "",
+    itemFileName: "",
     ...overrides,
   };
+}
+
+const ANALYSIS_RANGE_OPTIONS = [
+  { value: "overall", label: "Overall" },
+  { value: "7d", label: "7 days" },
+  { value: "15d", label: "15 days" },
+  { value: "30d", label: "Last month" },
+  { value: "custom", label: "Custom range" },
+];
+
+function getTrendRangeLabel(preset) {
+  return ANALYSIS_RANGE_OPTIONS.find((option) => option.value === preset)?.label || "Overall";
 }
 
 function buildTrendQuery(filter = {}) {
@@ -313,6 +327,7 @@ function buildTrendQuery(filter = {}) {
   if (filter?.preset) params.set("trendRange", filter.preset);
   if (filter?.startDate) params.set("startDate", filter.startDate);
   if (filter?.endDate) params.set("endDate", filter.endDate);
+  if (filter?.itemFileName) params.set("itemFileName", filter.itemFileName);
   const text = params.toString();
   return text ? `?${text}` : "";
 }
@@ -335,10 +350,10 @@ export function DashboardScreen() {
   const [jobs, setJobs] = useState([]);
   const [expandedJobId, setExpandedJobId] = useState("");
   const [jobAnalysis, setJobAnalysis] = useState({});
-  const [jobFailureItems, setJobFailureItems] = useState({});
+  const [jobItems, setJobItems] = useState({});
   const [jobTrendFilters, setJobTrendFilters] = useState({});
   const [busyAnalysisJobId, setBusyAnalysisJobId] = useState("");
-  const [failureItemsLoadingId, setFailureItemsLoadingId] = useState("");
+  const [jobItemsLoadingId, setJobItemsLoadingId] = useState("");
   const [busyJobId, setBusyJobId] = useState("");
   const [analysisTabByJobId, setAnalysisTabByJobId] = useState({});
   const [error, setError] = useState("");
@@ -443,27 +458,25 @@ export function DashboardScreen() {
     }
   }
 
-  async function loadJobFailureItems(jobId) {
-    if (jobFailureItems[jobId]) {
+  async function loadJobItems(jobId, force = false) {
+    if (!force && jobItems[jobId]) {
       return;
     }
 
     try {
-      setFailureItemsLoadingId(jobId);
+      setJobItemsLoadingId(jobId);
       const data = await apiRequest(`/qr/jobs/${jobId}/items`, {
         headers: createAuthHeaders(token),
       });
-      const failedItems = Array.isArray(data?.items)
-        ? data.items.filter((item) => item.status === "failed").slice(0, 5)
-        : [];
-      setJobFailureItems((prev) => ({
+      const items = Array.isArray(data?.items) ? data.items : [];
+      setJobItems((prev) => ({
         ...prev,
-        [jobId]: failedItems,
+        [jobId]: items,
       }));
     } catch (requestError) {
       setError(requestError.message || "Failed to load bulk row errors");
     } finally {
-      setFailureItemsLoadingId("");
+      setJobItemsLoadingId("");
     }
   }
 
@@ -475,8 +488,8 @@ export function DashboardScreen() {
 
     setExpandedJobId(jobId);
     const job = jobs.find((entry) => entry.id === jobId);
-    if (job?.jobType === "bulk" && Number(job.failureCount || 0) > 0) {
-      await loadJobFailureItems(jobId);
+    if (job?.jobType === "bulk") {
+      await loadJobItems(jobId);
     }
     const filter = jobTrendFilters[jobId] || createTrendFilterState();
     if (!jobTrendFilters[jobId]) {
@@ -497,8 +510,8 @@ export function DashboardScreen() {
       const filter = jobTrendFilters[expandedJobId] || createTrendFilterState();
       loadJobAnalysis(expandedJobId, filter);
       const job = jobs.find((entry) => entry.id === expandedJobId);
-      if (job?.jobType === "bulk" && Number(job.failureCount || 0) > 0) {
-        loadJobFailureItems(expandedJobId);
+      if (job?.jobType === "bulk") {
+        loadJobItems(expandedJobId, true);
       }
     }, 30000);
 
@@ -743,7 +756,9 @@ export function DashboardScreen() {
             {filteredJobs.map((job) => {
               const analysis = jobAnalysis[job.id];
               const expanded = expandedJobId === job.id;
-              const failedItems = jobFailureItems[job.id] || [];
+              const allJobItems = jobItems[job.id] || [];
+              const failedItems = allJobItems.filter((item) => item.status === "failed").slice(0, 5);
+              const generatedItems = allJobItems.filter((item) => item.status === "completed" && item.outputFileName);
               const currentTab = getAnalysisTab(job.id);
               const thumbnailSource = getThumbnailSource(job);
               const jobBusy = busyJobId === job.id;
@@ -904,7 +919,7 @@ export function DashboardScreen() {
                         <View style={{ borderWidth: 1, borderColor: "#fecdd3", backgroundColor: "#fff1f2", borderRadius: 16, padding: 12, gap: 8 }}>
                           <View style={{ flexDirection: "row", justifyContent: "space-between", gap: 8 }}>
                             <Text style={{ color: "#9f1239", fontWeight: "700" }}>Failed bulk rows</Text>
-                            {failureItemsLoadingId === job.id ? <Text style={{ color: "#be123c", fontSize: 12 }}>Loading...</Text> : null}
+                            {jobItemsLoadingId === job.id ? <Text style={{ color: "#be123c", fontSize: 12 }}>Loading...</Text> : null}
                           </View>
                           {failedItems.length ? (
                             failedItems.map((item) => (
@@ -956,28 +971,45 @@ export function DashboardScreen() {
                       <View style={{ borderWidth: 1, borderColor: "#dbe3f0", borderRadius: 16, padding: 12, backgroundColor: "#ffffff", gap: 8 }}>
                         <Text style={{ color: "#64748b", fontSize: 12, fontWeight: "700" }}>ANALYSIS FILTER</Text>
                         <Text style={{ color: "#475569", lineHeight: 20 }}>Overall report is shown first. Choose a range to refresh only the filtered trend and insights.</Text>
-                        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
-                          {[
-                            ["7d", "7 days"],
-                            ["15d", "15 days"],
-                            ["30d", "Last month"],
-                          ].map(([value, label]) => {
-                            const active = (jobTrendFilters[job.id] || createTrendFilterState()).preset === value;
-                            return (
-                              <TouchableOpacity
-                                key={`m-qr-filter-${job.id}-${value}`}
-                                onPress={() => {
-                                  const next = { ...(jobTrendFilters[job.id] || createTrendFilterState()), preset: value };
-                                  setJobTrendFilters((prev) => ({ ...prev, [job.id]: next }));
-                                  loadJobAnalysis(job.id, next);
-                                }}
-                                style={{ borderWidth: 1, borderColor: active ? "#0f172a" : "#dbe3f0", borderRadius: 999, paddingHorizontal: 12, paddingVertical: 8, backgroundColor: active ? "#0f172a" : "#ffffff" }}
-                              >
-                                <Text style={{ color: active ? "#ffffff" : "#334155", fontWeight: "700", fontSize: 12 }}>{label}</Text>
-                              </TouchableOpacity>
-                            );
-                          })}
+                        <View style={{ borderWidth: 1, borderColor: "#dbe3f0", borderRadius: 12, backgroundColor: "#ffffff", overflow: "hidden" }}>
+                          <Picker
+                            selectedValue={(jobTrendFilters[job.id] || createTrendFilterState()).preset}
+                            onValueChange={(value) => {
+                              const currentFilter = jobTrendFilters[job.id] || createTrendFilterState();
+                              const next = {
+                                ...currentFilter,
+                                preset: value,
+                                startDate: value === "overall" ? "" : currentFilter.startDate,
+                                endDate: value === "overall" ? "" : currentFilter.endDate,
+                              };
+                              setJobTrendFilters((prev) => ({ ...prev, [job.id]: next }));
+                              if (value !== "custom") {
+                                loadJobAnalysis(job.id, next);
+                              }
+                            }}
+                          >
+                            {ANALYSIS_RANGE_OPTIONS.map((option) => (
+                              <Picker.Item key={`m-qr-filter-${job.id}-${option.value}`} label={option.label} value={option.value} />
+                            ))}
+                          </Picker>
                         </View>
+                        {job.jobType === "bulk" ? (
+                          <View style={{ borderWidth: 1, borderColor: "#dbe3f0", borderRadius: 12, backgroundColor: "#ffffff", overflow: "hidden" }}>
+                            <Picker
+                              selectedValue={(jobTrendFilters[job.id] || createTrendFilterState()).itemFileName || ""}
+                              onValueChange={(value) => {
+                                const next = { ...(jobTrendFilters[job.id] || createTrendFilterState()), itemFileName: value };
+                                setJobTrendFilters((prev) => ({ ...prev, [job.id]: next }));
+                                loadJobAnalysis(job.id, next);
+                              }}
+                            >
+                              <Picker.Item label="All generated QR files" value="" />
+                              {generatedItems.map((item) => (
+                                <Picker.Item key={`${job.id}-${item.outputFileName}`} label={item.outputFileName} value={item.outputFileName} />
+                              ))}
+                            </Picker>
+                          </View>
+                        ) : null}
                       </View>
 
                       {job.trackingMode !== "tracked" && (currentTab === "overview" || currentTab === "scans") && (
@@ -1023,34 +1055,8 @@ export function DashboardScreen() {
                           {(currentTab === "overview" || currentTab === "scans") && (
                             <View style={{ borderWidth: 1, borderColor: "#dbe3f0", borderRadius: 16, padding: 12, backgroundColor: "#f8fafc", gap: 8 }}>
                               <Text style={{ color: "#0f172a", fontWeight: "700" }}>Scan trend</Text>
-                              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
-                                {[
-                                  ["7d", "7 days"],
-                                  ["15d", "15 days"],
-                                  ["30d", "Last month"],
-                                ].map(([value, label]) => {
-                                  const active = (jobTrendFilters[job.id] || createTrendFilterState()).preset === value;
-                                  return (
-                                    <TouchableOpacity
-                                      key={`${job.id}-${value}`}
-                                      onPress={() => {
-                                        const next = { ...(jobTrendFilters[job.id] || createTrendFilterState()), preset: value };
-                                        setJobTrendFilters((prev) => ({ ...prev, [job.id]: next }));
-                                        loadJobAnalysis(job.id, next);
-                                      }}
-                                      style={{
-                                        borderWidth: 1,
-                                        borderColor: active ? "#0f172a" : "#dbe3f0",
-                                        borderRadius: 999,
-                                        paddingHorizontal: 12,
-                                        paddingVertical: 8,
-                                        backgroundColor: active ? "#0f172a" : "#ffffff",
-                                      }}
-                                    >
-                                      <Text style={{ color: active ? "#ffffff" : "#334155", fontWeight: "700", fontSize: 12 }}>{label}</Text>
-                                    </TouchableOpacity>
-                                  );
-                                })}
+                              <View style={{ alignSelf: "flex-start" }}>
+                                <PerformanceBadge label={`Range: ${getTrendRangeLabel((jobTrendFilters[job.id] || createTrendFilterState()).preset)}`} tone="accent" />
                               </View>
                               <View style={{ flexDirection: "row", gap: 8 }}>
                                 <TextInput

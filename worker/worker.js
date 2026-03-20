@@ -533,10 +533,7 @@ async function processBulkJob(jobId, queuedRows = null) {
           ]);
           managedLink.content = trackedContent;
         }
-        qrEncodedContent =
-          ["Rating", "Feedback", "PDF", "Image Gallery"].includes(String(job.bulk_qr_type || "").trim())
-            ? managedLink.content || managedLink.url
-            : managedLink.url;
+        qrEncodedContent = managedLink.url;
       }
       if ((job.output_format || "png") === "svg") {
         const svg = await QRCode.toString(qrEncodedContent, {
