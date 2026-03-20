@@ -390,6 +390,11 @@ export function BulkGenerateContent({ embedded = false }) {
     null
   const activeBulkProgress = getBulkJobProgress(activeBulkJob)
   const isActiveBulkZipReady = Boolean(activeBulkJob?.artifact?.filePath)
+  const isActiveBulkFinishedWithoutZip =
+    Boolean(activeBulkJob) &&
+    activeBulkProgress.total > 0 &&
+    activeBulkProgress.processed >= activeBulkProgress.total &&
+    !isActiveBulkZipReady
 
   const content = (
     <main className="mx-auto max-w-[90rem] px-4 py-10 md:px-5">
@@ -609,9 +614,16 @@ export function BulkGenerateContent({ embedded = false }) {
             {loadingJobs && !activeBulkJob ? (
               <p className="text-sm text-slate-500">Loading bulk generation status...</p>
             ) : null}
-            {activeBulkJob && !isActiveBulkZipReady ? (
+            {isActiveBulkFinishedWithoutZip ? (
+              <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-medium text-rose-700">
+                {activeBulkJob?.errorMessage
+                  ? activeBulkJob.errorMessage
+                  : `Bulk QR generation finished with ${activeBulkJob?.successCount || 0} success and ${activeBulkJob?.failureCount || 0} failure. No ZIP is available.`}
+              </div>
+            ) : null}
+            {activeBulkJob && !isActiveBulkZipReady && !isActiveBulkFinishedWithoutZip ? (
               <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-700">
-                Bulk QR generation {activeBulkProgress.percent}% complete, {activeBulkProgress.processed} of {activeBulkProgress.total} processed.
+                Bulk QR generation {activeBulkProgress.percent}% complete, {activeBulkJob?.successCount || 0} succeeded and {activeBulkJob?.failureCount || 0} failed out of {activeBulkProgress.total}.
               </div>
             ) : null}
             {isActiveBulkZipReady ? (
