@@ -229,6 +229,14 @@ function parseLocationCoordinates(value) {
 }
 
 function buildLocationUrl(fields) {
+  const query = [fields.locationName, fields.locationAddress]
+    .map((value) => String(value || "").trim())
+    .filter(Boolean)
+    .join(", ")
+  if (query) {
+    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`
+  }
+
   const mapsUrl = String(fields.mapsUrl || "").trim()
   if (mapsUrl) {
     if (/google\.[^/]+\/maps|maps\.app\.goo\.gl/i.test(mapsUrl)) return mapsUrl
@@ -244,15 +252,18 @@ function buildLocationUrl(fields) {
     return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${latitude},${longitude}`)}`
   }
 
-  const query = String(fields.locationAddress || fields.locationName || "").trim()
-  if (query) {
-    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`
-  }
-
   return ""
 }
 
 function buildGoogleMapsPreviewUrl(fields) {
+  const query = [fields.locationName, fields.locationAddress]
+    .map((value) => String(value || "").trim())
+    .filter(Boolean)
+    .join(", ")
+  if (query) {
+    return `https://maps.google.com/maps?output=embed&q=${encodeURIComponent(query)}`
+  }
+
   const mapsUrl = String(fields.mapsUrl || "").trim()
   if (mapsUrl) {
     return `https://maps.google.com/maps?output=embed&q=${encodeURIComponent(mapsUrl)}`
@@ -262,11 +273,6 @@ function buildGoogleMapsPreviewUrl(fields) {
   const longitude = String(fields.longitude || "").trim()
   if (latitude && longitude) {
     return `https://maps.google.com/maps?output=embed&q=${encodeURIComponent(`${latitude},${longitude}`)}`
-  }
-
-  const query = String(fields.locationAddress || fields.locationName || "").trim()
-  if (query) {
-    return `https://maps.google.com/maps?output=embed&q=${encodeURIComponent(query)}`
   }
 
   return ""
@@ -297,6 +303,28 @@ function getManagedTitleForQrType(type, fields) {
   }
 
   return String(map[type] || type || "QR Code").trim() || String(type || "QR Code")
+}
+
+function getSocialLinkPlaceholder(platform) {
+  switch (String(platform || "").trim()) {
+    case "WhatsApp":
+      return "https://wa.me/919999999999"
+    case "Instagram":
+      return "https://instagram.com/yourbrand"
+    case "Facebook":
+      return "https://facebook.com/yourpage"
+    case "YouTube":
+      return "https://youtube.com/@yourchannel"
+    case "Twitter":
+    case "X":
+      return "https://x.com/yourhandle"
+    case "LinkedIn":
+      return "https://linkedin.com/in/yourprofile"
+    case "Telegram":
+      return "https://t.me/yourhandle"
+    default:
+      return "https://..."
+  }
 }
 
 function getUsableHostedId(value) {
@@ -1245,7 +1273,7 @@ export function SingleGenerateContent({ embedded = false, brandMode = false }) {
                     )}
                     <input
                       className={`border p-2 ${item.platform === "Custom" ? "md:col-span-4" : "md:col-span-7"}`}
-                      placeholder="https://..."
+                      placeholder={getSocialLinkPlaceholder(item.platform)}
                       value={item.url}
                       onChange={(e) => updateSocialLink(index, "url", e.target.value)}
                     />

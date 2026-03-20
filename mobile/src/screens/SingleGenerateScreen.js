@@ -171,6 +171,28 @@ function ActionButton({ title, onPress, disabled = false, tone = "dark" }) {
   );
 }
 
+function getSocialLinkPlaceholder(platform) {
+  switch (String(platform || "").trim()) {
+    case "WhatsApp":
+      return "https://wa.me/919999999999";
+    case "Instagram":
+      return "https://instagram.com/yourbrand";
+    case "Facebook":
+      return "https://facebook.com/yourpage";
+    case "YouTube":
+      return "https://youtube.com/@yourchannel";
+    case "Twitter":
+    case "X":
+      return "https://x.com/yourhandle";
+    case "LinkedIn":
+      return "https://linkedin.com/in/yourprofile";
+    case "Telegram":
+      return "https://t.me/yourhandle";
+    default:
+      return "https://...";
+  }
+}
+
 export function SingleGenerateScreen() {
   const { token, singleDraft, setSingleDraft } = useAuth();
   const skipQrTypeResetRef = useRef(false);
@@ -267,6 +289,14 @@ export function SingleGenerateScreen() {
   }
 
   function buildGoogleMapsPreviewUrl() {
+    const query = [fields.locationName, fields.locationAddress]
+      .map((value) => String(value || "").trim())
+      .filter(Boolean)
+      .join(", ");
+    if (query) {
+      return `https://www.google.com/maps?q=${encodeURIComponent(query)}&z=16&output=embed`;
+    }
+
     const latitude = String(fields.latitude || "").trim();
     const longitude = String(fields.longitude || "").trim();
     if (latitude && longitude) {
@@ -718,7 +748,7 @@ export function SingleGenerateScreen() {
                     prev.map((entry, entryIndex) => (entryIndex === index ? { ...entry, url: value } : entry)),
                   )
                 }
-                placeholder="https://..."
+                placeholder={getSocialLinkPlaceholder(item.platform)}
               />
               <ActionButton
                 title="Remove Link"

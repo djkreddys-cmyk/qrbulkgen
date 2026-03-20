@@ -103,6 +103,14 @@ function parseLocationCoordinates(value) {
 }
 
 function buildLocationUrl(fields) {
+  const query = [fields.locationName, fields.locationAddress]
+    .map((value) => String(value || "").trim())
+    .filter(Boolean)
+    .join(", ");
+  if (query) {
+    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
+  }
+
   const mapsUrl = String(fields.mapsUrl || "").trim();
   if (mapsUrl) {
     if (/google\.[^/]+\/maps|maps\.app\.goo\.gl/i.test(mapsUrl)) return mapsUrl;
@@ -116,11 +124,6 @@ function buildLocationUrl(fields) {
   const longitude = String(fields.longitude || "").trim();
   if (latitude && longitude) {
     return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${latitude},${longitude}`)}`;
-  }
-
-  const query = String(fields.locationAddress || fields.locationName || "").trim();
-  if (query) {
-    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
   }
 
   return "";

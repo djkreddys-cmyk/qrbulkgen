@@ -259,6 +259,22 @@ async function createZipFromDir(sourceDir, zipPath) {
   await zipPromise;
 }
 
+function toSafeFilePart(value, fallback) {
+  const safe = String(value || "")
+    .trim()
+    .replace(/[^a-zA-Z0-9-_]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
+  return safe || fallback;
+}
+
+function toQrTypeFilePart(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "Qr-QR";
+  const compact = raw.replace(/[^a-zA-Z0-9]+/g, "");
+  return `Qr-${compact || "QR"}`;
+}
+
 async function markFailed(jobId, message) {
   await db.query(
     `UPDATE qr_jobs
@@ -430,7 +446,7 @@ async function processBulkJob(jobId, queuedRows = null) {
     }
   }
 
-  const zipFileName = `${job.filename_prefix || "qr"}-${jobId}.zip`;
+  const zipFileName = `${toQrTypeFilePart(job.bulk_qr_type)}.zip`;
   const zipAbsPath = path.join(uploadsRoot, "bulk", "jobs", jobId, zipFileName);
   await createZipFromDir(outputDir, zipAbsPath);
   const zipStat = await fsp.stat(zipAbsPath);
