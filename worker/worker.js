@@ -610,6 +610,7 @@ async function processBulkJob(jobId, queuedRows = null) {
 
   let successCount = 0;
   let failureCount = 0;
+  let firstRowError = "";
 
   for (let i = 0; i < rows.length; i += 1) {
     let content = "";
@@ -619,6 +620,9 @@ async function processBulkJob(jobId, queuedRows = null) {
       content = builtRow.content;
       targetPayload = builtRow.targetPayload;
     } catch (error) {
+      if (!firstRowError) {
+        firstRowError = String(error?.message || "Unable to build QR content from CSV row").slice(0, 2000);
+      }
       failureCount += 1;
       await db.query(
         `INSERT INTO qr_job_items (job_id, row_index, content, tracking_mode, status, error_message)
@@ -724,6 +728,9 @@ async function processBulkJob(jobId, queuedRows = null) {
       );
       await updateJobProgress(jobId, successCount, failureCount);
     } catch (error) {
+      if (!firstRowError) {
+        firstRowError = String(error?.message || "QR generation failed for row").slice(0, 2000);
+      }
       failureCount += 1;
       await db.query(
         `INSERT INTO qr_job_items (job_id, row_index, content, tracking_mode, status, output_file_name, error_message)
@@ -739,6 +746,10 @@ async function processBulkJob(jobId, queuedRows = null) {
       );
       await updateJobProgress(jobId, successCount, failureCount);
     }
+  }
+
+  if (successCount === 0) {
+    throw new Error(firstRowError || "All bulk rows failed. No QR files were generated.");
   }
 
   const zipFileName = `${toQrTypeFilePart(job.bulk_qr_type)}.zip`;
