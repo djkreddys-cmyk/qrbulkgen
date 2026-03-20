@@ -308,9 +308,9 @@ export function SingleGenerateScreen() {
       return `https://www.google.com/maps?q=${encodeURIComponent(mapsUrl)}&z=16&output=embed`;
     }
 
-    const query = String(fields.locationAddress || fields.locationName || "").trim();
-    if (query) {
-      return `https://www.google.com/maps?q=${encodeURIComponent(query)}&z=16&output=embed`;
+    const fallbackQuery = String(fields.locationAddress || fields.locationName || "").trim();
+    if (fallbackQuery) {
+      return `https://www.google.com/maps?q=${encodeURIComponent(fallbackQuery)}&z=16&output=embed`;
     }
 
     return "";
