@@ -1309,7 +1309,7 @@ export default function Dashboard() {
                               onClick={() => setShareJob(job)}
                               className="rounded-2xl border border-emerald-200 bg-emerald-50 px-3.5 py-2.5 text-sm font-semibold text-emerald-700 shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-300 hover:bg-white"
                             >
-                              Ready to share
+                              Share
                             </button>
                           ) : null}
                           <button

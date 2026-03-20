@@ -567,7 +567,7 @@ export function BulkJobsScreen() {
                   Bulk QR generation {selectedBulkPercent}% complete
                 </Text>
                 <Text style={{ color: "#64748b", fontWeight: "600" }}>
-                  {activeBulkProgress.processed} / {activeBulkProgress.total}
+                  Processed {activeBulkProgress.processed} of {activeBulkProgress.total}
                 </Text>
               </View>
               <View
@@ -588,7 +588,7 @@ export function BulkJobsScreen() {
                 />
               </View>
               <Text style={{ color: "#475569" }}>
-                {selectedJob.successCount || 0} succeeded and {selectedJob.failureCount || 0} failed out of {activeBulkProgress.total || 0}.
+                Succeeded: {selectedJob.successCount || 0} / Failed: {selectedJob.failureCount || 0}
               </Text>
               {selectedJob.errorMessage ? (
                 <View
@@ -616,7 +616,7 @@ export function BulkJobsScreen() {
                   }}
                 >
                   <Text style={{ color: "#b91c1c" }}>
-                    Bulk QR generation finished with {selectedJob.successCount || 0} success and {selectedJob.failureCount || 0} failure. No ZIP is available.
+                    Bulk QR generation finished with no ZIP available. Succeeded: {selectedJob.successCount || 0} / Failed: {selectedJob.failureCount || 0}
                   </Text>
                 </View>
               ) : null}

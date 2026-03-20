@@ -616,7 +616,7 @@ export function BulkGenerateContent({ embedded = false }) {
               <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
                 <div className="flex items-center justify-between gap-3 text-sm font-medium text-slate-700">
                   <span>Bulk QR generation {activeBulkPercent}% complete</span>
-                  <span>{activeBulkProgress.processed} / {activeBulkProgress.total || 0}</span>
+                  <span>Processed {activeBulkProgress.processed} of {activeBulkProgress.total || 0}</span>
                 </div>
                 <div className="h-2 overflow-hidden rounded-full bg-slate-200">
                   <div
@@ -625,7 +625,7 @@ export function BulkGenerateContent({ embedded = false }) {
                   />
                 </div>
                 <p className="text-sm text-slate-600">
-                  {activeBulkJob?.successCount || 0} succeeded and {activeBulkJob?.failureCount || 0} failed out of {activeBulkProgress.total || 0}.
+                  Succeeded: {activeBulkJob?.successCount || 0} / Failed: {activeBulkJob?.failureCount || 0}
                 </p>
                 {shouldShowActiveBulkError ? (
                   <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-medium text-rose-700">
@@ -634,7 +634,7 @@ export function BulkGenerateContent({ embedded = false }) {
                 ) : null}
                 {isActiveBulkFinishedWithoutZip && !shouldShowActiveBulkError ? (
                   <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-medium text-rose-700">
-                    Bulk QR generation finished with {activeBulkJob?.successCount || 0} success and {activeBulkJob?.failureCount || 0} failure. No ZIP is available.
+                    Bulk QR generation finished with no ZIP available. Succeeded: {activeBulkJob?.successCount || 0} / Failed: {activeBulkJob?.failureCount || 0}
                   </div>
                 ) : null}
               </div>

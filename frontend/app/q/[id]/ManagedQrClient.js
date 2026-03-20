@@ -16,15 +16,12 @@ function downloadTextFile(content, fileName, mimeType) {
   URL.revokeObjectURL(url)
 }
 
-function openStructuredContent(content, fileName, mimeType) {
+function openStructuredContent(content, mimeType) {
   const blob = new Blob([content], { type: mimeType })
   const url = URL.createObjectURL(blob)
   const link = document.createElement("a")
   link.href = url
   link.target = "_self"
-  if (fileName) {
-    link.download = fileName
-  }
   document.body.appendChild(link)
   link.click()
   document.body.removeChild(link)
@@ -33,6 +30,10 @@ function openStructuredContent(content, fileName, mimeType) {
 
 export default function ManagedQrClient({ link, kind, resolvedContent, openHref, error = "" }) {
   const heading = useMemo(() => link?.title || `${link?.qrType || "QR"} QR`, [link])
+  const isMobileDevice = useMemo(
+    () => /android|iphone|ipad|ipod|mobile/i.test(typeof navigator !== "undefined" ? navigator.userAgent : ""),
+    [],
+  )
   const socialDestinations = useMemo(() => {
     if (link?.qrType !== "Social Media") return []
 
@@ -97,11 +98,11 @@ export default function ManagedQrClient({ link, kind, resolvedContent, openHref,
   function openStructuredAction() {
     if (!resolvedContent) return
     if (link.qrType === "vCard") {
-      openStructuredContent(resolvedContent, "contact.vcf", "text/vcard")
+      openStructuredContent(resolvedContent, "text/vcard")
       return
     }
     if (link.qrType === "WIFI") {
-      openStructuredContent(resolvedContent, "wifi.txt", "text/plain")
+      copyContent()
       return
     }
     if (link.qrType === "Text") {
@@ -199,6 +200,11 @@ export default function ManagedQrClient({ link, kind, resolvedContent, openHref,
                 ) : (
                   <pre className="whitespace-pre-wrap break-words text-sm text-slate-700">{resolvedContent || link.content}</pre>
                 )}
+                {link.qrType === "WIFI" ? (
+                  <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                    Auto-connect works only when a device scans a raw WiFi QR directly in the camera or OS scanner. This managed page can show or copy the WiFi details, but it cannot join the network automatically.
+                  </div>
+                ) : null}
                 <div className="mt-4 flex flex-wrap gap-3">
                   {link.qrType === "vCard" && (
                     <button
@@ -206,15 +212,24 @@ export default function ManagedQrClient({ link, kind, resolvedContent, openHref,
                       onClick={openStructuredAction}
                       className="rounded-xl bg-slate-950 px-4 py-3 text-sm font-medium text-white"
                     >
-                      Open contact card
+                      {isMobileDevice ? "Open in Contacts" : "Open contact card"}
+                    </button>
+                  )}
+                  {link.qrType === "WIFI" && (
+                    <button
+                      type="button"
+                      onClick={openStructuredAction}
+                      className="rounded-xl bg-slate-950 px-4 py-3 text-sm font-medium text-white"
+                    >
+                      Copy WiFi details
                     </button>
                   )}
                   <button
                     type="button"
                     onClick={copyContent}
-                    className={`rounded-xl px-4 py-3 text-sm font-medium ${link.qrType === "vCard" || link.qrType === "Social Media" ? "border border-slate-300 text-slate-700" : "bg-slate-950 text-white"}`}
+                    className={`rounded-xl px-4 py-3 text-sm font-medium ${link.qrType === "vCard" || link.qrType === "Social Media" || link.qrType === "WIFI" ? "border border-slate-300 text-slate-700" : "bg-slate-950 text-white"}`}
                   >
-                    {link.qrType === "Text" ? "Copy text" : "Copy content"}
+                    {link.qrType === "Text" ? "Copy text" : link.qrType === "WIFI" ? "Copy raw content" : "Copy content"}
                   </button>
                   <button
                     type="button"
