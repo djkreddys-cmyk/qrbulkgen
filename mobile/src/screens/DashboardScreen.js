@@ -335,8 +335,10 @@ export function DashboardScreen() {
   const [jobs, setJobs] = useState([]);
   const [expandedJobId, setExpandedJobId] = useState("");
   const [jobAnalysis, setJobAnalysis] = useState({});
+  const [jobFailureItems, setJobFailureItems] = useState({});
   const [jobTrendFilters, setJobTrendFilters] = useState({});
   const [busyAnalysisJobId, setBusyAnalysisJobId] = useState("");
+  const [failureItemsLoadingId, setFailureItemsLoadingId] = useState("");
   const [busyJobId, setBusyJobId] = useState("");
   const [analysisTabByJobId, setAnalysisTabByJobId] = useState({});
   const [error, setError] = useState("");
@@ -441,6 +443,30 @@ export function DashboardScreen() {
     }
   }
 
+  async function loadJobFailureItems(jobId) {
+    if (jobFailureItems[jobId]) {
+      return;
+    }
+
+    try {
+      setFailureItemsLoadingId(jobId);
+      const data = await apiRequest(`/qr/jobs/${jobId}/items`, {
+        headers: createAuthHeaders(token),
+      });
+      const failedItems = Array.isArray(data?.items)
+        ? data.items.filter((item) => item.status === "failed").slice(0, 5)
+        : [];
+      setJobFailureItems((prev) => ({
+        ...prev,
+        [jobId]: failedItems,
+      }));
+    } catch (requestError) {
+      setError(requestError.message || "Failed to load bulk row errors");
+    } finally {
+      setFailureItemsLoadingId("");
+    }
+  }
+
   async function handleToggleAnalysis(jobId) {
     if (expandedJobId === jobId) {
       setExpandedJobId("");
@@ -448,6 +474,10 @@ export function DashboardScreen() {
     }
 
     setExpandedJobId(jobId);
+    const job = jobs.find((entry) => entry.id === jobId);
+    if (job?.jobType === "bulk" && Number(job.failureCount || 0) > 0) {
+      await loadJobFailureItems(jobId);
+    }
     const filter = jobTrendFilters[jobId] || createTrendFilterState();
     if (!jobTrendFilters[jobId]) {
       setJobTrendFilters((prev) => ({ ...prev, [jobId]: filter }));
@@ -696,6 +726,7 @@ export function DashboardScreen() {
             {filteredJobs.map((job) => {
               const analysis = jobAnalysis[job.id];
               const expanded = expandedJobId === job.id;
+              const failedItems = jobFailureItems[job.id] || [];
               const currentTab = getAnalysisTab(job.id);
               const thumbnailSource = getThumbnailSource(job);
               const jobBusy = busyJobId === job.id;
@@ -772,6 +803,7 @@ export function DashboardScreen() {
                       <Text style={{ color: "#64748b" }}>
                         {job.successCount}/{job.totalCount} completed
                       </Text>
+                      {job.errorMessage ? <Text style={{ color: "#b91c1c" }}>{job.errorMessage}</Text> : null}
                       <Text numberOfLines={1} style={{ color: "#94a3b8", fontSize: 12 }}>
                         {job.id}
                       </Text>
@@ -851,6 +883,28 @@ export function DashboardScreen() {
                   {expanded && analysis && (
                     <View style={{ borderRadius: 20, backgroundColor: "#f8fafc", padding: 12, gap: 10, borderWidth: 1, borderColor: "#e2e8f0" }}>
                       <Text style={{ color: "#64748b", fontSize: 12, fontWeight: "700" }}>ANALYSIS FOR THIS JOB</Text>
+                      {job.jobType === "bulk" && job.failureCount > 0 ? (
+                        <View style={{ borderWidth: 1, borderColor: "#fecdd3", backgroundColor: "#fff1f2", borderRadius: 16, padding: 12, gap: 8 }}>
+                          <View style={{ flexDirection: "row", justifyContent: "space-between", gap: 8 }}>
+                            <Text style={{ color: "#9f1239", fontWeight: "700" }}>Failed bulk rows</Text>
+                            {failureItemsLoadingId === job.id ? <Text style={{ color: "#be123c", fontSize: 12 }}>Loading...</Text> : null}
+                          </View>
+                          {failedItems.length ? (
+                            failedItems.map((item) => (
+                              <View
+                                key={`${job.id}-failed-${item.rowIndex}-${item.outputFileName || "row"}`}
+                                style={{ borderWidth: 1, borderColor: "#ffe4e6", backgroundColor: "#ffffff", borderRadius: 12, padding: 10, gap: 4 }}
+                              >
+                                <Text style={{ color: "#0f172a", fontWeight: "700" }}>Row {Number(item.rowIndex || 0) + 1}</Text>
+                                <Text style={{ color: "#64748b" }}>{item.content || "No content captured"}</Text>
+                                <Text style={{ color: "#b91c1c" }}>{item.errorMessage || "Generation failed"}</Text>
+                              </View>
+                            ))
+                          ) : (
+                            <Text style={{ color: "#b91c1c" }}>{job.errorMessage || "This bulk job has failures."}</Text>
+                          )}
+                        </View>
+                      ) : null}
                       <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
                         {[
                           ["overview", "Overview"],

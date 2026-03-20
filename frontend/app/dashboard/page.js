@@ -326,7 +326,9 @@ export default function Dashboard() {
   const [busyJobId, setBusyJobId] = useState("")
   const [analysisJobId, setAnalysisJobId] = useState("")
   const [jobAnalysisById, setJobAnalysisById] = useState({})
+  const [jobFailureItemsById, setJobFailureItemsById] = useState({})
   const [analysisLoadingId, setAnalysisLoadingId] = useState("")
+  const [failureItemsLoadingId, setFailureItemsLoadingId] = useState("")
   const [analysisTabByJobId, setAnalysisTabByJobId] = useState({})
   const [jobTrendFilterById, setJobTrendFilterById] = useState({})
   const [selectedJobIds, setSelectedJobIds] = useState([])
@@ -435,6 +437,32 @@ export default function Dashboard() {
     }
   }
 
+  async function loadJobFailureItems(jobId, force = false) {
+    const token = getAuthToken()
+    if (!token) return
+    if (!force && jobFailureItemsById[jobId]) {
+      return
+    }
+
+    try {
+      setFailureItemsLoadingId(jobId)
+      const data = await apiRequest(`/qr/jobs/${jobId}/items`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      const failedItems = Array.isArray(data?.items)
+        ? data.items.filter((item) => item.status === "failed").slice(0, 5)
+        : []
+      setJobFailureItemsById((prev) => ({
+        ...prev,
+        [jobId]: failedItems,
+      }))
+    } catch (requestError) {
+      setError(requestError.message)
+    } finally {
+      setFailureItemsLoadingId("")
+    }
+  }
+
   async function handleToggleAnalysis(jobId) {
     if (analysisJobId === jobId) {
       setAnalysisJobId("")
@@ -445,6 +473,11 @@ export default function Dashboard() {
     const filter = jobTrendFilterById[jobId] || createTrendFilterState()
     if (!jobTrendFilterById[jobId]) {
       setJobTrendFilterById((prev) => ({ ...prev, [jobId]: filter }))
+    }
+
+    const job = jobs.find((entry) => entry.id === jobId)
+    if (job?.jobType === "bulk" && Number(job.failureCount || 0) > 0) {
+      await loadJobFailureItems(jobId)
     }
 
     if (jobAnalysisById[jobId]) {
@@ -1284,6 +1317,7 @@ export default function Dashboard() {
                           ) : jobAnalysisById[job.id] ? (
                             (() => {
                               const analysis = jobAnalysisById[job.id]
+                              const failedItems = jobFailureItemsById[job.id] || []
                               const totalRequested = analysis.job?.totalCount || job.totalCount || 0
                               const totalSuccess = analysis.job?.successCount || job.successCount || 0
                               const totalFailure = analysis.job?.failureCount || job.failureCount || 0
@@ -1316,6 +1350,29 @@ export default function Dashboard() {
                               const thisJobSuccessRate = totalSuccess / Math.max(totalRequested || 1, 1)
                               return (
                                 <div className="mt-4 space-y-4">
+                                {job.jobType === "bulk" && job.failureCount > 0 ? (
+                                  <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4">
+                                    <div className="flex items-center justify-between gap-3">
+                                      <p className="text-sm font-semibold text-rose-800">Failed bulk rows</p>
+                                      {failureItemsLoadingId === job.id ? (
+                                        <span className="text-xs font-medium text-rose-600">Loading...</span>
+                                      ) : null}
+                                    </div>
+                                    {failedItems.length ? (
+                                      <div className="mt-3 space-y-3">
+                                        {failedItems.map((item) => (
+                                          <div key={`${job.id}-failed-${item.rowIndex}-${item.outputFileName || "row"}`} className="rounded-xl border border-rose-100 bg-white/80 p-3">
+                                            <p className="text-sm font-semibold text-slate-900">Row {Number(item.rowIndex || 0) + 1}</p>
+                                            <p className="mt-1 text-xs text-slate-500 break-all">{item.content || "No content captured"}</p>
+                                            <p className="mt-2 text-sm text-rose-700">{item.errorMessage || "Generation failed"}</p>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    ) : (
+                                      <p className="mt-3 text-sm text-rose-700">{job.errorMessage || "This bulk job has failures. Open the bulk job details to inspect more rows."}</p>
+                                    )}
+                                  </div>
+                                ) : null}
                                 <div className="flex flex-wrap gap-2">
                                   {[
                                     ["overview", "Overview"],
