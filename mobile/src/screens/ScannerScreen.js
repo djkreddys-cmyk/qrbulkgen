@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import { Linking, Text, TouchableOpacity, View } from "react-native";
 import * as DocumentPicker from "expo-document-picker";
 import { Camera, CameraView, useCameraPermissions } from "expo-camera";
@@ -240,6 +240,9 @@ export function ScannerScreen() {
   const [displayValue, setDisplayValue] = useState("");
   const [lastScanAt, setLastScanAt] = useState(0);
   const [fileScanMessage, setFileScanMessage] = useState("");
+  const [scanError, setScanError] = useState("");
+  const [isResolvingScan, setIsResolvingScan] = useState(false);
+  const scanLockRef = useRef(false);
 
   async function trackManagedScan(link, resolvedTarget) {
     const linkId = String(link?.id || "").trim();
@@ -311,6 +314,12 @@ export function ScannerScreen() {
   async function handleOpen() {
     const target = resolveOpenTarget(scannedValue);
     if (!target) return;
+    const supported = await Linking.canOpenURL(target).catch(() => false);
+    if (!supported) {
+      setScanError("This QR was scanned, but the target cannot be opened on this device.");
+      return;
+    }
+    setScanError("");
     await Linking.openURL(target);
   }
 
@@ -324,6 +333,7 @@ export function ScannerScreen() {
   async function handlePickSavedQr() {
     try {
       setFileScanMessage("");
+      setScanError("");
       const result = await DocumentPicker.getDocumentAsync({
         type: ["image/*"],
         copyToCacheDirectory: true,
@@ -345,18 +355,41 @@ export function ScannerScreen() {
         return;
       }
 
-      const resolved = await resolveScannedValue(first);
+      const resolved = await resolveScannedValue(first.trim());
       setScannedValue(resolved);
       setDisplayValue(getScannedDisplayValue(resolved));
       setLastScanAt(Date.now());
-      setFileScanMessage("Saved QR opened successfully.");
-
-      const target = resolveOpenTarget(resolved);
-      if (target) {
-        Linking.openURL(target).catch(() => {});
-      }
+      setFileScanMessage("Saved QR scanned successfully.");
     } catch (_error) {
       setFileScanMessage("Unable to scan that image right now.");
+    }
+  }
+
+  async function handleBarcodeScanned({ data }) {
+    const now = Date.now();
+    if (scanLockRef.current || isResolvingScan || now - lastScanAt < 1800) {
+      return;
+    }
+
+    const rawValue = String(data || "").trim();
+    if (!rawValue) {
+      return;
+    }
+
+    scanLockRef.current = true;
+    setIsResolvingScan(true);
+    setScanError("");
+    setFileScanMessage("");
+    setLastScanAt(now);
+
+    try {
+      const resolved = await resolveScannedValue(rawValue);
+      setScannedValue(resolved);
+      setDisplayValue(getScannedDisplayValue(resolved));
+    } catch (_error) {
+      setScanError("Unable to read this QR code right now.");
+    } finally {
+      setIsResolvingScan(false);
     }
   }
 
@@ -393,8 +426,7 @@ export function ScannerScreen() {
       <Card>
         <Text style={{ fontSize: 24, fontWeight: "700", color: "#0f172a" }}>QR Scanner</Text>
         <Text style={{ color: "#64748b", lineHeight: 22 }}>
-          Scan any QR code and web links will open immediately. You can also move the scanned content
-          into the single generator to restyle or regenerate it.
+          Scan any QR code, inspect the result, then open it or send it into the single generator.
         </Text>
         <TouchableOpacity
           onPress={handlePickSavedQr}
@@ -413,20 +445,7 @@ export function ScannerScreen() {
             style={{ height: 320 }}
             facing="back"
             barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
-            onBarcodeScanned={async ({ data }) => {
-              const now = Date.now();
-              if (now - lastScanAt < 1800) {
-                return;
-              }
-              setLastScanAt(now);
-              const resolved = await resolveScannedValue(data || "");
-              setScannedValue(resolved);
-              setDisplayValue(getScannedDisplayValue(resolved));
-              const target = resolveOpenTarget(resolved);
-              if (target) {
-                Linking.openURL(target).catch(() => {});
-              }
-            }}
+            onBarcodeScanned={scannedValue ? undefined : handleBarcodeScanned}
           />
         </View>
         <TouchableOpacity
@@ -434,6 +453,10 @@ export function ScannerScreen() {
             setScannedValue("");
             setDisplayValue("");
             setLastScanAt(0);
+            setScanError("");
+            setFileScanMessage("");
+            setIsResolvingScan(false);
+            scanLockRef.current = false;
           }}
           style={{ backgroundColor: "#e2e8f0", paddingVertical: 14, borderRadius: 16 }}
         >
@@ -441,6 +464,9 @@ export function ScannerScreen() {
             Scan Another QR
           </Text>
         </TouchableOpacity>
+        {isResolvingScan ? (
+          <Text style={{ color: "#475569", lineHeight: 20 }}>Processing scanned QR...</Text>
+        ) : null}
       </Card>
 
       <Card>
@@ -448,6 +474,7 @@ export function ScannerScreen() {
         <Text style={{ color: scannedValue ? "#0f172a" : "#64748b", lineHeight: 22 }}>
           {displayValue || scannedValue || "Scan a QR code to see its content here."}
         </Text>
+        {scanError ? <Text style={{ color: "#b00020", lineHeight: 20 }}>{scanError}</Text> : null}
         <View style={{ flexDirection: "row", gap: 12 }}>
           <TouchableOpacity
             onPress={handleUseInGenerator}
