@@ -25,6 +25,38 @@ function normalizeBoolean(value, fallback = true) {
   return ["true", "yes", "1", "on"].includes(source)
 }
 
+function getBarcodeRequirements(barcodeType) {
+  if (barcodeType === "EAN-13") {
+    return {
+      hint: "EAN-13 requires exactly 13 numeric digits.",
+      sample: "8901234567890",
+      valid: (value) => /^\d{13}$/.test(String(value || "").trim()),
+    }
+  }
+
+  if (barcodeType === "UPC-A") {
+    return {
+      hint: "UPC-A requires exactly 12 numeric digits.",
+      sample: "123456789012",
+      valid: (value) => /^\d{12}$/.test(String(value || "").trim()),
+    }
+  }
+
+  if (barcodeType === "ITF-14") {
+    return {
+      hint: "ITF-14 requires exactly 14 numeric digits.",
+      sample: "12345678901231",
+      valid: (value) => /^\d{14}$/.test(String(value || "").trim()),
+    }
+  }
+
+  return {
+    hint: "",
+    sample: "",
+    valid: () => true,
+  }
+}
+
 function renderBarcode(row, defaults = {}) {
   return buildBarcodeSvg(row.value || defaults.value || "ITEM-001", {
     barcodeType: row.barcodeType || defaults.barcodeType || "Code 128",
@@ -80,6 +112,8 @@ export default function BarcodeGenerateContent({ mode = "single" }) {
   const [bulkError, setBulkError] = useState("")
   const activeFormat = getBarcodeFormat(barcodeType)
   const matrixMode = isMatrixBarcode(barcodeType)
+  const barcodeRequirements = getBarcodeRequirements(barcodeType)
+  const hasFormatError = !barcodeRequirements.valid(value)
   const a4PresetOptions = [
     { value: "38x21", label: "38 x 21 mm", columns: 5, rows: 13 },
     { value: "48x25", label: "48 x 25 mm", columns: 4, rows: 8 },
@@ -91,6 +125,17 @@ export default function BarcodeGenerateContent({ mode = "single" }) {
   useEffect(() => {
     setBarcodeFamily(matrixMode ? "matrix" : "linear")
   }, [matrixMode])
+
+  useEffect(() => {
+    if (!barcodeRequirements.sample || barcodeRequirements.valid(value)) {
+      return
+    }
+
+    setValue(barcodeRequirements.sample)
+    if (!matrixMode) {
+      setLabel(barcodeRequirements.sample)
+    }
+  }, [barcodeRequirements, matrixMode, value])
 
   useEffect(() => {
     const preset = a4PresetOptions.find((option) => option.value === a4Preset)
@@ -467,6 +512,11 @@ export default function BarcodeGenerateContent({ mode = "single" }) {
           <div>
             <label className="mb-1 block text-sm">{matrixMode ? "Data Matrix Value" : "Barcode Value"}</label>
             <input value={value} onChange={(e) => setValue(e.target.value)} className="w-full rounded-xl border p-2.5" />
+            {barcodeRequirements.hint ? (
+              <p className={`mt-2 text-xs ${hasFormatError ? "text-amber-700" : "text-slate-500"}`}>
+                {barcodeRequirements.hint}
+              </p>
+            ) : null}
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
