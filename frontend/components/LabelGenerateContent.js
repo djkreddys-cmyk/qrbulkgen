@@ -2,61 +2,10 @@
 
 import { useEffect, useMemo, useRef, useState } from "react"
 import QRCodeStyling from "qr-code-styling"
+import { buildBarcodeSvg } from "../lib/barcode"
+import { downloadCsv, parseCsv } from "../lib/csv"
 
-function escapeXml(value) {
-  return String(value || "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&apos;")
-}
-
-function buildBarcodePattern(value) {
-  const source = String(value || "").trim() || "ITEM-001"
-  const bits = []
-
-  for (const char of source) {
-    const code = char.charCodeAt(0).toString(2).padStart(8, "0")
-    for (const bit of code) {
-      bits.push(bit === "1" ? 3 : 2)
-      bits.push(1)
-    }
-    bits.push(2)
-  }
-
-  return [6, 2, ...bits, 6]
-}
-
-function buildBarcodeSvg(value) {
-  const bars = buildBarcodePattern(value)
-  const quietZone = 12
-  const totalBarsWidth = bars.reduce((sum, item) => sum + item, 0)
-  const width = quietZone * 2 + totalBarsWidth
-  let x = quietZone
-  let paintBar = true
-
-  const rects = bars
-    .map((barWidth) => {
-      const currentX = x
-      x += barWidth
-      const shouldPaint = paintBar
-      paintBar = !paintBar
-      if (!shouldPaint) return ""
-      return `<rect x="${currentX}" y="0" width="${barWidth}" height="72" fill="#0f172a" />`
-    })
-    .filter(Boolean)
-    .join("")
-
-  return `<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="96" viewBox="0 0 ${width} 96" role="img" aria-label="${escapeXml(value)}">
-  <rect width="${width}" height="96" fill="#ffffff" />
-  ${rects}
-  <text x="${width / 2}" y="90" text-anchor="middle" font-family="monospace" font-size="12" letter-spacing="1.5" fill="#0f172a">${escapeXml(value)}</text>
-</svg>`
-}
-
-export default function LabelGenerateContent() {
+export default function LabelGenerateContent({ mode = "single" }) {
   const qrPreviewRef = useRef(null)
   const qrCodeRef = useRef(null)
 
@@ -69,6 +18,8 @@ export default function LabelGenerateContent() {
   const [accentColor, setAccentColor] = useState("#0f172a")
   const [backgroundColor, setBackgroundColor] = useState("#ffffff")
   const [labelSize, setLabelSize] = useState("4x3")
+  const [bulkRows, setBulkRows] = useState([])
+  const [bulkError, setBulkError] = useState("")
 
   const barcodeSvg = useMemo(() => buildBarcodeSvg(barcodeValue), [barcodeValue])
 
@@ -105,30 +56,136 @@ export default function LabelGenerateContent() {
     window.print()
   }
 
+  function handleBulkCsvChange(event) {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    const reader = new FileReader()
+    reader.onload = () => {
+      try {
+        const parsed = parseCsv(String(reader.result || ""))
+        setBulkRows(parsed)
+        setBulkError("")
+      } catch {
+        setBulkRows([])
+        setBulkError("Unable to read this CSV file.")
+      }
+    }
+    reader.readAsText(file)
+  }
+
+  function downloadSampleCsv() {
+    downloadCsv(
+      "label-bulk-sample.csv",
+      ["title", "subtitle", "sku", "price", "barcodeValue", "qrValue"],
+      [
+        {
+          title: "Premium Coffee Beans",
+          subtitle: "250g Pack",
+          sku: "SKU-COF-250",
+          price: "$12.99",
+          barcodeValue: "890123456789",
+          qrValue: "https://qrbulkgen.com/products/premium-coffee-beans",
+        },
+      ],
+    )
+  }
+
   const labelLayout =
     labelSize === "2x1"
       ? {
           widthClass: "max-w-[26rem]",
           gridClass: "grid-cols-1",
-          qrBoxClass: "min-h-[150px]",
+          qrBoxClass: "min-h-[170px]",
           titleClass: "text-xl",
           metaColsClass: "grid-cols-2",
+          qrPanelClass: "",
         }
       : labelSize === "3x2"
         ? {
             widthClass: "max-w-[32rem]",
-            gridClass: "md:grid-cols-[1.2fr_0.8fr]",
-            qrBoxClass: "min-h-[170px]",
+            gridClass: "grid-cols-1",
+            qrBoxClass: "min-h-[168px]",
             titleClass: "text-2xl",
             metaColsClass: "grid-cols-2",
+            qrPanelClass: "",
           }
         : {
             widthClass: "max-w-[38rem]",
-            gridClass: "md:grid-cols-[1.35fr_0.85fr]",
-            qrBoxClass: "min-h-[188px]",
+            gridClass: "md:grid-cols-[1.55fr_1fr]",
+            qrBoxClass: "min-h-[210px]",
             titleClass: "text-[1.85rem]",
             metaColsClass: "grid-cols-2",
+            qrPanelClass: "md:min-w-[240px]",
           }
+
+  if (mode === "bulk") {
+    return (
+      <main className="mx-auto max-w-[90rem] px-4 py-10 md:px-5">
+        <h1 className="text-3xl font-bold">Bulk Label Upload</h1>
+
+        <div className="mt-8 grid grid-cols-1 gap-6 xl:grid-cols-[0.9fr_1.1fr]">
+          <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">CSV upload</p>
+              <h2 className="mt-2 text-xl font-semibold text-slate-900">Upload label rows</h2>
+              <p className="mt-1 text-sm text-slate-500">
+                Import labels in bulk with columns for title, SKU, price, barcode value, and QR destination.
+              </p>
+            </div>
+
+            <input type="file" accept=".csv" onChange={handleBulkCsvChange} className="w-full border p-2" />
+            <button type="button" onClick={downloadSampleCsv} className="rounded-xl border px-4 py-3 text-sm font-semibold text-slate-900">
+              Download Sample CSV
+            </button>
+            {!!bulkError && <p className="text-sm text-rose-600">{bulkError}</p>}
+          </section>
+
+          <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Preview rows</p>
+                <h2 className="mt-2 text-xl font-semibold text-slate-900">Bulk label preview</h2>
+              </div>
+              <span className="rounded-full bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-700">
+                {bulkRows.length} rows
+              </span>
+            </div>
+
+            {!bulkRows.length ? (
+              <p className="mt-6 text-sm text-slate-500">Upload a CSV to preview label rows here.</p>
+            ) : (
+              <div className="mt-6 grid gap-4">
+                {bulkRows.slice(0, 4).map((row, index) => (
+                  <div key={`${row.sku || row.title || "label"}-${index}`} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                    <p className="text-sm font-semibold text-slate-900">{row.title || `Label ${index + 1}`}</p>
+                    <p className="mt-1 text-xs text-slate-500">{row.subtitle || row.sku || "No subtitle"}</p>
+                    <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-4">
+                      <div className="grid gap-3 sm:grid-cols-[1.45fr_0.85fr]">
+                        <div>
+                          <div className="grid grid-cols-2 gap-2">
+                            <div className="rounded-xl bg-slate-50 px-3 py-2 text-xs text-slate-700">SKU: {row.sku || "-"}</div>
+                            <div className="rounded-xl bg-slate-50 px-3 py-2 text-xs text-slate-700">Price: {row.price || "-"}</div>
+                          </div>
+                          <div
+                            className="mt-3 overflow-auto rounded-xl border border-slate-200 bg-white p-3"
+                            dangerouslySetInnerHTML={{ __html: buildBarcodeSvg(row.barcodeValue || row.sku || `ITEM-${index + 1}`) }}
+                          />
+                        </div>
+                        <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-3 py-4 text-center text-xs text-slate-500">
+                          QR: {row.qrValue || "Add QR value"}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        </div>
+      </main>
+    )
+  }
 
   return (
     <main className="mx-auto max-w-[90rem] px-4 py-10 md:px-5">
@@ -240,20 +297,26 @@ export default function LabelGenerateContent() {
                   </div>
                 </div>
 
-                <div className="border-t border-slate-200 bg-slate-50 p-6 md:border-l md:border-t-0">
-                  <div className="rounded-3xl bg-white p-4 shadow-sm">
-                    <div
-                      className={`flex w-full items-center justify-center rounded-2xl bg-slate-50 p-3 ${labelLayout.qrBoxClass}`}
-                      ref={qrPreviewRef}
-                    />
-                    <p className="mt-4 text-center text-xs leading-5 text-slate-500">
-                      Scan for product info, support, warranty, menu, or campaign destination.
-                    </p>
+                <div className={`border-t border-slate-200 bg-slate-50 p-6 ${labelLayout.gridClass === "grid-cols-1" ? "" : "md:border-l md:border-t-0"} ${labelLayout.qrPanelClass}`}>
+                  <div className={`grid gap-4 ${labelLayout.gridClass === "grid-cols-1" ? "sm:grid-cols-[0.95fr_1.05fr] sm:items-center" : "grid-cols-1"}`}>
+                    <div className="rounded-3xl bg-white p-4 shadow-sm">
+                      <div
+                        className={`flex w-full items-center justify-center rounded-2xl bg-slate-50 p-3 ${labelLayout.qrBoxClass}`}
+                        ref={qrPreviewRef}
+                      />
+                    </div>
+                    <div>
+                      <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-3 text-center text-[11px] uppercase tracking-[0.18em] text-slate-500">
+                        Scannable Product Link
+                      </div>
+                      <p className="mt-3 px-2 text-center text-xs leading-5 text-slate-500">
+                        Scan for product info, support, warranty, menu, or campaign destination.
+                      </p>
+                      <p className="mt-3 break-all text-center text-xs font-semibold text-slate-700">
+                        {barcodeValue || "Barcode value"}
+                      </p>
+                    </div>
                   </div>
-                  <div className="mt-4 rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-3 text-[11px] uppercase tracking-[0.18em] text-slate-500">
-                    Scannable Product Link
-                  </div>
-                  <p className="mt-2 text-xs font-semibold text-slate-700">{barcodeValue || "Barcode value"}</p>
                 </div>
               </div>
             </div>
