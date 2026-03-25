@@ -1,11 +1,15 @@
 import bwipjs from "bwip-js"
 
 export const BARCODE_FORMATS = [
-  { value: "Code 128", family: "linear", bcid: "code128", description: "Flexible for inventory, labels, and warehouse SKUs." },
-  { value: "Code 39", family: "linear", bcid: "code39", description: "Simple alphanumeric barcode often used for internal asset tags." },
-  { value: "EAN-13", family: "linear", bcid: "ean13", description: "Retail product barcode for globally traded consumer goods." },
-  { value: "UPC-A", family: "linear", bcid: "upca", description: "Retail product barcode commonly used in the United States." },
-  { value: "Data Matrix", family: "matrix", bcid: "datamatrix", description: "Compact 2D code for dense payloads, labels, and small surfaces." },
+  { value: "Code 128", family: "linear", group: "standard", bcid: "code128", description: "Flexible for inventory, labels, and warehouse SKUs." },
+  { value: "Code 39", family: "linear", group: "standard", bcid: "code39", description: "Simple alphanumeric barcode often used for internal asset tags." },
+  { value: "EAN-13", family: "linear", group: "standard", bcid: "ean13", description: "Retail product barcode for globally traded consumer goods." },
+  { value: "UPC-A", family: "linear", group: "standard", bcid: "upca", description: "Retail product barcode commonly used in the United States." },
+  { value: "Data Matrix", family: "matrix", group: "standard", bcid: "datamatrix", description: "Compact 2D code for dense payloads, labels, and small surfaces." },
+  { value: "PDF417", family: "linear", group: "advanced", bcid: "pdf417", description: "Dense stacked barcode for IDs, transport, and document-style payloads." },
+  { value: "ITF-14", family: "linear", group: "advanced", bcid: "itf14", description: "Outer carton and logistics barcode for packaged goods." },
+  { value: "GS1-128", family: "linear", group: "advanced", bcid: "gs1-128", description: "Structured supply-chain barcode for logistics and traceability." },
+  { value: "GS1 DataBar", family: "linear", group: "advanced", bcid: "databaromni", description: "Retail and supply-chain barcode for item identification." },
 ]
 
 function toHexColor(value, fallback) {

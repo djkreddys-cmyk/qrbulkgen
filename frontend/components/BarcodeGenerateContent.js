@@ -40,6 +40,8 @@ function renderBarcode(row, defaults = {}) {
 
 export default function BarcodeGenerateContent({ mode = "single" }) {
   const linearFormats = BARCODE_FORMATS.filter((format) => format.family === "linear")
+  const standardLinearFormats = linearFormats.filter((format) => format.group === "standard")
+  const advancedLinearFormats = linearFormats.filter((format) => format.group === "advanced")
   const matrixFormats = BARCODE_FORMATS.filter((format) => format.family === "matrix")
 
   const [barcodeFamily, setBarcodeFamily] = useState("linear")
@@ -279,11 +281,11 @@ export default function BarcodeGenerateContent({ mode = "single" }) {
           </div>
 
           <div className="inline-flex overflow-hidden rounded-2xl border border-slate-900 shadow-sm">
-            <button
+                <button
               type="button"
               onClick={() => {
                 setBarcodeFamily("linear")
-                setBarcodeType(linearFormats[0]?.value || "Code 128")
+                setBarcodeType(standardLinearFormats[0]?.value || "Code 128")
               }}
               className={`px-4 py-2.5 text-sm font-semibold transition ${barcodeFamily === "linear" ? "bg-slate-950 text-white" : "bg-white text-slate-900 hover:bg-slate-50"}`}
             >
@@ -305,11 +307,30 @@ export default function BarcodeGenerateContent({ mode = "single" }) {
             <div>
               <label className="mb-1 block text-sm">Barcode Type</label>
               <select value={barcodeType} onChange={(e) => setBarcodeType(e.target.value)} className="w-full rounded-xl border p-2.5">
-                {(barcodeFamily === "matrix" ? matrixFormats : linearFormats).map((format) => (
-                  <option key={format.value} value={format.value}>
-                    {format.value}
-                  </option>
-                ))}
+                {barcodeFamily === "matrix" ? (
+                  matrixFormats.map((format) => (
+                    <option key={format.value} value={format.value}>
+                      {format.value}
+                    </option>
+                  ))
+                ) : (
+                  <>
+                    <optgroup label="Standard">
+                      {standardLinearFormats.map((format) => (
+                        <option key={format.value} value={format.value}>
+                          {format.value}
+                        </option>
+                      ))}
+                    </optgroup>
+                    <optgroup label="Advanced">
+                      {advancedLinearFormats.map((format) => (
+                        <option key={format.value} value={format.value}>
+                          {format.value}
+                        </option>
+                      ))}
+                    </optgroup>
+                  </>
+                )}
               </select>
             </div>
             <div>
@@ -361,7 +382,7 @@ export default function BarcodeGenerateContent({ mode = "single" }) {
             ) : (
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
                 <p className="font-semibold text-slate-900">Separate 2D path</p>
-                <p className="mt-1">Data Matrix skips human-readable text and uses the square 2D encoder directly.</p>
+                <p className="mt-1">Data Matrix stays outside the linear dropdown and uses the dedicated 2D renderer path.</p>
               </div>
             )}
           </div>
@@ -478,7 +499,9 @@ export default function BarcodeGenerateContent({ mode = "single" }) {
             </div>
             <div className="rounded-2xl bg-slate-50 p-4">
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Engine</p>
-              <p className="mt-2 text-sm text-slate-700">Rendered with real format encoding through bwip-js.</p>
+              <p className="mt-2 text-sm text-slate-700">
+                {activeFormat.group === "advanced" ? "Advanced format rendered with real bwip-js encoding." : "Rendered with real format encoding through bwip-js."}
+              </p>
             </div>
           </div>
         </section>
