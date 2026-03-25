@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { buildBarcodeSvg } from "../lib/barcode"
+import { BARCODE_FORMATS, buildBarcodeSvg, getBarcodeFormat, isMatrixBarcode } from "../lib/barcode"
 import { downloadCsv, parseCsv } from "../lib/csv"
 
 function downloadFile(contents, filename, mimeType) {
@@ -26,18 +26,23 @@ function normalizeBoolean(value, fallback = true) {
 
 function renderBarcode(row, defaults = {}) {
   return buildBarcodeSvg(row.value || defaults.value || "ITEM-001", {
+    barcodeType: row.barcodeType || defaults.barcodeType || "Code 128",
     barHeight: Number(row.height || defaults.height || 110),
     labelFontSize: Number(row.labelFontSize || defaults.labelFontSize || 16),
     quietZone: Number(row.margin || defaults.margin || 18),
-    wideBar: Number(row.wideBar || defaults.wideBar || 4),
-    narrowBar: Number(row.narrowBar || defaults.narrowBar || 2),
+    widthPreset: row.width || defaults.widthPreset || "medium",
     fillColor: row.lineColor || defaults.lineColor || "#0f172a",
     backgroundColor: row.backgroundColor || defaults.backgroundColor || "#ffffff",
+    textPosition: row.textPosition || defaults.textPosition || "bottom",
     label: normalizeBoolean(row.showText, defaults.showText) ? row.label || row.value || defaults.label || defaults.value : "",
   })
 }
 
 export default function BarcodeGenerateContent({ mode = "single" }) {
+  const linearFormats = BARCODE_FORMATS.filter((format) => format.family === "linear")
+  const matrixFormats = BARCODE_FORMATS.filter((format) => format.family === "matrix")
+
+  const [barcodeFamily, setBarcodeFamily] = useState("linear")
   const [barcodeType, setBarcodeType] = useState("Code 128")
   const [value, setValue] = useState("QRBULKGEN-001")
   const [productName, setProductName] = useState("Premium Coffee Beans")
@@ -53,29 +58,27 @@ export default function BarcodeGenerateContent({ mode = "single" }) {
   const [textPosition, setTextPosition] = useState("bottom")
   const [bulkRows, setBulkRows] = useState([])
   const [bulkError, setBulkError] = useState("")
+  const activeFormat = getBarcodeFormat(barcodeType)
+  const matrixMode = isMatrixBarcode(barcodeType)
 
-  const widthValues = {
-    compact: { wideBar: 2.8, narrowBar: 1.4, labelFontSize: 13 },
-    medium: { wideBar: 4, narrowBar: 2, labelFontSize: 16 },
-    wide: { wideBar: 5.2, narrowBar: 2.6, labelFontSize: 18 },
-  }
-
-  const widthConfig = widthValues[widthPreset] || widthValues.medium
+  useEffect(() => {
+    setBarcodeFamily(matrixMode ? "matrix" : "linear")
+  }, [matrixMode])
 
   const barcodeSvg = useMemo(
     () =>
       buildBarcodeSvg(value, {
+        barcodeType,
         quietZone: margin,
         barHeight: height,
-        labelFontSize: widthConfig.labelFontSize,
-        wideBar: widthConfig.wideBar,
-        narrowBar: widthConfig.narrowBar,
+        labelFontSize: widthPreset === "compact" ? 12 : widthPreset === "wide" ? 18 : 15,
+        widthPreset,
         fillColor: lineColor,
         backgroundColor,
-        label: showText ? label || value : "",
+        label: showText && !matrixMode ? label || value : "",
         textPosition,
       }),
-    [backgroundColor, height, label, lineColor, margin, showText, textPosition, value, widthConfig],
+    [backgroundColor, barcodeType, height, label, lineColor, margin, matrixMode, showText, textPosition, value, widthPreset],
   )
 
   useEffect(() => {
@@ -147,6 +150,17 @@ export default function BarcodeGenerateContent({ mode = "single" }) {
           showText: "yes",
           filename: "asset-001",
         },
+        {
+          value: "https://qrbulkgen.com/products/premium-coffee-beans",
+          productName: "Warranty label",
+          sku: "DM-001",
+          label: "",
+          barcodeType: "Data Matrix",
+          width: "medium",
+          height: "128",
+          showText: "no",
+          filename: "warranty-datamatrix",
+        },
       ],
     )
   }
@@ -216,7 +230,7 @@ export default function BarcodeGenerateContent({ mode = "single" }) {
                       <div>
                         <p className="text-sm font-semibold text-slate-900">{row.productName || row.label || row.value || `Row ${index + 1}`}</p>
                         <p className="mt-1 text-xs text-slate-500">
-                          {[row.barcodeType || barcodeType, row.sku || "No SKU", `${row.filename || "barcode-file"}.svg`].join(" • ")}
+                          {[row.barcodeType || barcodeType, row.sku || "No SKU", `${row.filename || "barcode-file"}.svg`].join(" | ")}
                         </p>
                       </div>
                       <span className="rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-slate-700">
@@ -234,6 +248,9 @@ export default function BarcodeGenerateContent({ mode = "single" }) {
                           showText,
                           value,
                           label,
+                          barcodeType,
+                          widthPreset,
+                          textPosition,
                         }),
                       }}
                     />
@@ -255,20 +272,44 @@ export default function BarcodeGenerateContent({ mode = "single" }) {
         <section className="barcode-print-controls space-y-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Barcode setup</p>
-            <h2 className="mt-2 text-xl font-semibold text-slate-900">Create a production-ready barcode</h2>
+            <h2 className="mt-2 text-xl font-semibold text-slate-900">Create a production-ready code</h2>
             <p className="mt-1 text-sm text-slate-500">
-              Choose the barcode standard, tune the display, and keep the label metadata ready for label printing.
+              Choose a linear barcode format or switch to Data Matrix for a compact 2D label path.
             </p>
+          </div>
+
+          <div className="inline-flex overflow-hidden rounded-2xl border border-slate-900 shadow-sm">
+            <button
+              type="button"
+              onClick={() => {
+                setBarcodeFamily("linear")
+                setBarcodeType(linearFormats[0]?.value || "Code 128")
+              }}
+              className={`px-4 py-2.5 text-sm font-semibold transition ${barcodeFamily === "linear" ? "bg-slate-950 text-white" : "bg-white text-slate-900 hover:bg-slate-50"}`}
+            >
+              Linear Barcode
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setBarcodeFamily("matrix")
+                setBarcodeType(matrixFormats[0]?.value || "Data Matrix")
+              }}
+              className={`border-l border-slate-900 px-4 py-2.5 text-sm font-semibold transition ${barcodeFamily === "matrix" ? "bg-slate-950 text-white" : "bg-white text-slate-900 hover:bg-slate-50"}`}
+            >
+              Data Matrix
+            </button>
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
             <div>
               <label className="mb-1 block text-sm">Barcode Type</label>
               <select value={barcodeType} onChange={(e) => setBarcodeType(e.target.value)} className="w-full rounded-xl border p-2.5">
-                <option>Code 128</option>
-                <option>Code 39</option>
-                <option>EAN-13</option>
-                <option>UPC-A</option>
+                {(barcodeFamily === "matrix" ? matrixFormats : linearFormats).map((format) => (
+                  <option key={format.value} value={format.value}>
+                    {format.value}
+                  </option>
+                ))}
               </select>
             </div>
             <div>
@@ -278,7 +319,7 @@ export default function BarcodeGenerateContent({ mode = "single" }) {
           </div>
 
           <div>
-            <label className="mb-1 block text-sm">Barcode Value</label>
+            <label className="mb-1 block text-sm">{matrixMode ? "Data Matrix Value" : "Barcode Value"}</label>
             <input value={value} onChange={(e) => setValue(e.target.value)} className="w-full rounded-xl border p-2.5" />
           </div>
 
@@ -293,27 +334,36 @@ export default function BarcodeGenerateContent({ mode = "single" }) {
             </div>
           </div>
 
-          <div>
-            <label className="mb-1 block text-sm">Display Label</label>
-            <input value={label} onChange={(e) => setLabel(e.target.value)} className="w-full rounded-xl border p-2.5" />
-          </div>
+          {!matrixMode ? (
+            <div>
+              <label className="mb-1 block text-sm">Display Label</label>
+              <input value={label} onChange={(e) => setLabel(e.target.value)} className="w-full rounded-xl border p-2.5" />
+            </div>
+          ) : null}
 
           <div className="grid gap-4 md:grid-cols-2">
             <div>
-              <label className="mb-1 block text-sm">Width</label>
+              <label className="mb-1 block text-sm">{matrixMode ? "Module Size" : "Width"}</label>
               <select value={widthPreset} onChange={(e) => setWidthPreset(e.target.value)} className="w-full rounded-xl border p-2.5">
                 <option value="compact">Compact</option>
                 <option value="medium">Medium</option>
                 <option value="wide">Wide</option>
               </select>
             </div>
-            <div>
-              <label className="mb-1 block text-sm">Text Position</label>
-              <select value={textPosition} onChange={(e) => setTextPosition(e.target.value)} className="w-full rounded-xl border p-2.5">
-                <option value="bottom">Bottom</option>
-                <option value="top">Top</option>
-              </select>
-            </div>
+            {!matrixMode ? (
+              <div>
+                <label className="mb-1 block text-sm">Text Position</label>
+                <select value={textPosition} onChange={(e) => setTextPosition(e.target.value)} className="w-full rounded-xl border p-2.5">
+                  <option value="bottom">Bottom</option>
+                  <option value="top">Top</option>
+                </select>
+              </div>
+            ) : (
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+                <p className="font-semibold text-slate-900">Separate 2D path</p>
+                <p className="mt-1">Data Matrix skips human-readable text and uses the square 2D encoder directly.</p>
+              </div>
+            )}
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
@@ -346,13 +396,20 @@ export default function BarcodeGenerateContent({ mode = "single" }) {
           </div>
 
           <div className="grid gap-4 md:grid-cols-3">
-            <label className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm">
-              <span className="mb-2 block font-semibold text-slate-900">Show Text</span>
-              <select value={showText ? "yes" : "no"} onChange={(e) => setShowText(e.target.value === "yes")} className="w-full rounded-xl border p-2.5">
-                <option value="yes">Yes</option>
-                <option value="no">No</option>
-              </select>
-            </label>
+            {!matrixMode ? (
+              <label className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm">
+                <span className="mb-2 block font-semibold text-slate-900">Show Text</span>
+                <select value={showText ? "yes" : "no"} onChange={(e) => setShowText(e.target.value === "yes")} className="w-full rounded-xl border p-2.5">
+                  <option value="yes">Yes</option>
+                  <option value="no">No</option>
+                </select>
+              </label>
+            ) : (
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm">
+                <span className="mb-2 block font-semibold text-slate-900">Output</span>
+                <p className="text-slate-700">Data Matrix renders as a compact square symbol for labels and small surfaces.</p>
+              </div>
+            )}
             <label className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm">
               <span className="mb-2 block font-semibold text-slate-900">Line Color</span>
               <input type="color" value={lineColor} onChange={(e) => setLineColor(e.target.value)} className="h-11 w-full rounded-xl border p-1" />
@@ -368,7 +425,7 @@ export default function BarcodeGenerateContent({ mode = "single" }) {
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Preview</p>
-              <h2 className="mt-2 text-xl font-semibold text-slate-900">{barcodeType} preview</h2>
+              <h2 className="mt-2 text-xl font-semibold text-slate-900">{activeFormat.value} preview</h2>
             </div>
             <div className="flex flex-wrap gap-3">
               <button
@@ -395,14 +452,14 @@ export default function BarcodeGenerateContent({ mode = "single" }) {
             <div className="barcode-print-target rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Product</p>
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{matrixMode ? "2D code" : "Product"}</p>
                   <h3 className="mt-2 text-2xl font-black text-slate-950">{productName || "Product Name"}</h3>
                   <p className="mt-1 text-sm text-slate-500">{sku || "SKU"}</p>
                 </div>
-                <div className="rounded-full bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-700">{barcodeType}</div>
+                <div className="rounded-full bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-700">{activeFormat.value}</div>
               </div>
               <div
-                className="mt-6 overflow-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-inner"
+                className={`mt-6 overflow-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-inner ${matrixMode ? "flex justify-center" : ""}`}
                 dangerouslySetInnerHTML={{ __html: barcodeSvg }}
               />
             </div>
@@ -411,15 +468,17 @@ export default function BarcodeGenerateContent({ mode = "single" }) {
           <div className="grid gap-4 md:grid-cols-3">
             <div className="rounded-2xl bg-slate-50 p-4">
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Best for</p>
-              <p className="mt-2 text-sm text-slate-700">Inventory tags, retail SKUs, warehouse bins, and asset labels.</p>
+              <p className="mt-2 text-sm text-slate-700">{activeFormat.description}</p>
             </div>
             <div className="rounded-2xl bg-slate-50 p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Text mode</p>
-              <p className="mt-2 text-sm text-slate-700">{showText ? `Visible ${textPosition}` : "Hidden from preview and download"}</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">{matrixMode ? "2D path" : "Text mode"}</p>
+              <p className="mt-2 text-sm text-slate-700">
+                {matrixMode ? "Separate matrix renderer with compact 2D output." : showText ? `Visible ${textPosition}` : "Hidden from preview and download"}
+              </p>
             </div>
             <div className="rounded-2xl bg-slate-50 p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Next step</p>
-              <p className="mt-2 text-sm text-slate-700">Move this barcode into label printing when the code is ready.</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Engine</p>
+              <p className="mt-2 text-sm text-slate-700">Rendered with real format encoding through bwip-js.</p>
             </div>
           </div>
         </section>

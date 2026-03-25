@@ -85,6 +85,7 @@ export default function LabelGenerateContent({ mode = "single" }) {
   const barcodeSvg = useMemo(
     () =>
       buildBarcodeSvg(barcodeValue, {
+        barcodeType,
         label: showBarcode ? barcodeValue : "",
         fillColor: accentColor,
         backgroundColor,
@@ -92,7 +93,7 @@ export default function LabelGenerateContent({ mode = "single" }) {
         quietZone: labelSize === "2x1" ? 10 : 14,
         labelFontSize: labelSize === "2x1" ? 10 : 12,
       }),
-    [accentColor, backgroundColor, barcodeValue, labelSize, showBarcode],
+    [accentColor, backgroundColor, barcodeType, barcodeValue, labelSize, showBarcode],
   )
 
   useEffect(() => {
@@ -321,7 +322,7 @@ export default function LabelGenerateContent({ mode = "single" }) {
                         <div>
                           <p className="text-sm font-semibold text-slate-900">{rowTitle}</p>
                           <p className="mt-1 text-xs text-slate-500">
-                            {[row.barcodeType || barcodeType, row.sku || "No SKU", templateOptions[template].label].join(" • ")}
+                            {[row.barcodeType || barcodeType, row.sku || "No SKU", templateOptions[template].label].join(" | ")}
                           </p>
                         </div>
                         <span className="rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-slate-700">
@@ -343,6 +344,7 @@ export default function LabelGenerateContent({ mode = "single" }) {
                                 className="mt-3 overflow-auto rounded-xl border border-slate-200 bg-white p-3"
                                 dangerouslySetInnerHTML={{
                                   __html: buildBarcodeSvg(rowBarcode, {
+                                    barcodeType: row.barcodeType || barcodeType,
                                     label: rowBarcode,
                                     fillColor: accentColor,
                                     backgroundColor,

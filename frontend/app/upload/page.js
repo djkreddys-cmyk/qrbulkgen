@@ -13,7 +13,7 @@ import {
   getDefaultTrackingMode,
   supportsTrackingModeSelection,
   TRACKING_MODE_OPTIONS,
-} from "../../../shared/qr-config"
+} from "../../lib/qr-config"
 
 function withAuthHeader() {
   const token = getAuthToken()

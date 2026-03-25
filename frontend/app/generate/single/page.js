@@ -16,7 +16,7 @@ import {
   supportsTrackingModeSelection,
   TRACKING_MODE_OPTIONS,
   validateQrFields,
-} from "../../../../shared/qr-config"
+} from "../../../lib/qr-config"
 
 function toUtcDateTime(value) {
   if (!value) return ""
