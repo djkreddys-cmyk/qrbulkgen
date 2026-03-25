@@ -53,6 +53,7 @@ function getDisplayValue(value, maxLength = 42) {
 export default function LabelGenerateContent({ mode = "single" }) {
   const qrPreviewRef = useRef(null)
   const qrCodeRef = useRef(null)
+  const printRootRef = useRef(null)
 
   const [template, setTemplate] = useState("product")
   const [contentType, setContentType] = useState("both")
@@ -123,9 +124,28 @@ export default function LabelGenerateContent({ mode = "single" }) {
     qrCodeRef.current.update(options)
   }, [accentColor, backgroundColor, labelSize, qrValue, showQr])
 
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return undefined
+    }
+
+    function handleAfterPrint() {
+      document.body.classList.remove("label-print-mode")
+    }
+
+    window.addEventListener("afterprint", handleAfterPrint)
+    return () => {
+      window.removeEventListener("afterprint", handleAfterPrint)
+      document.body.classList.remove("label-print-mode")
+    }
+  }, [])
+
   function handlePrintLabel() {
     if (typeof window === "undefined") return
-    window.print()
+    document.body.classList.add("label-print-mode")
+    window.setTimeout(() => {
+      window.print()
+    }, 50)
   }
 
   function handleBulkCsvChange(event) {
@@ -349,11 +369,11 @@ export default function LabelGenerateContent({ mode = "single" }) {
   }
 
   return (
-    <main className="mx-auto max-w-[90rem] px-4 py-10 md:px-5">
+    <main className="label-print-page mx-auto max-w-[90rem] px-4 py-10 md:px-5">
       <h1 className="text-3xl font-bold">Label Printing</h1>
 
       <div className="mt-8 grid grid-cols-1 gap-6 xl:grid-cols-[0.88fr_1.12fr]">
-        <section className="space-y-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <section className="label-print-controls space-y-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Label setup</p>
             <h2 className="mt-2 text-xl font-semibold text-slate-900">Build a print-ready label</h2>
@@ -495,7 +515,7 @@ export default function LabelGenerateContent({ mode = "single" }) {
           </div>
         </section>
 
-        <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <section className="label-print-preview-panel space-y-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Preview</p>
@@ -516,9 +536,10 @@ export default function LabelGenerateContent({ mode = "single" }) {
             </div>
           </div>
 
-          <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4 md:p-5">
+          <div className="label-print-target-wrap rounded-3xl border border-slate-200 bg-slate-50 p-4 md:p-5">
             <div
-              className={`overflow-hidden rounded-[1.75rem] border border-slate-200 shadow-sm ${labelLayout.widthClass}`}
+              ref={printRootRef}
+              className={`label-print-target overflow-hidden rounded-[1.75rem] border border-slate-200 shadow-sm ${labelLayout.widthClass}`}
               style={{ backgroundColor, borderTop: `8px solid ${accentColor}` }}
             >
               <div className={`grid gap-0 ${labelLayout.shellClass}`}>

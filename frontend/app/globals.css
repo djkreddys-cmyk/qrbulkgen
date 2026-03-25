@@ -44,3 +44,77 @@ button {
   background: #fde68a;
   color: #0f172a;
 }
+
+@media print {
+  body.label-print-mode {
+    background: #ffffff !important;
+  }
+
+  body.barcode-print-mode {
+    background: #ffffff !important;
+  }
+
+  body.label-print-mode nav,
+  body.label-print-mode .label-print-controls,
+  body.label-print-mode .label-print-preview-panel > :not(.label-print-target-wrap),
+  body.label-print-mode .label-print-page > h1,
+  body.label-print-mode .label-print-page > div > .label-print-controls {
+    display: none !important;
+  }
+
+  body.label-print-mode .label-print-page,
+  body.label-print-mode .label-print-page > div,
+  body.label-print-mode .label-print-preview-panel {
+    max-width: none !important;
+    width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    background: #ffffff !important;
+  }
+
+  body.label-print-mode .label-print-preview-panel {
+    display: block !important;
+  }
+
+  body.label-print-mode .label-print-target {
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  body.barcode-print-mode nav,
+  body.barcode-print-mode .barcode-print-controls,
+  body.barcode-print-mode .barcode-print-preview-panel > :not(.barcode-print-target-wrap),
+  body.barcode-print-mode .barcode-print-page > h1,
+  body.barcode-print-mode .barcode-print-page > div > .barcode-print-controls {
+    display: none !important;
+  }
+
+  body.barcode-print-mode .barcode-print-page,
+  body.barcode-print-mode .barcode-print-page > div,
+  body.barcode-print-mode .barcode-print-preview-panel {
+    max-width: none !important;
+    width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    background: #ffffff !important;
+  }
+
+  body.barcode-print-mode .barcode-print-preview-panel {
+    display: block !important;
+  }
+
+  body.barcode-print-mode .barcode-print-target {
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+}

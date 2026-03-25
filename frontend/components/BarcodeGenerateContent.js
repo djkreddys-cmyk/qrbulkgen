@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { buildBarcodeSvg } from "../lib/barcode"
 import { downloadCsv, parseCsv } from "../lib/csv"
 
@@ -77,6 +77,30 @@ export default function BarcodeGenerateContent({ mode = "single" }) {
       }),
     [backgroundColor, height, label, lineColor, margin, showText, textPosition, value, widthConfig],
   )
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return undefined
+    }
+
+    function handleAfterPrint() {
+      document.body.classList.remove("barcode-print-mode")
+    }
+
+    window.addEventListener("afterprint", handleAfterPrint)
+    return () => {
+      window.removeEventListener("afterprint", handleAfterPrint)
+      document.body.classList.remove("barcode-print-mode")
+    }
+  }, [])
+
+  function handlePrintBarcode() {
+    if (typeof window === "undefined") return
+    document.body.classList.add("barcode-print-mode")
+    window.setTimeout(() => {
+      window.print()
+    }, 50)
+  }
 
   function handleBulkCsvChange(event) {
     const file = event.target.files?.[0]
@@ -224,11 +248,11 @@ export default function BarcodeGenerateContent({ mode = "single" }) {
   }
 
   return (
-    <main className="mx-auto max-w-[90rem] px-4 py-10 md:px-5">
+    <main className="barcode-print-page mx-auto max-w-[90rem] px-4 py-10 md:px-5">
       <h1 className="text-3xl font-bold">Barcode Generator</h1>
 
       <div className="mt-8 grid grid-cols-1 gap-6 xl:grid-cols-[0.92fr_1.08fr]">
-        <section className="space-y-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <section className="barcode-print-controls space-y-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Barcode setup</p>
             <h2 className="mt-2 text-xl font-semibold text-slate-900">Create a production-ready barcode</h2>
@@ -340,7 +364,7 @@ export default function BarcodeGenerateContent({ mode = "single" }) {
           </div>
         </section>
 
-        <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <section className="barcode-print-preview-panel space-y-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Preview</p>
@@ -349,8 +373,15 @@ export default function BarcodeGenerateContent({ mode = "single" }) {
             <div className="flex flex-wrap gap-3">
               <button
                 type="button"
-                onClick={() => downloadFile(barcodeSvg, `${filename || "barcode"}.svg`, "image/svg+xml")}
+                onClick={handlePrintBarcode}
                 className="rounded-xl bg-black px-4 py-3 text-sm font-semibold text-white"
+              >
+                Print Barcode
+              </button>
+              <button
+                type="button"
+                onClick={() => downloadFile(barcodeSvg, `${filename || "barcode"}.svg`, "image/svg+xml")}
+                className="rounded-xl border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-900"
               >
                 Download SVG
               </button>
@@ -360,8 +391,8 @@ export default function BarcodeGenerateContent({ mode = "single" }) {
             </div>
           </div>
 
-          <div className="rounded-3xl border border-slate-200 bg-slate-50 p-6">
-            <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="barcode-print-target-wrap rounded-3xl border border-slate-200 bg-slate-50 p-6">
+            <div className="barcode-print-target rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Product</p>
