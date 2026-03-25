@@ -22,13 +22,6 @@ const marketingLinks = [
   { href: "/create-qr-codes-from-csv", label: "CSV QR" },
   { href: "/#seo-pages", label: "Use Cases" },
 ]
-const analysisMenuItems = [
-  { href: "/dashboard?type=qr&mode=single", label: "QR Code" },
-  { href: "/dashboard?type=short-url&mode=single", label: "Short URL" },
-  { href: "/dashboard?type=barcode&mode=single", label: "Barcode" },
-  { href: "/dashboard?type=label&mode=single", label: "Label" },
-]
-
 export default function Navbar() {
   const router = useRouter()
   const [session, setSession] = useState(null)
@@ -175,23 +168,7 @@ export default function Navbar() {
           {authed ? (
             <>
               <Link href="/generate?type=qr&mode=single">Generate</Link>
-              <div className="group relative">
-                <button type="button" className="inline-flex items-center gap-2">
-                  <span>Analysis</span>
-                  <span className="text-xs text-slate-500">▼</span>
-                </button>
-                <div className="invisible absolute left-0 top-full z-20 mt-2 w-48 rounded-2xl border border-slate-200 bg-white p-2 opacity-0 shadow-lg transition group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100">
-                  {analysisMenuItems.map((item) => (
-                    <Link
-                      key={item.href}
-                      href={item.href}
-                      className="block rounded-xl px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 hover:text-slate-950"
-                    >
-                      {item.label}
-                    </Link>
-                  ))}
-                </div>
-              </div>
+              <Link href="/dashboard?type=qr&mode=single">Analysis</Link>
               <Link href="/pricing">Pricing</Link>
             </>
           ) : (
