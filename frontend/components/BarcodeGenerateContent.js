@@ -50,6 +50,22 @@ function getBarcodeRequirements(barcodeType) {
     }
   }
 
+  if (barcodeType === "GS1-128") {
+    return {
+      hint: "GS1-128 needs GS1 application identifiers, for example (01) followed by a GTIN.",
+      sample: "(01)12345678901231",
+      valid: (value) => /^\(01\)\d{14}$/.test(String(value || "").trim()),
+    }
+  }
+
+  if (barcodeType === "GS1 DataBar") {
+    return {
+      hint: "GS1 DataBar should begin with the (01) application identifier and a 14-digit GTIN.",
+      sample: "(01)12345678901231",
+      valid: (value) => /^\(01\)\d{14}$/.test(String(value || "").trim()),
+    }
+  }
+
   return {
     hint: "",
     sample: "",
