@@ -412,6 +412,36 @@ export default function HomePageClient() {
         </div>
       </section>
 
+      <section id="seo-pages" className="space-y-6">
+        <div className="max-w-3xl">
+          <p className="text-sm font-semibold uppercase tracking-[0.22em] text-slate-500">SEO pages</p>
+          <h2 className="mt-3 text-[2.5rem] font-black tracking-tight text-slate-950">
+            Explore landing pages built for the workflows people actually search for.
+          </h2>
+          <p className="mt-4 leading-8 text-slate-600">
+            These pages target high-intent QR use cases like labels, CSV imports, packaging, classrooms,
+            restaurant tables, print sheets, and inventory rollouts so visitors can land on a page that
+            matches the job they need to get done.
+          </p>
+        </div>
+        <div className="grid auto-rows-fr gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {landingPages.map((page) => (
+            <Link
+              key={page.href}
+              href={page.href}
+              className="flex h-full flex-col rounded-[1.75rem] border border-white/80 bg-white/90 p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-lg"
+            >
+              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
+                {page.heroKicker}
+              </p>
+              <h3 className="mt-3 text-xl font-bold leading-tight text-slate-950">{page.title}</h3>
+              <p className="mt-3 text-sm leading-7 text-slate-600">{page.description}</p>
+              <p className="mt-5 text-sm font-semibold text-slate-950">Open page</p>
+            </Link>
+          ))}
+        </div>
+      </section>
+
       <section className="space-y-6">
         <div className="rounded-[2rem] border border-slate-200 bg-white/90 p-8 shadow-sm backdrop-blur">
           <p className="text-sm font-semibold uppercase tracking-[0.22em] text-slate-500">Analysis reports</p>

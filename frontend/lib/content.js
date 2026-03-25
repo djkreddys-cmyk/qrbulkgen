@@ -285,6 +285,150 @@ export const landingPages = [
     ],
   },
   {
+    slug: "bulk-qr-codes-for-inventory",
+    href: "/bulk-qr-codes-for-inventory",
+    title: "Bulk QR Codes for Inventory",
+    description:
+      "Generate bulk QR codes for inventory labels, bins, shelves, stock counts, warehouse workflows, and internal asset tracking from one CSV-based workflow.",
+    heroKicker: "Inventory workflow",
+    heroTitle: "Create bulk QR codes for inventory without slowing down warehouse operations.",
+    heroBody:
+      "Generate large batches of QR codes for shelves, pallets, bins, stock locations, and asset tags. QRBulkGen helps inventory teams move from spreadsheet rows to organized exports without manually building every label.",
+    bullets: [
+      "Create repeatable QR batches for bins, racks, SKUs, and location labels",
+      "Use CSV imports when inventory lists are too large for manual creation",
+      "Keep outputs organized for warehouse printing and operations handoff",
+    ],
+    workflowTitle: "Inventory QR generation needs predictable output, not one-off design work.",
+    workflowBody:
+      "Warehouse and operations teams need large, clean QR batches they can trust. The workflow should validate row data, keep filenames organized, and return assets that are easy to print, sort, and reuse during inventory updates.",
+    workflowPoints: [
+      "Prepare inventory data once for bins, shelves, or SKUs",
+      "Generate the full batch through the queued bulk workflow",
+      "Download organized exports for warehouse or fulfillment teams",
+    ],
+    faqs: [
+      {
+        question: "What inventory use cases fit this page?",
+        answer:
+          "Teams use it for warehouse bins, shelf labels, stock locations, product IDs, internal asset tracking, and fulfillment operations.",
+      },
+      {
+        question: "Why use bulk QR codes for inventory?",
+        answer:
+          "Bulk generation is faster and more reliable when you need many labels that share one style system and need to be printed or delivered together.",
+      },
+    ],
+  },
+  {
+    slug: "qr-codes-for-product-packaging",
+    href: "/qr-codes-for-product-packaging",
+    title: "QR Codes for Product Packaging",
+    description:
+      "Create packaging QR codes for inserts, labels, setup guides, support flows, warranties, promotions, and post-purchase product experiences.",
+    heroKicker: "Packaging use case",
+    heroTitle: "Connect product packaging to setup, support, and post-purchase experiences.",
+    heroBody:
+      "Use QRBulkGen to create QR codes for packaging inserts, product boxes, manuals, warranty activation, onboarding flows, and promotional campaigns. Keep branded outputs consistent across product lines and print runs.",
+    bullets: [
+      "Generate packaging QR codes for support docs, setup guides, and campaign destinations",
+      "Keep branding consistent across inserts, cartons, labels, and product families",
+      "Scale from one packaging test to bulk production when the workflow is ready",
+    ],
+    workflowTitle: "Packaging QR codes work best when operations and customer experience stay connected.",
+    workflowBody:
+      "A packaging QR code is not just a link on a box. It is part of the product experience. Teams need dependable output for print runs, plus flexible destinations for onboarding, support, galleries, PDFs, ratings, or campaign follow-up.",
+    workflowPoints: [
+      "Align packaging design with a branded QR style system",
+      "Generate inserts and product-linked codes in one repeatable workflow",
+      "Route scans into support, setup, feedback, or campaign experiences",
+    ],
+    faqs: [
+      {
+        question: "What can packaging QR codes link to?",
+        answer:
+          "Teams often link packaging scans to setup guides, support pages, warranty registration, product galleries, PDFs, ratings, or post-purchase feedback.",
+      },
+      {
+        question: "Can I create packaging QR codes in bulk?",
+        answer:
+          "Yes. QRBulkGen supports bulk generation for packaging runs that need many outputs with the same branding and organized file delivery.",
+      },
+    ],
+  },
+  {
+    slug: "qr-codes-for-classrooms",
+    href: "/qr-codes-for-classrooms",
+    title: "QR Codes for Classrooms",
+    description:
+      "Generate QR codes for classroom stations, worksheets, learning centers, assignments, reading corners, and student resource sheets.",
+    heroKicker: "Education use case",
+    heroTitle: "Make classroom QR code sets for stations, lessons, and student resources.",
+    heroBody:
+      "Teachers and schools can use QRBulkGen to create QR codes for learning centers, assignments, classroom signs, lab tables, resource sheets, and printed activities. Generate one code fast or batch an entire classroom set at once.",
+    bullets: [
+      "Create QR sheets for stations, activities, and student resources",
+      "Build printable classroom sets instead of recreating codes for every worksheet",
+      "Reuse one simple workflow for lessons, labs, and subject-based activities",
+    ],
+    workflowTitle: "Education teams need simple batch creation they can print and use immediately.",
+    workflowBody:
+      "Classroom QR codes are often prepared in groups: one lesson, one worksheet packet, one station rotation, or one resource wall. A batch workflow helps teachers spend less time rebuilding assets and more time preparing instruction.",
+    workflowPoints: [
+      "Collect the lesson links, text, or files you want students to access",
+      "Generate one classroom set with matching design and sizing",
+      "Print and distribute sheets, cards, or station materials quickly",
+    ],
+    faqs: [
+      {
+        question: "What classroom materials can use QR codes?",
+        answer:
+          "Teams use them for worksheets, station cards, reading centers, lab activities, classroom posters, assignment sheets, and student help resources.",
+      },
+      {
+        question: "Is QRBulkGen only for businesses?",
+        answer:
+          "No. It also fits classroom and school workflows where teachers need multiple QR codes for printed activities and student-friendly materials.",
+      },
+    ],
+  },
+  {
+    slug: "qr-codes-for-restaurant-tables",
+    href: "/qr-codes-for-restaurant-tables",
+    title: "QR Codes for Restaurant Tables",
+    description:
+      "Generate QR codes for restaurant tables, menus, feedback forms, promotions, table service flows, and location-specific dining experiences.",
+    heroKicker: "Restaurant use case",
+    heroTitle: "Create QR codes for restaurant tables, menus, and guest feedback.",
+    heroBody:
+      "Restaurants and cafes can use QRBulkGen to create table-specific QR codes for menus, ordering, payments, promotions, and review capture. Build one table set or generate a full location rollout in bulk.",
+    bullets: [
+      "Generate table QR codes for menus, payments, specials, and review flows",
+      "Create multiple table-specific codes for one dining room or multi-location rollout",
+      "Use the same styling system across every table, menu card, or tent card",
+    ],
+    workflowTitle: "Dining room QR workflows are easier when the full table set is created together.",
+    workflowBody:
+      "Restaurant teams often need one QR code per table, section, room, or promotion. The workflow should make those batches easy to build, simple to print, and consistent enough that each table looks like part of the same guest experience.",
+    workflowPoints: [
+      "Prepare the table, menu, or promotion data for the location",
+      "Generate the full set of table QR codes in one branded run",
+      "Print and deploy the finished assets across the dining room",
+    ],
+    faqs: [
+      {
+        question: "Can each restaurant table have its own QR code?",
+        answer:
+          "Yes. Teams often generate one QR code per table so each surface can route to the right menu, service flow, or feedback experience.",
+      },
+      {
+        question: "Can this help with multiple locations?",
+        answer:
+          "Yes. Bulk generation is helpful when restaurant groups need organized exports for different rooms, sections, or locations.",
+      },
+    ],
+  },
+  {
     slug: "single-qr-codes",
     href: "/single-qr-codes",
     title: "Single QR Code Generator",

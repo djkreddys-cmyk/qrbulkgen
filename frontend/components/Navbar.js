@@ -7,6 +7,12 @@ import { useEffect, useState } from "react"
 import { clearAuthSession, getAuthUser, isAuthenticated, loadAuthSession } from "../lib/auth"
 
 const MOBILE_APP_INSTALL_URL = process.env.NEXT_PUBLIC_ANDROID_APP_URL || ""
+const marketingLinks = [
+  { href: "/bulk-qr-codes", label: "Bulk QR" },
+  { href: "/qr-code-generator-for-labels", label: "Label QR" },
+  { href: "/create-qr-codes-from-csv", label: "CSV QR" },
+  { href: "/#seo-pages", label: "SEO Pages" },
+]
 
 export default function Navbar() {
   const router = useRouter()
@@ -99,14 +105,20 @@ export default function Navbar() {
           {appPromptMessage ? <p className="text-xs text-slate-500 md:text-right">{appPromptMessage}</p> : null}
         </div>
       ) : null}
-      <nav className="flex justify-between items-center p-6 border-b">
+      <nav className="flex flex-col gap-4 border-b p-6 lg:flex-row lg:items-center lg:justify-between">
         <h1 className="text-xl font-bold">QRBulkGen</h1>
 
-        <div className="flex items-center gap-6 text-gray-700">
+        <div className="flex flex-wrap items-center gap-4 text-gray-700 lg:gap-6">
           {!authed ? <Link href="/">Home</Link> : null}
           <Link href="/generate">Generate</Link>
           <Link href="/pricing">Pricing</Link>
+          <Link href="/#insights">Blog</Link>
           <Link href="/dashboard">Dashboard</Link>
+          {marketingLinks.map((link) => (
+            <Link key={link.href} href={link.href} className="text-sm text-slate-600 hover:text-slate-950">
+              {link.label}
+            </Link>
+          ))}
 
           {authed ? (
             <>
