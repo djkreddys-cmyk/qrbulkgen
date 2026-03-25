@@ -72,12 +72,10 @@ export function buildBarcodeSvg(value, options = {}) {
   }
 
   try {
-    return bwipjs.toSVG({
+    const bwipOptions = {
       bcid: format.bcid,
       text,
       scale: getScale(options.widthPreset, format.family === "matrix"),
-      height: format.family === "matrix" ? undefined : Math.max(10, Number(options.barHeight || 96) / 10),
-      width: format.family === "matrix" ? Math.max(10, Number(options.barHeight || 96) / 8) : undefined,
       includetext: format.family === "matrix" ? false : showText,
       alttext: format.family === "matrix" ? undefined : options.label || text,
       textxalign: "center",
@@ -88,7 +86,15 @@ export function buildBarcodeSvg(value, options = {}) {
       barcolor: toHexColor(options.fillColor, "0f172a"),
       textcolor: toHexColor(options.fillColor, "0f172a"),
       backgroundcolor: toHexColor(options.backgroundColor, "ffffff"),
-    })
+    }
+
+    if (format.family === "matrix") {
+      bwipOptions.width = Math.max(10, Number(options.barHeight || 96) / 8)
+    } else {
+      bwipOptions.height = Math.max(10, Number(options.barHeight || 96) / 10)
+    }
+
+    return bwipjs.toSVG(bwipOptions)
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "This value is not valid for the selected format."
     return buildFallbackSvg(errorMessage, options)
