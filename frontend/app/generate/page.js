@@ -4,6 +4,8 @@ import Link from "next/link"
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import Navbar from "../../components/Navbar"
+import BarcodeGenerateContent from "../../components/BarcodeGenerateContent"
+import LabelGenerateContent from "../../components/LabelGenerateContent"
 import { SingleGenerateContent } from "./single/page"
 import { BulkGenerateContent } from "../upload/page"
 import { isAuthenticated } from "../../lib/auth"
@@ -26,7 +28,7 @@ export default function GeneratePage() {
 
     const params = new URLSearchParams(window.location.search)
     const queryMode = params.get("mode")
-    if (queryMode === "bulk" || queryMode === "single") {
+    if (["bulk", "single", "barcode", "labels"].includes(queryMode)) {
       setMode(queryMode)
     }
     setIsCheckingSession(false)
@@ -57,6 +59,20 @@ export default function GeneratePage() {
               >
                 Bulk
               </button>
+              <button
+                type="button"
+                onClick={() => handleModeChange("barcode")}
+                className={`border-l border-slate-900 px-5 py-2.5 text-sm font-semibold transition ${mode === "barcode" ? "bg-slate-950 text-white" : "text-slate-900 hover:bg-slate-50"}`}
+              >
+                Barcode
+              </button>
+              <button
+                type="button"
+                onClick={() => handleModeChange("labels")}
+                className={`border-l border-slate-900 px-5 py-2.5 text-sm font-semibold transition ${mode === "labels" ? "bg-slate-950 text-white" : "text-slate-900 hover:bg-slate-50"}`}
+              >
+                Labels
+              </button>
             </div>
             <div className="hidden h-10 w-24 rounded-2xl bg-gradient-to-r from-slate-100 via-white to-slate-100 md:block" />
           </div>
@@ -74,7 +90,10 @@ export default function GeneratePage() {
         </div>
       </main>
 
-      {mode === "single" ? <SingleGenerateContent embedded /> : <BulkGenerateContent embedded />}
+      {mode === "single" ? <SingleGenerateContent embedded /> : null}
+      {mode === "bulk" ? <BulkGenerateContent embedded /> : null}
+      {mode === "barcode" ? <BarcodeGenerateContent /> : null}
+      {mode === "labels" ? <LabelGenerateContent /> : null}
     </div>
   )
 }

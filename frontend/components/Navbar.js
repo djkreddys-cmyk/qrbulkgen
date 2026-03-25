@@ -111,16 +111,24 @@ export default function Navbar() {
         <h1 className="text-xl font-bold">QRBulkGen</h1>
 
         <div className="flex flex-wrap items-center gap-4 text-gray-700 lg:gap-6">
-          {!authed ? <Link href="/">Home</Link> : null}
-          <Link href="/pricing">Pricing</Link>
-          <Link href="/#insights">Blog</Link>
-          {marketingLinks.map((link) => (
-            <Link key={link.href} href={link.href} className="text-sm text-slate-600 hover:text-slate-950">
-              {link.label}
-            </Link>
-          ))}
-          {authed ? <Link href="/generate">Generate</Link> : null}
-          {authed ? <Link href="/dashboard">Dashboard</Link> : null}
+          {authed ? (
+            <>
+              <Link href="/generate">Generate</Link>
+              <Link href="/dashboard">Dashboard</Link>
+              <Link href="/pricing">Pricing</Link>
+            </>
+          ) : (
+            <>
+              <Link href="/">Home</Link>
+              <Link href="/pricing">Pricing</Link>
+              <Link href="/#insights">Blog</Link>
+              {marketingLinks.map((link) => (
+                <Link key={link.href} href={link.href} className="text-sm text-slate-600 hover:text-slate-950">
+                  {link.label}
+                </Link>
+              ))}
+            </>
+          )}
 
           {authed ? (
             <>
