@@ -25,6 +25,16 @@ function normalizeBoolean(value, fallback = true) {
   return ["true", "yes", "1", "on"].includes(source)
 }
 
+function toDownloadName(value) {
+  const normalized = String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+
+  return normalized || "barcode"
+}
+
 function getBarcodeRequirements(barcodeType) {
   if (barcodeType === "EAN-13") {
     return {
@@ -96,10 +106,6 @@ export default function BarcodeGenerateContent({ mode = "single" }) {
   const [barcodeFamily, setBarcodeFamily] = useState("linear")
   const [barcodeType, setBarcodeType] = useState("Code 128")
   const [value, setValue] = useState("QRBULKGEN-001")
-  const [productName, setProductName] = useState("Premium Coffee Beans")
-  const [sku, setSku] = useState("SKU-COF-250")
-  const [label, setLabel] = useState("QRBULKGEN-001")
-  const [filename, setFilename] = useState("barcode")
   const [widthPreset, setWidthPreset] = useState("medium")
   const [height, setHeight] = useState(116)
   const [margin, setMargin] = useState(18)
@@ -148,10 +154,7 @@ export default function BarcodeGenerateContent({ mode = "single" }) {
     }
 
     setValue(barcodeRequirements.sample)
-    if (!matrixMode) {
-      setLabel(barcodeRequirements.sample)
-    }
-  }, [barcodeRequirements, matrixMode, value])
+  }, [barcodeRequirements, value])
 
   useEffect(() => {
     const preset = a4PresetOptions.find((option) => option.value === a4Preset)
@@ -172,19 +175,16 @@ export default function BarcodeGenerateContent({ mode = "single" }) {
         widthPreset,
         fillColor: lineColor,
         backgroundColor,
-        label: showText && !matrixMode ? label || value : "",
+        label: showText && !matrixMode ? value : "",
         textPosition,
       }),
-    [backgroundColor, barcodeType, height, label, lineColor, margin, matrixMode, showText, textPosition, value, widthPreset],
+    [backgroundColor, barcodeType, height, lineColor, margin, matrixMode, showText, textPosition, value, widthPreset],
   )
 
   const printItems = useMemo(
     () => [
       {
         value,
-        productName,
-        sku,
-        label,
         barcodeType,
         width: widthPreset,
         height,
@@ -196,7 +196,7 @@ export default function BarcodeGenerateContent({ mode = "single" }) {
         copies,
       },
     ],
-    [backgroundColor, barcodeType, copies, height, label, lineColor, margin, productName, showText, sku, textPosition, value, widthPreset],
+    [backgroundColor, barcodeType, copies, height, lineColor, margin, showText, textPosition, value, widthPreset],
   )
 
   const a4Layout = useMemo(
@@ -393,7 +393,6 @@ export default function BarcodeGenerateContent({ mode = "single" }) {
                           backgroundColor,
                           showText,
                           value,
-                          label,
                           barcodeType,
                           widthPreset,
                           textPosition,
@@ -411,7 +410,6 @@ export default function BarcodeGenerateContent({ mode = "single" }) {
   }
 
   function renderBarcodePrintCard(item, key, variant = "full") {
-    const itemFormat = getBarcodeFormat(item.barcodeType || barcodeType)
     const itemMatrixMode = isMatrixBarcode(item.barcodeType || barcodeType)
     const itemSvg = renderBarcode(item, {
       height,
@@ -420,7 +418,6 @@ export default function BarcodeGenerateContent({ mode = "single" }) {
       backgroundColor,
       showText,
       value,
-      label,
       barcodeType,
       widthPreset,
       textPosition,
@@ -430,22 +427,10 @@ export default function BarcodeGenerateContent({ mode = "single" }) {
     return (
       <div
         key={key}
-        className={`border border-slate-200 bg-white ${compact ? "min-h-[8.5rem] rounded-2xl p-3" : "rounded-3xl p-6 shadow-sm"}`}
+        className={`border border-slate-200 bg-white ${compact ? "min-h-[7rem] rounded-2xl p-3" : "rounded-3xl p-4 shadow-sm"}`}
       >
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{itemMatrixMode ? "2D code" : "Product"}</p>
-            <h3 className={`mt-2 font-black text-slate-950 ${compact ? "text-base leading-tight" : "text-2xl"}`}>
-              {item.productName || productName || "Product Name"}
-            </h3>
-            <p className={`mt-1 text-slate-500 ${compact ? "text-xs" : "text-sm"}`}>{item.sku || sku || "SKU"}</p>
-          </div>
-          <div className={`rounded-full bg-slate-100 font-semibold text-slate-700 ${compact ? "px-2 py-1 text-[11px]" : "px-3 py-2 text-sm"}`}>
-            {itemFormat.value}
-          </div>
-        </div>
         <div
-          className={`overflow-auto border border-slate-200 bg-white ${compact ? "mt-3 rounded-xl p-2" : "mt-6 rounded-2xl p-5 shadow-inner"} ${itemMatrixMode ? "flex justify-center" : ""}`}
+          className={`overflow-auto border border-slate-200 bg-white ${compact ? "rounded-xl p-2" : "rounded-2xl p-4 shadow-inner"} ${itemMatrixMode ? "flex justify-center" : ""}`}
           dangerouslySetInnerHTML={{ __html: itemSvg }}
         />
       </div>
@@ -489,40 +474,34 @@ export default function BarcodeGenerateContent({ mode = "single" }) {
             </button>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-2">
-            <div>
-              <label className="mb-1 block text-sm">Barcode Type</label>
-              <select value={barcodeType} onChange={(e) => setBarcodeType(e.target.value)} className="w-full rounded-xl border p-2.5">
-                {barcodeFamily === "matrix" ? (
-                  matrixFormats.map((format) => (
-                    <option key={format.value} value={format.value}>
-                      {format.value}
-                    </option>
-                  ))
-                ) : (
-                  <>
-                    <optgroup label="Standard">
-                      {standardLinearFormats.map((format) => (
-                        <option key={format.value} value={format.value}>
-                          {format.value}
-                        </option>
-                      ))}
-                    </optgroup>
-                    <optgroup label="Advanced">
-                      {advancedLinearFormats.map((format) => (
-                        <option key={format.value} value={format.value}>
-                          {format.value}
-                        </option>
-                      ))}
-                    </optgroup>
-                  </>
-                )}
-              </select>
-            </div>
-            <div>
-              <label className="mb-1 block text-sm">Filename</label>
-              <input value={filename} onChange={(e) => setFilename(e.target.value)} className="w-full rounded-xl border p-2.5" />
-            </div>
+          <div>
+            <label className="mb-1 block text-sm">Barcode Type</label>
+            <select value={barcodeType} onChange={(e) => setBarcodeType(e.target.value)} className="w-full rounded-xl border p-2.5">
+              {barcodeFamily === "matrix" ? (
+                matrixFormats.map((format) => (
+                  <option key={format.value} value={format.value}>
+                    {format.value}
+                  </option>
+                ))
+              ) : (
+                <>
+                  <optgroup label="Standard">
+                    {standardLinearFormats.map((format) => (
+                      <option key={format.value} value={format.value}>
+                        {format.value}
+                      </option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="Advanced">
+                    {advancedLinearFormats.map((format) => (
+                      <option key={format.value} value={format.value}>
+                        {format.value}
+                      </option>
+                    ))}
+                  </optgroup>
+                </>
+              )}
+            </select>
           </div>
 
           <div>
@@ -533,17 +512,6 @@ export default function BarcodeGenerateContent({ mode = "single" }) {
                 {barcodeRequirements.hint}
               </p>
             ) : null}
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-2">
-            <div>
-              <label className="mb-1 block text-sm">Product Name</label>
-              <input value={productName} onChange={(e) => setProductName(e.target.value)} className="w-full rounded-xl border p-2.5" />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm">SKU</label>
-              <input value={sku} onChange={(e) => setSku(e.target.value)} className="w-full rounded-xl border p-2.5" />
-            </div>
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
@@ -578,13 +546,6 @@ export default function BarcodeGenerateContent({ mode = "single" }) {
               />
             </div>
           </div>
-
-          {!matrixMode ? (
-            <div>
-              <label className="mb-1 block text-sm">Display Label</label>
-              <input value={label} onChange={(e) => setLabel(e.target.value)} className="w-full rounded-xl border p-2.5" />
-            </div>
-          ) : null}
 
           <div className="grid gap-4 md:grid-cols-2">
             <div>
@@ -801,7 +762,7 @@ export default function BarcodeGenerateContent({ mode = "single" }) {
               </button>
               <button
                 type="button"
-                onClick={() => downloadFile(barcodeSvg, `${filename || "barcode"}.svg`, "image/svg+xml")}
+                onClick={() => downloadFile(barcodeSvg, `${toDownloadName(value)}.svg`, "image/svg+xml")}
                 className="rounded-xl border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-900"
               >
                 Download SVG
@@ -891,24 +852,6 @@ export default function BarcodeGenerateContent({ mode = "single" }) {
             </div>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-3">
-            <div className="rounded-2xl bg-slate-50 p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Best for</p>
-              <p className="mt-2 text-sm text-slate-700">{activeFormat.description}</p>
-            </div>
-            <div className="rounded-2xl bg-slate-50 p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">{matrixMode ? "2D path" : "Text mode"}</p>
-              <p className="mt-2 text-sm text-slate-700">
-                {matrixMode ? "Separate matrix renderer with compact 2D output." : showText ? `Visible ${textPosition}` : "Hidden from preview and download"}
-              </p>
-            </div>
-            <div className="rounded-2xl bg-slate-50 p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Engine</p>
-              <p className="mt-2 text-sm text-slate-700">
-                {activeFormat.group === "advanced" ? "Advanced format rendered with real bwip-js encoding." : "Rendered with real format encoding through bwip-js."}
-              </p>
-            </div>
-          </div>
         </section>
       </div>
     </main>
