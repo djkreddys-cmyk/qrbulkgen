@@ -141,6 +141,42 @@ export const landingPages = [
     ],
   },
   {
+    slug: "barcode-generator",
+    href: "/barcode-generator",
+    title: "Barcode Generator",
+    description:
+      "Generate barcodes for inventory, packaging, retail, asset tracking, shipping labels, and product operations from a workflow built for production use.",
+    heroKicker: "Barcode workflow",
+    heroTitle: "Create barcodes for inventory, products, and operational labeling.",
+    heroBody:
+      "Barcode generation is a natural next step for teams already using QR workflows. Use this page to position QRBulkGen for product labels, warehouse operations, asset tags, retail shelves, and shipping processes that still rely on scannable barcode standards.",
+    bullets: [
+      "Support inventory, SKU, asset, and product barcode workflows",
+      "Pair barcode generation with packaging, labeling, and print handoff needs",
+      "Position the platform beyond QR-only use cases for operations teams",
+    ],
+    workflowTitle: "Barcode generation belongs in the same operational system as QR and label workflows.",
+    workflowBody:
+      "Most teams do not think in separate tools for QR, barcode, and labels. They think in terms of outputs they need to print and use in the real world. Adding barcode coverage helps QRBulkGen fit packaging, warehouse, and retail workflows more naturally.",
+    workflowPoints: [
+      "Use barcode pages to target inventory, retail, and warehouse search intent",
+      "Pair barcode messaging with existing packaging and label SEO pages",
+      "Guide visitors into the product even before the full barcode engine ships",
+    ],
+    faqs: [
+      {
+        question: "Who needs a barcode generator page?",
+        answer:
+          "Operations, warehouse, retail, fulfillment, packaging, and internal asset teams often search specifically for barcode generation rather than QR generation.",
+      },
+      {
+        question: "Can barcode and QR workflows live together?",
+        answer:
+          "Yes. Many product, packaging, and inventory workflows need both barcodes and QR codes, often on the same label or print run.",
+      },
+    ],
+  },
+  {
     slug: "qr-code-generator-for-labels",
     href: "/qr-code-generator-for-labels",
     title: "QR Code Generator for Labels",
@@ -177,6 +213,42 @@ export const landingPages = [
     ],
   },
   {
+    slug: "label-generator",
+    href: "/label-generator",
+    title: "Label Generator",
+    description:
+      "Create label-ready assets for inventory, products, shipping, packaging, asset tags, and printable operations workflows with QR, barcode, and text fields.",
+    heroKicker: "Label builder",
+    heroTitle: "Generate labels for products, inventory, packaging, and operations.",
+    heroBody:
+      "A label generator is more than a QR tool. Teams need a workflow that can eventually combine QR codes, barcodes, names, SKUs, batch numbers, pricing, and printable layouts into one production-ready label experience.",
+    bullets: [
+      "Position label generation for inventory, asset tags, and product packaging",
+      "Support print-ready workflows instead of one-off image creation",
+      "Connect QR, barcode, and text-based fields under one label story",
+    ],
+    workflowTitle: "Label generation should match how teams actually prepare items for print and use.",
+    workflowBody:
+      "When people search for a label generator, they usually want something practical: printable outputs, consistent naming, repeatable templates, and the ability to include scannable codes plus supporting text. That complements QRBulkGen's current strengths well.",
+    workflowPoints: [
+      "Use label-focused pages for higher-intent operational search traffic",
+      "Bridge from QR workflows into packaging, stock, and product labeling",
+      "Set up the product story for future printable label templates and exports",
+    ],
+    faqs: [
+      {
+        question: "What kinds of labels fit this page?",
+        answer:
+          "It fits product labels, stock labels, warehouse tags, packaging inserts, asset tags, shelf labels, and shipping-related workflows.",
+      },
+      {
+        question: "Can a label include both QR and barcode content?",
+        answer:
+          "Yes. In many real-world workflows, teams need labels that combine barcodes, QR codes, titles, SKUs, prices, or internal identifiers.",
+      },
+    ],
+  },
+  {
     slug: "create-qr-codes-from-csv",
     href: "/create-qr-codes-from-csv",
     title: "Create QR Codes from CSV",
@@ -209,6 +281,42 @@ export const landingPages = [
         question: "Why use CSV instead of single generation?",
         answer:
           "CSV generation is better for repeatable batches like packaging, inventory, event check-in assets, and segmented campaigns where many rows share one visual system.",
+      },
+    ],
+  },
+  {
+    slug: "bulk-barcode-generator",
+    href: "/bulk-barcode-generator",
+    title: "Bulk Barcode Generator",
+    description:
+      "Create barcodes in bulk for inventory lists, product catalogs, warehouse bins, retail operations, and printable labeling workflows.",
+    heroKicker: "Bulk barcode workflow",
+    heroTitle: "Generate bulk barcodes from spreadsheet-style operational data.",
+    heroBody:
+      "Bulk barcode generation speaks directly to inventory and retail teams that work from SKUs, stock sheets, asset lists, and warehouse exports. This page gives QRBulkGen a search presence around production-scale barcode jobs and print-ready handoff.",
+    bullets: [
+      "Target teams working from spreadsheets, SKU exports, and product catalogs",
+      "Align barcode messaging with bulk imports and print operations",
+      "Expand the platform story beyond QR-only batch generation",
+    ],
+    workflowTitle: "Bulk barcode generation should feel operational from import to export.",
+    workflowBody:
+      "The core value of a bulk barcode workflow is not the image itself. It is the ability to move rows of operational data into organized output that can be printed, sorted, and shared with warehouse or packaging teams.",
+    workflowPoints: [
+      "Use CSV-style messaging to attract spreadsheet-driven teams",
+      "Support inventory, catalog, and warehouse bulk use cases in SEO",
+      "Connect barcode demand to the existing batch-generation product story",
+    ],
+    faqs: [
+      {
+        question: "Why create a bulk barcode page separately from QR?",
+        answer:
+          "Because many users search specifically for bulk barcode generation when they are solving inventory, retail, or packaging tasks and may not search for QR at all.",
+      },
+      {
+        question: "What workflows would this page target?",
+        answer:
+          "Product catalogs, warehouse bins, internal assets, stock systems, SKU lists, packaging runs, and retail label operations.",
       },
     ],
   },
@@ -425,6 +533,42 @@ export const landingPages = [
         question: "Can this help with multiple locations?",
         answer:
           "Yes. Bulk generation is helpful when restaurant groups need organized exports for different rooms, sections, or locations.",
+      },
+    ],
+  },
+  {
+    slug: "product-label-generator",
+    href: "/product-label-generator",
+    title: "Product Label Generator",
+    description:
+      "Create product labels for packaging, shelves, retail, warehouse stock, SKU tags, and post-purchase product experiences with scannable codes and printable layouts.",
+    heroKicker: "Product labeling",
+    heroTitle: "Build product labels that connect packaging, stock, and customer experience.",
+    heroBody:
+      "A product label generator helps teams create labels that can include SKU data, names, scannable QR codes, barcode-ready positioning, support links, and printable layouts. This page strengthens QRBulkGen for ecommerce, retail, and packaged goods use cases.",
+    bullets: [
+      "Position the platform for retail, ecommerce, packaging, and shelf workflows",
+      "Support labels that may combine branding, SKU data, QR, and barcodes",
+      "Tie product labels to packaging pages and inventory SEO routes",
+    ],
+    workflowTitle: "Product labels sit at the intersection of packaging, inventory, and brand.",
+    workflowBody:
+      "Teams creating product labels need more than a generic code generator. They care about packaging consistency, warehouse readability, and what happens when a customer scans the code later. That makes product labeling a strong SEO and product expansion path for QRBulkGen.",
+    workflowPoints: [
+      "Use this page to capture product-label search demand",
+      "Link brand, packaging, and operations workflows in one story",
+      "Prepare the site for future product-label templates and print exports",
+    ],
+    faqs: [
+      {
+        question: "Who would use a product label generator page?",
+        answer:
+          "Retail brands, ecommerce teams, warehouse operators, fulfillment teams, and packaging managers looking for printable scannable labels.",
+      },
+      {
+        question: "What can product labels include?",
+        answer:
+          "They often include names, SKUs, internal identifiers, branding, QR codes, barcodes, setup links, support links, or post-purchase experience links.",
       },
     ],
   },

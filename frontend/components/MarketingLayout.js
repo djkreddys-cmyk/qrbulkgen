@@ -32,6 +32,8 @@ export function MarketingShell({ children }) {
             <Link href="/pricing" className="hover:text-slate-950">Pricing</Link>
             <Link href="/#insights" className="hover:text-slate-950">Insights</Link>
             <Link href="/bulk-qr-codes" className="hover:text-slate-950">Bulk QR</Link>
+            <Link href="/barcode-generator" className="hover:text-slate-950">Barcode</Link>
+            <Link href="/label-generator" className="hover:text-slate-950">Labels</Link>
             <Link href="/qr-code-generator-for-labels" className="hover:text-slate-950">Label QR</Link>
             <Link href="/create-qr-codes-from-csv" className="hover:text-slate-950">CSV QR</Link>
             <Link href="/single-qr-codes" className="hover:text-slate-950">Single QR</Link>

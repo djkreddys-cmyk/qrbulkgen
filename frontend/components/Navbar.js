@@ -9,9 +9,11 @@ import { clearAuthSession, getAuthUser, isAuthenticated, loadAuthSession } from 
 const MOBILE_APP_INSTALL_URL = process.env.NEXT_PUBLIC_ANDROID_APP_URL || ""
 const marketingLinks = [
   { href: "/bulk-qr-codes", label: "Bulk QR" },
+  { href: "/barcode-generator", label: "Barcode" },
+  { href: "/label-generator", label: "Labels" },
   { href: "/qr-code-generator-for-labels", label: "Label QR" },
   { href: "/create-qr-codes-from-csv", label: "CSV QR" },
-  { href: "/#seo-pages", label: "SEO Pages" },
+  { href: "/#seo-pages", label: "Use Cases" },
 ]
 
 export default function Navbar() {
@@ -110,15 +112,15 @@ export default function Navbar() {
 
         <div className="flex flex-wrap items-center gap-4 text-gray-700 lg:gap-6">
           {!authed ? <Link href="/">Home</Link> : null}
-          <Link href="/generate">Generate</Link>
           <Link href="/pricing">Pricing</Link>
           <Link href="/#insights">Blog</Link>
-          <Link href="/dashboard">Dashboard</Link>
           {marketingLinks.map((link) => (
             <Link key={link.href} href={link.href} className="text-sm text-slate-600 hover:text-slate-950">
               {link.label}
             </Link>
           ))}
+          {authed ? <Link href="/generate">Generate</Link> : null}
+          {authed ? <Link href="/dashboard">Dashboard</Link> : null}
 
           {authed ? (
             <>

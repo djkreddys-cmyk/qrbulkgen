@@ -6,7 +6,9 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:4
 
 const RESERVED_SLUGS = new Set([
   "api",
+  "barcode-generator",
   "blog",
+  "bulk-barcode-generator",
   "bulk-qr-codes",
   "bulk-qr-codes-for-inventory",
   "create-qr-codes-from-csv",
@@ -20,6 +22,7 @@ const RESERVED_SLUGS = new Set([
   "print-multiple-qr-codes-on-one-page",
   "private-qr-code-generator",
   "pricing",
+  "product-label-generator",
   "q",
   "qr-code-generator-for-labels",
   "qr-codes-for-classrooms",
