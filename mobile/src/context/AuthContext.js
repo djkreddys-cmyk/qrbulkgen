@@ -4,13 +4,13 @@ import { apiRequest, createAuthHeaders } from "../lib/api";
 import { clearStoredSession, loadStoredSession, saveStoredSession } from "../lib/storage";
 
 const AuthContext = createContext(null);
-const PROTECTED_ROUTES = ["dashboard", "scanner", "single-generate", "bulk-jobs", "short-links"];
+const PROTECTED_ROUTES = ["dashboard", "generate", "analysis", "scanner", "single-generate", "bulk-jobs", "short-links"];
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState("");
   const [screen, setScreen] = useState("login");
-  const [activeRoute, setActiveRoute] = useState("dashboard");
+  const [activeRoute, setActiveRoute] = useState("analysis");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isBootstrapping, setIsBootstrapping] = useState(true);
   const [error, setError] = useState("");
@@ -37,7 +37,7 @@ export function AuthProvider({ children }) {
       setToken(stored.token);
       setUser(data.user || stored.user || null);
       setScreen("app");
-      setActiveRoute("dashboard");
+      setActiveRoute("analysis");
       setSingleDraft(null);
       setBulkDraft(null);
       } catch {
@@ -67,7 +67,7 @@ export function AuthProvider({ children }) {
       setUser(data.user || null);
       setToken(data.token || "");
       setScreen("app");
-      setActiveRoute("dashboard");
+      setActiveRoute("analysis");
       setSingleDraft(null);
       setBulkDraft(null);
       await saveStoredSession({
@@ -94,7 +94,7 @@ export function AuthProvider({ children }) {
       setUser(data.user || null);
       setToken(data.token || "");
       setScreen("app");
-      setActiveRoute("dashboard");
+      setActiveRoute("analysis");
       setSingleDraft(null);
       await saveStoredSession({
         token: data.token || "",
@@ -149,7 +149,7 @@ export function AuthProvider({ children }) {
   async function completePasswordReset() {
     setUser(null);
     setToken("");
-    setActiveRoute("dashboard");
+    setActiveRoute("analysis");
     setSingleDraft(null);
     setBulkDraft(null);
     setResetPasswordToken("");
@@ -177,7 +177,7 @@ export function AuthProvider({ children }) {
     setUser(null);
     setToken("");
     setScreen("login");
-    setActiveRoute("dashboard");
+    setActiveRoute("analysis");
     setError("");
     setSingleDraft(null);
     setResetPasswordToken("");

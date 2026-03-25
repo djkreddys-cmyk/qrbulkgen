@@ -241,7 +241,7 @@ function buildTrendQuery(filter = {}) {
   return text ? `?${text}` : "";
 }
 
-export function ShortLinksScreen({ variant = "create" }) {
+export function ShortLinksScreen({ variant = "create", mode = "single" }) {
   const { token } = useAuth();
   const [title, setTitle] = useState("");
   const [targetUrl, setTargetUrl] = useState("");
@@ -476,10 +476,10 @@ export function ShortLinksScreen({ variant = "create" }) {
     <View style={{ gap: 16, paddingBottom: 36 }}>
       <Card>
         <SectionEyebrow>CONTROL CENTER</SectionEyebrow>
-        <Text style={{ fontSize: 24, fontWeight: "700", color: "#0f172a" }}>{isDashboardVariant ? "Short URL Dashboard" : "Short URL"}</Text>
+        <Text style={{ fontSize: 24, fontWeight: "700", color: "#0f172a" }}>{isDashboardVariant ? `${mode === "bulk" ? "Bulk" : "Single"} Short URL Analysis` : "Short URL"}</Text>
         <Text style={{ color: "#64748b", lineHeight: 22 }}>
           {isDashboardVariant
-            ? "Open analysis on each saved short URL to review clicks, visitors, expiry status, and related link performance from mobile."
+            ? `Open ${mode} short URL analysis here. Saved short URLs are not yet tagged separately by creation mode, so this mobile view currently shows the same saved link dataset under both tabs.`
             : "Create clean short URLs like qrbulkgen.com/a7K9xQ, manage expiry, and then review analytics from the dashboard workspace."}
         </Text>
       </Card>

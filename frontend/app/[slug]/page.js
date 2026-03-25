@@ -37,6 +37,7 @@ const RESERVED_SLUGS = new Set([
   "short-links",
   "single-qr-codes",
   "upload",
+  "use-cases",
 ])
 
 export default async function ShortLinkRedirectPage({ params }) {

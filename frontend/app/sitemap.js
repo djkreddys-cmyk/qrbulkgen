@@ -6,6 +6,7 @@ export default function sitemap() {
     "/pricing",
     "/blog",
     "/generate",
+    "/use-cases",
     "/barcode-generator",
     "/bulk-qr-codes",
     "/bulk-barcode-generator",

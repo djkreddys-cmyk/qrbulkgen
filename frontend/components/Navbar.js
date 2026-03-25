@@ -15,12 +15,7 @@ import {
 
 const MOBILE_APP_INSTALL_URL = process.env.NEXT_PUBLIC_ANDROID_APP_URL || ""
 const marketingLinks = [
-  { href: "/bulk-qr-codes", label: "Bulk QR" },
-  { href: "/barcode-generator", label: "Barcode" },
-  { href: "/label-generator", label: "Labels" },
-  { href: "/qr-code-generator-for-labels", label: "Label QR" },
-  { href: "/create-qr-codes-from-csv", label: "CSV QR" },
-  { href: "/#seo-pages", label: "Use Cases" },
+  { href: "/use-cases", label: "Use Cases" },
 ]
 export default function Navbar() {
   const router = useRouter()

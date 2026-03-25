@@ -343,7 +343,7 @@ function getShareUrl(job) {
   return "";
 }
 
-export function DashboardScreen() {
+export function DashboardScreen({ mode = "single", hideWorkspaceTabs = false }) {
   const { token, navigate, setSingleDraft, setBulkDraft } = useAuth();
   const [workspace, setWorkspace] = useState("qr");
   const [filters, setFilters] = useState({ startDate: "", endDate: "", qrType: "all", status: "active" });
@@ -536,6 +536,10 @@ export function DashboardScreen() {
 
   const filteredJobs = useMemo(() => {
     return jobs.filter((job) => {
+      if (job.jobType !== mode) {
+        return false;
+      }
+
       if (filters.qrType !== "all" && job.qrType !== filters.qrType) {
         return false;
       }
@@ -554,7 +558,7 @@ export function DashboardScreen() {
 
       return true;
     });
-  }, [filters.qrType, filters.status, jobs]);
+  }, [filters.qrType, filters.status, jobs, mode]);
 
   function handleEditJob(job) {
     if (job.jobType === "single") {
@@ -596,6 +600,7 @@ export function DashboardScreen() {
 
   return (
     <ScrollView contentContainerStyle={{ gap: 16, paddingBottom: 36 }}>
+      {!hideWorkspaceTabs ? (
       <Card style={{ shadowColor: "#cbd5e1", shadowOpacity: 0.25, shadowRadius: 10, shadowOffset: { width: 0, height: 2 } }}>
         <Text style={{ fontSize: 12, fontWeight: "700", color: "#64748b", letterSpacing: 2 }}>WORKSPACE</Text>
         <View style={{ gap: 10 }}>
@@ -627,15 +632,18 @@ export function DashboardScreen() {
           </TouchableOpacity>
         </View>
       </Card>
+      ) : null}
 
-      {workspace === "short-links" ? <ShortLinksScreen variant="dashboard" /> : null}
+      {workspace === "short-links" ? <ShortLinksScreen variant="dashboard" mode={mode} /> : null}
 
       {workspace === "qr" ? (
       <>
       <Card>
-        <Text style={{ fontSize: 24, fontWeight: "700", color: "#0f172a" }}>Analytics Dashboard</Text>
+        <Text style={{ fontSize: 24, fontWeight: "700", color: "#0f172a" }}>{mode === "bulk" ? "Bulk QR Analysis" : "Single QR Analysis"}</Text>
         <Text style={{ color: "#64748b", lineHeight: 22 }}>
-          Open analysis on any created QR to inspect generation quality, scan behavior, response depth, and expiry health from mobile.
+          {mode === "bulk"
+            ? "Review only bulk QR analysis here, including batch generation quality, row issues, scans, and expiry health from mobile."
+            : "Review only single QR analysis here, including generation quality, scan behavior, response depth, and expiry health from mobile."}
         </Text>
       </Card>
 

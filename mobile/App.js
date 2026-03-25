@@ -3,9 +3,11 @@ import { Linking, ScrollView, Text, TouchableOpacity, View } from "react-native"
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 
 import { AuthProvider, useAuth } from "./src/context/AuthContext";
+import { AnalysisWorkspaceScreen } from "./src/screens/AnalysisWorkspaceScreen";
 import { BulkJobsScreen } from "./src/screens/BulkJobsScreen";
 import { DashboardScreen } from "./src/screens/DashboardScreen";
 import { ForgotPasswordScreen } from "./src/screens/ForgotPasswordScreen";
+import { GenerateWorkspaceScreen } from "./src/screens/GenerateWorkspaceScreen";
 import { LoginScreen } from "./src/screens/LoginScreen";
 import { RegisterScreen } from "./src/screens/RegisterScreen";
 import { ResetPasswordScreen } from "./src/screens/ResetPasswordScreen";
@@ -62,7 +64,7 @@ function MobileShell() {
           setResetNotice("Password reset successful. Please log in.");
           navigate("login");
         } else if (route === "dashboard") {
-          navigate("dashboard");
+          navigate("analysis");
         }
       } catch {
         // Ignore malformed deep links and keep the app usable.
@@ -91,9 +93,13 @@ function MobileShell() {
   }
 
   if (user) {
-    let screenContent = <DashboardScreen />;
+    let screenContent = <AnalysisWorkspaceScreen />;
 
-    if (activeRoute === "single-generate") {
+    if (activeRoute === "generate") {
+      screenContent = <GenerateWorkspaceScreen />;
+    } else if (activeRoute === "analysis") {
+      screenContent = <AnalysisWorkspaceScreen />;
+    } else if (activeRoute === "single-generate") {
       screenContent = <SingleGenerateScreen />;
     } else if (activeRoute === "scanner") {
       screenContent = <ScannerScreen />;
@@ -111,23 +117,9 @@ function MobileShell() {
             Logged in as {user.name || user.email}
           </Text>
           <View style={{ flexDirection: "row", gap: 12 }}>
-            <TabButton label="Dashboard" route="dashboard" activeRoute={activeRoute} navigate={navigate} />
+            <TabButton label="Generate" route="generate" activeRoute={activeRoute} navigate={navigate} />
+            <TabButton label="Analysis" route="analysis" activeRoute={activeRoute} navigate={navigate} />
             <TabButton label="Scanner" route="scanner" activeRoute={activeRoute} navigate={navigate} />
-            <TabButton
-              label="Single QR"
-              route="single-generate"
-              activeRoute={activeRoute}
-              navigate={navigate}
-            />
-          </View>
-          <View style={{ flexDirection: "row", gap: 12 }}>
-            <TabButton label="Bulk QR" route="bulk-jobs" activeRoute={activeRoute} navigate={navigate} />
-            <TabButton
-              label="Short URL"
-              route="short-links"
-              activeRoute={activeRoute}
-              navigate={navigate}
-            />
           </View>
           {screenContent}
           <TouchableOpacity
