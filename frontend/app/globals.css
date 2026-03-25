@@ -77,6 +77,24 @@ button {
     page-break-inside: avoid;
   }
 
+  body.label-print-mode .label-print-screen-chrome {
+    display: none !important;
+  }
+
+  body.label-print-mode .label-print-page {
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+  }
+
+  body.label-print-mode .print-page-break {
+    break-after: page;
+    page-break-after: always;
+  }
+
   body.barcode-print-mode * {
     visibility: hidden !important;
   }
@@ -98,5 +116,18 @@ button {
     background: #ffffff !important;
     break-inside: avoid;
     page-break-inside: avoid;
+  }
+
+  body.barcode-print-mode .barcode-print-screen-chrome {
+    display: none !important;
+  }
+
+  body.barcode-print-mode .barcode-print-page-block {
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
   }
 }

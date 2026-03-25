@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import QRCodeStyling from "qr-code-styling"
 import { buildBarcodeSvg } from "../lib/barcode"
 import { downloadCsv, parseCsv } from "../lib/csv"
+import { buildA4PrintLayout, buildRollPrintLayout } from "../lib/print-layout"
 
 const templateOptions = {
   product: {
@@ -53,11 +54,11 @@ function getDisplayValue(value, maxLength = 42) {
 export default function LabelGenerateContent({ mode = "single" }) {
   const qrPreviewRef = useRef(null)
   const qrCodeRef = useRef(null)
-  const printRootRef = useRef(null)
 
   const [template, setTemplate] = useState("product")
   const [contentType, setContentType] = useState("both")
   const [labelSize, setLabelSize] = useState("4x3")
+  const [printFormat, setPrintFormat] = useState("a4")
   const [title, setTitle] = useState("Premium Coffee Beans")
   const [subtitle, setSubtitle] = useState("250g Pack")
   const [sku, setSku] = useState("SKU-COF-250")
@@ -74,13 +75,48 @@ export default function LabelGenerateContent({ mode = "single" }) {
   const [showTitle, setShowTitle] = useState(true)
   const [showSku, setShowSku] = useState(true)
   const [showPrice, setShowPrice] = useState(true)
+  const [showDescription, setShowDescription] = useState(true)
+  const [showBorders, setShowBorders] = useState(true)
   const [copies, setCopies] = useState(1)
   const [bulkRows, setBulkRows] = useState([])
   const [bulkError, setBulkError] = useState("")
+  const [a4Preset, setA4Preset] = useState("48x25")
+  const [a4Columns, setA4Columns] = useState(4)
+  const [a4Rows, setA4Rows] = useState(8)
+  const [horizontalGap, setHorizontalGap] = useState(6)
+  const [verticalGap, setVerticalGap] = useState(6)
+  const [topMargin, setTopMargin] = useState(10)
+  const [leftMargin, setLeftMargin] = useState(10)
+  const [pagePadding, setPagePadding] = useState(12)
+  const [rollWidth, setRollWidth] = useState("50")
+  const [rollLabelHeight, setRollLabelHeight] = useState("30")
+  const [rollGap, setRollGap] = useState(4)
+  const [rollTopOffset, setRollTopOffset] = useState(6)
+  const [rollLeftMargin, setRollLeftMargin] = useState(6)
+  const [rollAlignment, setRollAlignment] = useState("center")
+  const [rollPrinterType, setRollPrinterType] = useState("thermal")
 
   const activeTemplate = templateOptions[template] || templateOptions.product
   const showQr = contentType === "qr" || contentType === "both"
   const showBarcode = contentType === "barcode" || contentType === "both"
+  const labelBorderClass = showBorders ? "border border-slate-200 shadow-sm" : ""
+  const labelSurfaceClass = showBorders ? "bg-white" : "bg-transparent"
+  const a4PresetOptions = [
+    { value: "38x21", label: "38 x 21 mm", columns: 5, rows: 13 },
+    { value: "48x25", label: "48 x 25 mm", columns: 4, rows: 8 },
+    { value: "64x34", label: "64 x 34 mm", columns: 3, rows: 8 },
+    { value: "99x38", label: "99 x 38 mm", columns: 2, rows: 7 },
+    { value: "custom", label: "Custom", columns: a4Columns, rows: a4Rows },
+  ]
+
+  useEffect(() => {
+    const preset = a4PresetOptions.find((option) => option.value === a4Preset)
+    if (!preset || preset.value === "custom") {
+      return
+    }
+    setA4Columns(preset.columns)
+    setA4Rows(preset.rows)
+  }, [a4Preset])
 
   const barcodeSvg = useMemo(
     () =>
@@ -95,6 +131,63 @@ export default function LabelGenerateContent({ mode = "single" }) {
       }),
     [accentColor, backgroundColor, barcodeType, barcodeValue, labelSize, showBarcode],
   )
+
+  const printItems = useMemo(() => {
+    if (mode === "bulk" && bulkRows.length) {
+      return bulkRows.map((row) => ({
+        productName: row.productName || row.title || title,
+        subtitle: row.subtitle || subtitle,
+        sku: row.sku || sku,
+        price: row.price || price,
+        batch: row.batch || batch,
+        expiry: row.expiry || expiry,
+        description: row.description || description,
+        qrValue: row.qrValue || qrValue,
+        barcodeValue: row.barcodeValue || row.barcode || barcodeValue,
+        barcodeType: row.barcodeType || barcodeType,
+        copies: row.copies || 1,
+      }))
+    }
+
+    return [
+      {
+        productName: title,
+        subtitle,
+        sku,
+        price,
+        batch,
+        expiry,
+        description,
+        qrValue,
+        barcodeValue,
+        barcodeType,
+        copies,
+      },
+    ]
+  }, [barcodeType, barcodeValue, batch, bulkRows, copies, description, expiry, mode, price, qrValue, sku, subtitle, title])
+
+  const a4Layout = useMemo(
+    () =>
+      buildA4PrintLayout(printItems, {
+        columns: a4Columns,
+        rows: a4Rows,
+        fallbackCopies: 1,
+      }),
+    [a4Columns, a4Rows, printItems],
+  )
+
+  const rollLayout = useMemo(
+    () =>
+      buildRollPrintLayout(printItems, {
+        labelHeight: rollLabelHeight,
+        gap: rollGap,
+        fallbackCopies: 1,
+      }),
+    [printItems, rollGap, rollLabelHeight],
+  )
+
+  const previewA4Pages = a4Layout.pages
+  const previewRollItems = rollLayout.items
 
   useEffect(() => {
     if (!qrPreviewRef.current || !showQr || !qrValue.trim()) {
@@ -141,12 +234,20 @@ export default function LabelGenerateContent({ mode = "single" }) {
     }
   }, [])
 
-  function handlePrintLabel() {
+  function openPrintDialog() {
     if (typeof window === "undefined") return
     document.body.classList.add("label-print-mode")
     window.setTimeout(() => {
       window.print()
     }, 50)
+  }
+
+  function handlePrintLabel() {
+    openPrintDialog()
+  }
+
+  function handleExportPdf() {
+    openPrintDialog()
   }
 
   function handleBulkCsvChange(event) {
@@ -181,6 +282,7 @@ export default function LabelGenerateContent({ mode = "single" }) {
         "qrValue",
         "barcodeValue",
         "barcodeType",
+        "copies",
       ],
       [
         {
@@ -194,6 +296,7 @@ export default function LabelGenerateContent({ mode = "single" }) {
           qrValue: "https://qrbulkgen.com/products/premium-coffee-beans",
           barcodeValue: "890123456789",
           barcodeType: "EAN-13",
+          copies: "3",
         },
       ],
     )
@@ -223,6 +326,124 @@ export default function LabelGenerateContent({ mode = "single" }) {
             textClass: "text-[1.95rem]",
             qrSectionClass: "grid-cols-1",
           }
+
+  function renderSingleLabelCard(previewKey, previewData = {}, attachQrRef = false) {
+    const previewTitle = previewData.productName || previewData.title || title
+    const previewSubtitle = previewData.subtitle || subtitle
+    const previewSku = previewData.sku || sku
+    const previewPrice = previewData.price || price
+    const previewBatch = previewData.batch || batch
+    const previewExpiry = previewData.expiry || expiry
+    const previewDescription = previewData.description || description
+    const previewBarcodeType = previewData.barcodeType || barcodeType
+    const previewBarcodeValue = previewData.barcodeValue || previewData.barcode || barcodeValue
+    const previewQrValue = previewData.qrValue || qrValue
+    const previewBarcodeSvg = buildBarcodeSvg(previewBarcodeValue, {
+      barcodeType: previewBarcodeType,
+      label: showBarcode ? previewBarcodeValue : "",
+      fillColor: accentColor,
+      backgroundColor,
+      barHeight: labelSize === "2x1" ? 58 : labelSize === "3x2" ? 70 : 84,
+      quietZone: labelSize === "2x1" ? 10 : 14,
+      labelFontSize: labelSize === "2x1" ? 10 : 12,
+    })
+
+    return (
+      <div
+        key={previewKey}
+        className={`overflow-hidden rounded-[1.5rem] ${labelBorderClass} ${labelSurfaceClass}`}
+        style={{ backgroundColor, borderTop: showBorders ? `8px solid ${accentColor}` : undefined }}
+      >
+        <div className={`grid gap-0 ${labelLayout.shellClass}`}>
+          <div className="p-5">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">{activeTemplate.kicker}</p>
+                {showTitle ? (
+                  <h3 className={`mt-3 font-black leading-tight text-slate-950 ${labelLayout.textClass}`}>
+                    {previewTitle || "Label Title"}
+                  </h3>
+                ) : null}
+                <p className="mt-2 text-sm text-slate-600">{previewSubtitle || "Supporting subtitle"}</p>
+              </div>
+              {showLogo ? (
+                <div className="rounded-2xl border border-dashed border-slate-300 px-4 py-3 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                  Logo
+                </div>
+              ) : null}
+            </div>
+
+            <div className={`mt-5 grid gap-3 ${labelLayout.infoColsClass}`}>
+              {showSku ? (
+                <div className="rounded-2xl bg-slate-50 px-4 py-3 shadow-sm">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">SKU</p>
+                  <p className="mt-1 font-semibold text-slate-900">{previewSku || "-"}</p>
+                </div>
+              ) : null}
+              {showPrice ? (
+                <div className="rounded-2xl bg-slate-50 px-4 py-3 shadow-sm">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Price</p>
+                  <p className="mt-1 font-semibold text-slate-900">{previewPrice || "-"}</p>
+                </div>
+              ) : null}
+              <div className="rounded-2xl bg-slate-50 px-4 py-3 shadow-sm">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Batch</p>
+                <p className="mt-1 font-semibold text-slate-900">{previewBatch || "-"}</p>
+              </div>
+              <div className="rounded-2xl bg-slate-50 px-4 py-3 shadow-sm">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Expiry</p>
+                <p className="mt-1 font-semibold text-slate-900">{previewExpiry || "-"}</p>
+              </div>
+            </div>
+
+            {showBarcode ? (
+              <div className="mt-5 overflow-auto rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                <div dangerouslySetInnerHTML={{ __html: previewBarcodeSvg }} />
+              </div>
+            ) : null}
+
+            {showDescription ? (
+              <p className="mt-4 text-sm leading-6 text-slate-600">{previewDescription || "Short description"}</p>
+            ) : null}
+          </div>
+
+          <div className={`border-t border-slate-200 bg-slate-50 p-5 ${labelLayout.shellClass === "grid-cols-1" ? "" : "md:border-l md:border-t-0"}`}>
+            <div className={`grid gap-4 ${labelLayout.qrSectionClass}`}>
+                    {showQr ? (
+                      <div className="rounded-3xl bg-white p-4 shadow-sm">
+                        <div className="flex min-h-[120px] w-full items-center justify-center rounded-2xl bg-slate-50 p-3">
+                          <div
+                            className="h-[92px] w-[92px] rounded-2xl border border-slate-200 bg-white"
+                            ref={attachQrRef ? qrPreviewRef : null}
+                          />
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="rounded-3xl border border-dashed border-slate-200 bg-white p-6 text-center text-sm text-slate-500">
+                        Barcode-only label
+                      </div>
+                    )}
+
+              <div>
+                <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-3 text-center text-[11px] uppercase tracking-[0.18em] text-slate-500">
+                  {previewCardLabel(contentType)}
+                </div>
+                <p className="mt-3 px-2 text-center text-xs leading-5 text-slate-500">
+                  Scan for product info, support, menu, setup instructions, or campaign destination.
+                </p>
+                <div className="mt-3 rounded-2xl bg-white px-4 py-3 text-center">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Destination</p>
+                  <p className="mt-2 break-words text-xs font-semibold leading-5 text-slate-700">
+                    {showQr ? getDisplayValue(previewQrValue, printFormat === "a4" ? 42 : 32) : getDisplayValue(previewBarcodeValue, 28)}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   if (mode === "bulk") {
     return (
@@ -278,7 +499,11 @@ export default function LabelGenerateContent({ mode = "single" }) {
                 <button type="button" className="rounded-xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white">
                   Generate Labels
                 </button>
-                <button type="button" className="rounded-xl border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-900">
+                <button
+                  type="button"
+                  onClick={handleExportPdf}
+                  className="rounded-xl border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-900"
+                >
                   Export PDF
                 </button>
               </div>
@@ -414,6 +639,26 @@ export default function LabelGenerateContent({ mode = "single" }) {
             </select>
           </div>
 
+          <div>
+            <label className="mb-1 block text-sm">Print Format</label>
+            <div className="inline-flex overflow-hidden rounded-2xl border border-slate-900 shadow-sm">
+              <button
+                type="button"
+                onClick={() => setPrintFormat("a4")}
+                className={`px-4 py-2.5 text-sm font-semibold transition ${printFormat === "a4" ? "bg-slate-950 text-white" : "bg-white text-slate-900 hover:bg-slate-50"}`}
+              >
+                A4 Sheet
+              </button>
+              <button
+                type="button"
+                onClick={() => setPrintFormat("roll")}
+                className={`border-l border-slate-900 px-4 py-2.5 text-sm font-semibold transition ${printFormat === "roll" ? "bg-slate-950 text-white" : "bg-white text-slate-900 hover:bg-slate-50"}`}
+              >
+                Roll Printing
+              </button>
+            </div>
+          </div>
+
           <div className="grid gap-4 md:grid-cols-2">
             <div>
               <label className="mb-1 block text-sm">Product Name</label>
@@ -486,6 +731,118 @@ export default function LabelGenerateContent({ mode = "single" }) {
             </div>
           </div>
 
+          {printFormat === "a4" ? (
+            <div className="space-y-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">A4 Print Settings</p>
+                <p className="mt-1 text-sm text-slate-600">Configure sheet layout, spacing, and page fill for office printing.</p>
+              </div>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div>
+                  <label className="mb-1 block text-sm">Paper Size</label>
+                  <input value="A4" readOnly className="w-full rounded-xl border bg-white p-2.5 text-slate-600" />
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm">Label Preset</label>
+                  <select value={a4Preset} onChange={(e) => setA4Preset(e.target.value)} className="w-full rounded-xl border p-2.5">
+                    {a4PresetOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div>
+                  <label className="mb-1 block text-sm">Columns</label>
+                  <input type="number" min="1" max="6" value={a4Columns} onChange={(e) => setA4Columns(Math.max(1, Number(e.target.value) || 1))} className="w-full rounded-xl border p-2.5" />
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm">Rows</label>
+                  <input type="number" min="1" max="20" value={a4Rows} onChange={(e) => setA4Rows(Math.max(1, Number(e.target.value) || 1))} className="w-full rounded-xl border p-2.5" />
+                </div>
+              </div>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div>
+                  <label className="mb-1 block text-sm">Horizontal Gap</label>
+                  <input type="number" min="0" max="20" value={horizontalGap} onChange={(e) => setHorizontalGap(Math.max(0, Number(e.target.value) || 0))} className="w-full rounded-xl border p-2.5" />
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm">Vertical Gap</label>
+                  <input type="number" min="0" max="20" value={verticalGap} onChange={(e) => setVerticalGap(Math.max(0, Number(e.target.value) || 0))} className="w-full rounded-xl border p-2.5" />
+                </div>
+              </div>
+              <div className="grid gap-4 md:grid-cols-3">
+                <div>
+                  <label className="mb-1 block text-sm">Top Margin</label>
+                  <input type="number" min="0" max="30" value={topMargin} onChange={(e) => setTopMargin(Math.max(0, Number(e.target.value) || 0))} className="w-full rounded-xl border p-2.5" />
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm">Left Margin</label>
+                  <input type="number" min="0" max="30" value={leftMargin} onChange={(e) => setLeftMargin(Math.max(0, Number(e.target.value) || 0))} className="w-full rounded-xl border p-2.5" />
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm">Page Padding</label>
+                  <input type="number" min="0" max="30" value={pagePadding} onChange={(e) => setPagePadding(Math.max(0, Number(e.target.value) || 0))} className="w-full rounded-xl border p-2.5" />
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Roll Print Settings</p>
+                <p className="mt-1 text-sm text-slate-600">Configure sticker rolls or thermal printing with continuous-feed labels.</p>
+              </div>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div>
+                  <label className="mb-1 block text-sm">Printer Type</label>
+                  <select value={rollPrinterType} onChange={(e) => setRollPrinterType(e.target.value)} className="w-full rounded-xl border p-2.5">
+                    <option value="thermal">Thermal</option>
+                    <option value="sticker-roll">Sticker Roll</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm">Roll Width (mm)</label>
+                  <select value={rollWidth} onChange={(e) => setRollWidth(e.target.value)} className="w-full rounded-xl border p-2.5">
+                    <option value="40">40</option>
+                    <option value="50">50</option>
+                    <option value="75">75</option>
+                    <option value="100">100</option>
+                    <option value="custom">Custom</option>
+                  </select>
+                </div>
+              </div>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div>
+                  <label className="mb-1 block text-sm">Label Height (mm)</label>
+                  <input type="number" min="20" max="200" value={rollLabelHeight} onChange={(e) => setRollLabelHeight(e.target.value)} className="w-full rounded-xl border p-2.5" />
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm">Gap Between Labels (mm)</label>
+                  <input type="number" min="0" max="20" value={rollGap} onChange={(e) => setRollGap(Math.max(0, Number(e.target.value) || 0))} className="w-full rounded-xl border p-2.5" />
+                </div>
+              </div>
+              <div className="grid gap-4 md:grid-cols-3">
+                <div>
+                  <label className="mb-1 block text-sm">Top Offset</label>
+                  <input type="number" min="0" max="20" value={rollTopOffset} onChange={(e) => setRollTopOffset(Math.max(0, Number(e.target.value) || 0))} className="w-full rounded-xl border p-2.5" />
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm">Left Margin</label>
+                  <input type="number" min="0" max="20" value={rollLeftMargin} onChange={(e) => setRollLeftMargin(Math.max(0, Number(e.target.value) || 0))} className="w-full rounded-xl border p-2.5" />
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm">Alignment</label>
+                  <select value={rollAlignment} onChange={(e) => setRollAlignment(e.target.value)} className="w-full rounded-xl border p-2.5">
+                    <option value="center">Center</option>
+                    <option value="left">Left</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="grid gap-4 md:grid-cols-2">
             <div>
               <label className="mb-1 block text-sm">Accent</label>
@@ -514,6 +871,14 @@ export default function LabelGenerateContent({ mode = "single" }) {
               <input type="checkbox" checked={showPrice} onChange={(e) => setShowPrice(e.target.checked)} />
               Show price
             </label>
+            <label className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+              <input type="checkbox" checked={showDescription} onChange={(e) => setShowDescription(e.target.checked)} />
+              Show description
+            </label>
+            <label className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+              <input type="checkbox" checked={showBorders} onChange={(e) => setShowBorders(e.target.checked)} />
+              Show borders
+            </label>
           </div>
         </section>
 
@@ -532,104 +897,99 @@ export default function LabelGenerateContent({ mode = "single" }) {
               >
                 Print Label
               </button>
-              <button type="button" className="rounded-xl border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-900">
+              <button
+                type="button"
+                onClick={handleExportPdf}
+                className="rounded-xl border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-900"
+              >
                 Export PDF
               </button>
             </div>
           </div>
 
           <div className="label-print-target-wrap rounded-3xl border border-slate-200 bg-slate-50 p-4 md:p-5">
-            <div
-              ref={printRootRef}
-              className={`label-print-target overflow-hidden rounded-[1.75rem] border border-slate-200 shadow-sm ${labelLayout.widthClass}`}
-              style={{ backgroundColor, borderTop: `8px solid ${accentColor}` }}
-            >
-              <div className={`grid gap-0 ${labelLayout.shellClass}`}>
-                <div className="p-6">
-                  <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">{activeTemplate.kicker}</p>
-                      {showTitle ? (
-                        <h3 className={`mt-3 font-black leading-tight text-slate-950 ${labelLayout.textClass}`}>
-                          {title || "Label Title"}
-                        </h3>
-                      ) : null}
-                      <p className="mt-2 text-sm text-slate-600">{subtitle || "Supporting subtitle"}</p>
-                    </div>
-                    {showLogo ? (
-                      <div className="rounded-2xl border border-dashed border-slate-300 px-4 py-3 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-                        Logo
+            <div className="label-print-target overflow-hidden rounded-[1.75rem]">
+              {printFormat === "a4" ? (
+                <div className="space-y-5">
+                  <div className="label-print-screen-chrome rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-sm">
+                    <div className="flex items-center justify-between gap-4 border-b border-slate-200 pb-4">
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">A4 Sheet Preview</p>
+                        <h3 className="mt-2 text-xl font-semibold text-slate-900">{a4Layout.columns} x {a4Layout.rows} layout</h3>
                       </div>
-                    ) : null}
-                  </div>
-
-                  <div className={`mt-5 grid gap-3 ${labelLayout.infoColsClass}`}>
-                    {showSku ? (
-                      <div className="rounded-2xl bg-slate-50 px-4 py-3 shadow-sm">
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">SKU</p>
-                        <p className="mt-1 font-semibold text-slate-900">{sku || "-"}</p>
+                      <div className="flex flex-wrap gap-2 text-sm">
+                        <span className="rounded-full bg-slate-100 px-3 py-2 font-semibold text-slate-700">{a4Layout.labelsPerPage} labels / page</span>
+                        <span className="rounded-full bg-sky-100 px-3 py-2 font-semibold text-sky-800">{a4Layout.totalPages} page{a4Layout.totalPages === 1 ? "" : "s"}</span>
                       </div>
-                    ) : null}
-                    {showPrice ? (
-                      <div className="rounded-2xl bg-slate-50 px-4 py-3 shadow-sm">
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Price</p>
-                        <p className="mt-1 font-semibold text-slate-900">{price || "-"}</p>
-                      </div>
-                    ) : null}
-                    <div className="rounded-2xl bg-slate-50 px-4 py-3 shadow-sm">
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Batch</p>
-                      <p className="mt-1 font-semibold text-slate-900">{batch || "-"}</p>
-                    </div>
-                    <div className="rounded-2xl bg-slate-50 px-4 py-3 shadow-sm">
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Expiry</p>
-                      <p className="mt-1 font-semibold text-slate-900">{expiry || "-"}</p>
                     </div>
                   </div>
 
-                  {showBarcode ? (
-                    <div className="mt-5 overflow-auto rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                      <div dangerouslySetInnerHTML={{ __html: barcodeSvg }} />
-                    </div>
-                  ) : null}
-
-                  <p className="mt-4 text-sm leading-6 text-slate-600">{description || "Short description"}</p>
-                </div>
-
-                <div className={`border-t border-slate-200 bg-slate-50 p-6 ${labelLayout.shellClass === "grid-cols-1" ? "" : "md:border-l md:border-t-0"}`}>
-                  <div className={`grid gap-4 ${labelLayout.qrSectionClass}`}>
-                    {showQr ? (
-                      <div className="rounded-3xl bg-white p-4 shadow-sm">
+                  {(previewA4Pages.length ? previewA4Pages : [[]]).map((page, pageIndex) => (
+                    <div
+                      key={`a4-page-${pageIndex}`}
+                      className={`label-print-page rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-sm ${pageIndex < previewA4Pages.length - 1 ? "print-page-break" : ""}`}
+                    >
+                      <div
+                        className="rounded-[2rem] border border-slate-300 bg-white shadow-inner"
+                        style={{
+                          padding: `${pagePadding}px`,
+                        }}
+                      >
                         <div
-                          className="flex min-h-[120px] w-full items-center justify-center rounded-2xl bg-slate-50 p-3"
-                          ref={qrPreviewRef}
-                        />
+                          className="grid"
+                          style={{
+                            gridTemplateColumns: `repeat(${a4Layout.columns}, minmax(0, 1fr))`,
+                            gap: `${verticalGap}px ${horizontalGap}px`,
+                            paddingTop: `${topMargin}px`,
+                            paddingLeft: `${leftMargin}px`,
+                          }}
+                        >
+                          {page.map((row, index) =>
+                            renderSingleLabelCard(`a4-preview-${pageIndex}-${index}`, row, pageIndex === 0 && index === 0),
+                          )}
+                        </div>
                       </div>
-                    ) : (
-                      <div className="rounded-3xl border border-dashed border-slate-200 bg-white p-6 text-center text-sm text-slate-500">
-                        Barcode-only label
-                      </div>
-                    )}
-
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-sm">
+                  <div className="label-print-screen-chrome flex items-center justify-between gap-4 border-b border-slate-200 pb-4">
                     <div>
-                      <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-3 text-center text-[11px] uppercase tracking-[0.18em] text-slate-500">
-                        {previewCardLabel(contentType)}
+                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Roll Preview</p>
+                      <h3 className="mt-2 text-xl font-semibold text-slate-900">{rollPrinterType === "thermal" ? "Thermal Roll" : "Sticker Roll"}</h3>
+                    </div>
+                    <div className="flex flex-wrap gap-2 text-sm">
+                      <span className="rounded-full bg-slate-100 px-3 py-2 font-semibold text-slate-700">{rollLayout.totalItems} stickers</span>
+                      <span className="rounded-full bg-amber-100 px-3 py-2 font-semibold text-amber-800">~{rollLayout.estimatedLength} mm</span>
+                    </div>
+                  </div>
+
+                  <div className="mt-5 flex justify-center">
+                    <div
+                      className="rounded-[2rem] border border-slate-300 bg-slate-50 p-4 shadow-inner"
+                      style={{
+                        width: rollWidth === "custom" ? "22rem" : `${Math.max(12, Number(rollWidth) / 4)}rem`,
+                        paddingTop: `${rollTopOffset}px`,
+                        paddingLeft: `${rollLeftMargin}px`,
+                      }}
+                    >
+                      <div
+                        className={`grid gap-3 ${rollAlignment === "center" ? "justify-items-center" : "justify-items-start"}`}
+                      >
+                        {previewRollItems.map((row, index) => (
+                          <div key={row.__printKey || `roll-preview-${index}`} className="w-full">
+                            {renderSingleLabelCard(`roll-preview-${index}`, row, index === 0)}
+                            <div className="mt-2 border-t border-dashed border-slate-300 pt-2 text-center text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+                              Cut line
+                            </div>
+                          </div>
+                        ))}
                       </div>
-                      <p className="mt-3 px-2 text-center text-xs leading-5 text-slate-500">
-                        Scan for product info, support, menu, setup instructions, or campaign destination.
-                      </p>
-                      <div className="mt-3 rounded-2xl bg-white px-4 py-3 text-center">
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Destination</p>
-                        <p className="mt-2 break-words text-xs font-semibold leading-5 text-slate-700">
-                          {showQr ? getDisplayValue(qrValue, labelSize === "4x3" ? 52 : 34) : getDisplayValue(barcodeValue, 28)}
-                        </p>
-                      </div>
-                      <p className="mt-3 text-center text-xs text-slate-500">
-                        {copies} {copies === 1 ? "copy" : "copies"} ready for print
-                      </p>
                     </div>
                   </div>
                 </div>
-              </div>
+              )}
             </div>
           </div>
         </section>
