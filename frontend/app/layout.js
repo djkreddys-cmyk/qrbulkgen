@@ -1,4 +1,5 @@
 import { Manrope, Space_Grotesk } from "next/font/google";
+import { Analytics } from "@vercel/analytics/next";
 
 import "./globals.css";
 
@@ -39,7 +40,10 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <html lang="en">
-      <body className={`${manrope.variable} ${spaceGrotesk.variable}`}>{children}</body>
+      <body className={`${manrope.variable} ${spaceGrotesk.variable}`}>
+        {children}
+        <Analytics />
+      </body>
     </html>
   );
 }
