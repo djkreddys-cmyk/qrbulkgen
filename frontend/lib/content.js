@@ -141,6 +141,150 @@ export const landingPages = [
     ],
   },
   {
+    slug: "qr-code-generator-for-labels",
+    href: "/qr-code-generator-for-labels",
+    title: "QR Code Generator for Labels",
+    description:
+      "Create label-ready QR codes for inventory, packaging, bins, shelves, equipment, and product tags with a bulk workflow built for printing.",
+    heroKicker: "Labels use case",
+    heroTitle: "Generate QR codes for labels without rebuilding the same sheet by hand.",
+    heroBody:
+      "Create scannable QR labels for inventory, warehouse bins, product packaging, classroom stations, restaurant tables, and internal asset tracking. Use one workflow for batch generation, styling, and print-ready output.",
+    bullets: [
+      "Build label runs for shelves, boxes, SKUs, tables, and internal assets",
+      "Keep naming and exports organized for print vendors or in-house teams",
+      "Use one design system across every label batch instead of styling row by row",
+    ],
+    workflowTitle: "Label production is only useful when the files are easy to print and sort.",
+    workflowBody:
+      "Teams making QR labels usually need more than a basic generator. They need repeatable naming, consistent styling, and one artifact they can hand to a print shop or use on their own label sheets without confusion.",
+    workflowPoints: [
+      "Prepare rows for each label or item you need to print",
+      "Generate the full batch with consistent colors, logos, and styling",
+      "Export organized assets for packaging, warehouse, or classroom use",
+    ],
+    faqs: [
+      {
+        question: "What kinds of labels can this page support?",
+        answer:
+          "Teams use the workflow for inventory labels, product packaging, warehouse bins, classroom stations, restaurant tables, and equipment tags.",
+      },
+      {
+        question: "Can I make many label QR codes at once?",
+        answer:
+          "Yes. QRBulkGen supports bulk generation so operators can create large label runs instead of making every QR code individually.",
+      },
+    ],
+  },
+  {
+    slug: "create-qr-codes-from-csv",
+    href: "/create-qr-codes-from-csv",
+    title: "Create QR Codes from CSV",
+    description:
+      "Upload spreadsheet data, map required fields, and generate QR codes from CSV for print runs, campaigns, events, and operations workflows.",
+    heroKicker: "CSV import workflow",
+    heroTitle: "Turn spreadsheet rows into production-ready QR code batches.",
+    heroBody:
+      "If your QR workflow starts in Excel or Google Sheets, this is the route that matters. Import CSV data, validate the file, process rows through the queue, and download finished QR artifacts when the batch is ready.",
+    bullets: [
+      "Use CSV data for inventory, attendee lists, product records, and campaign segmentation",
+      "Validate required columns before a long print or launch workflow begins",
+      "Download one finished ZIP artifact instead of collecting files manually",
+    ],
+    workflowTitle: "CSV-based QR generation works best when validation happens before production.",
+    workflowBody:
+      "Spreadsheet imports save time only when the workflow catches issues early. A useful CSV QR system verifies fields before queueing work, shows job status while the worker processes rows, and keeps the finished artifact organized for handoff.",
+    workflowPoints: [
+      "Prepare spreadsheet data with the required columns for your QR type",
+      "Upload once and monitor queued, processing, completed, or failed states",
+      "Download the completed ZIP when the batch is fully packaged",
+    ],
+    faqs: [
+      {
+        question: "Can I create QR codes directly from spreadsheet data?",
+        answer:
+          "Yes. Export your spreadsheet as CSV, include the required fields for the selected QR type, and QRBulkGen can process the rows as one job.",
+      },
+      {
+        question: "Why use CSV instead of single generation?",
+        answer:
+          "CSV generation is better for repeatable batches like packaging, inventory, event check-in assets, and segmented campaigns where many rows share one visual system.",
+      },
+    ],
+  },
+  {
+    slug: "print-multiple-qr-codes-on-one-page",
+    href: "/print-multiple-qr-codes-on-one-page",
+    title: "Print Multiple QR Codes on One Page",
+    description:
+      "Prepare multiple QR codes for one print run with organized exports for label sheets, inserts, event cards, table tents, and operations handoff.",
+    heroKicker: "Print workflow",
+    heroTitle: "Create multiple QR codes for a single print-ready page or sheet.",
+    heroBody:
+      "Use QRBulkGen when you need more than a download button. Generate multiple QR codes for one print workflow, keep file naming clean, and hand off organized assets for labels, inserts, menus, badges, or classroom sheets.",
+    bullets: [
+      "Prepare batches for label sheets, cards, menus, inserts, and print vendors",
+      "Avoid the one-by-one export process that slows down production",
+      "Keep the same visual treatment across every code in the print run",
+    ],
+    workflowTitle: "Printing multiple QR codes should feel like a batch workflow, not repetitive design work.",
+    workflowBody:
+      "The practical challenge is not making one QR code. It is assembling enough outputs for a reliable print run and keeping everything easy to review before production. Batch generation helps teams move from data to print handoff with less manual work.",
+    workflowPoints: [
+      "Collect the items you want to print into one repeatable batch",
+      "Generate matching QR outputs for a unified print sheet or asset set",
+      "Review and deliver organized files to the printer or internal team",
+    ],
+    faqs: [
+      {
+        question: "Can I use this workflow for label sheets or cards?",
+        answer:
+          "Yes. Teams use it for label sheets, product inserts, event badges, menus, classroom handouts, and other print runs that need many QR codes together.",
+      },
+      {
+        question: "Does this help with large print jobs?",
+        answer:
+          "Yes. Bulk QR generation is designed for larger jobs where keeping outputs consistent and organized matters more than making one QR code at a time.",
+      },
+    ],
+  },
+  {
+    slug: "private-qr-code-generator",
+    href: "/private-qr-code-generator",
+    title: "Private QR Code Generator",
+    description:
+      "Use a privacy-friendly QR workflow for internal operations, controlled rollouts, and teams that want clear ownership over generated assets and exports.",
+    heroKicker: "Privacy-friendly workflow",
+    heroTitle: "Choose a QR workflow built for privacy-conscious teams.",
+    heroBody:
+      "Some teams care as much about operational control as they do about QR styling. QRBulkGen supports a structured workflow for internal campaigns, private assets, packaging runs, and team-owned exports without forcing a throwaway consumer flow.",
+    bullets: [
+      "Use one controlled workflow for internal labels, support assets, and campaign handoff",
+      "Keep generation, job history, and exports inside the same product experience",
+      "Support teams that value operational clarity before they ship files externally",
+    ],
+    workflowTitle: "Privacy-friendly QR generation is really about control, traceability, and predictable handoff.",
+    workflowBody:
+      "When teams search for a private QR code generator, they usually want a workflow that feels owned and reviewable. That means consistent generation, clear job history, organized exports, and less dependence on ad-hoc tools or disconnected handoffs.",
+    workflowPoints: [
+      "Generate assets inside one account-based workflow",
+      "Review job history before sharing final files with stakeholders",
+      "Use predictable exports for internal operations or client delivery",
+    ],
+    faqs: [
+      {
+        question: "Who is this privacy-focused page for?",
+        answer:
+          "It is aimed at teams handling internal operations, packaging assets, support materials, or controlled campaign launches where clear ownership of outputs matters.",
+      },
+      {
+        question: "Is this only for one-off QR generation?",
+        answer:
+          "No. Privacy-conscious teams often need both single and bulk generation, so QRBulkGen supports polished one-off assets as well as CSV-based batches.",
+      },
+    ],
+  },
+  {
     slug: "single-qr-codes",
     href: "/single-qr-codes",
     title: "Single QR Code Generator",
