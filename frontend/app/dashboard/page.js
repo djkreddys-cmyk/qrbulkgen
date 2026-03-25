@@ -299,6 +299,12 @@ function getJobTitle(job) {
 }
 
 const DASHBOARD_PAGE_SIZE = 10
+const ANALYSIS_TYPE_OPTIONS = [
+  { value: "qr", label: "QR Code" },
+  { value: "short-url", label: "Short URL" },
+  { value: "barcode", label: "Barcode" },
+  { value: "label", label: "Label" },
+]
 
 function PaginationPills({ page, totalPages, totalItems, onChange }) {
   if (totalPages <= 1) return null
@@ -360,8 +366,19 @@ export default function Dashboard() {
   const [exportingShortLinkReportId, setExportingShortLinkReportId] = useState("")
   const [qrPage, setQrPage] = useState(1)
   const [shortLinksPage, setShortLinksPage] = useState(1)
+  const [analysisType, setAnalysisType] = useState("qr")
+  const [analysisMode, setAnalysisMode] = useState("single")
 
   const queryString = useMemo(() => buildQuery(filters), [filters])
+
+  function updateAnalysisView(nextType, nextMode = analysisMode) {
+    const resolvedType = ANALYSIS_TYPE_OPTIONS.some((option) => option.value === nextType) ? nextType : "qr"
+    const resolvedMode = ["single", "bulk"].includes(nextMode) ? nextMode : "single"
+    setAnalysisType(resolvedType)
+    setAnalysisMode(resolvedMode)
+    setActiveWorkspace(resolvedType === "short-url" ? "short-links" : "qr")
+    router.replace(`/dashboard?type=${resolvedType}&mode=${resolvedMode}`)
+  }
 
   async function loadData(activeQuery = queryString) {
     const token = getAuthToken()
@@ -395,6 +412,22 @@ export default function Dashboard() {
   useEffect(() => {
     loadData()
   }, [queryString]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    const params = new URLSearchParams(window.location.search)
+    const nextType = params.get("type")
+    const nextMode = params.get("mode")
+
+    if (ANALYSIS_TYPE_OPTIONS.some((option) => option.value === nextType)) {
+      setAnalysisType(nextType)
+      setActiveWorkspace(nextType === "short-url" ? "short-links" : "qr")
+    }
+
+    if (["single", "bulk"].includes(nextMode)) {
+      setAnalysisMode(nextMode)
+    }
+  }, [])
 
   useEffect(() => {
     setSelectedJobIds((prev) => prev.filter((id) => jobs.some((job) => job.id === id)))
@@ -527,7 +560,7 @@ export default function Dashboard() {
 
   function handleEditJob(job) {
     const mode = job.jobType === "bulk" ? "bulk" : "single"
-    const params = new URLSearchParams({ mode })
+    const params = new URLSearchParams({ type: "qr", mode })
     params.set("editJob", job.id)
     router.push(`/generate?${params.toString()}`)
   }
@@ -644,6 +677,14 @@ export default function Dashboard() {
 
   const filteredJobs = useMemo(() => {
     return jobs.filter((job) => {
+      if (analysisType !== "qr") {
+        return false
+      }
+
+      if (job.jobType !== analysisMode) {
+        return false
+      }
+
       if (filters.qrType !== "all" && job.qrType !== filters.qrType) {
         return false
       }
@@ -662,7 +703,7 @@ export default function Dashboard() {
 
       return true
     })
-  }, [filters.qrType, filters.status, jobs])
+  }, [analysisMode, analysisType, filters.qrType, filters.status, jobs])
 
   const qrTotalPages = Math.max(Math.ceil(filteredJobs.length / DASHBOARD_PAGE_SIZE), 1)
   const paginatedJobs = useMemo(() => {
@@ -1051,22 +1092,35 @@ export default function Dashboard() {
           <aside className="hidden xl:block">
             <div className="sticky top-24 space-y-4">
               <div className="rounded-[1.75rem] border border-slate-200 bg-white p-4 shadow-sm">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">Workspace</p>
-                <div className="mt-4 grid gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setActiveWorkspace("qr")}
-                    className={`rounded-2xl border px-4 py-3 text-left text-sm font-semibold transition ${activeWorkspace === "qr" ? "border-slate-950 bg-slate-950 text-white shadow-sm" : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50"}`}
+                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">Analysis View</p>
+                <div className="mt-4 space-y-3">
+                  <select
+                    value={analysisType}
+                    onChange={(e) => updateAnalysisView(e.target.value, "single")}
+                    className="h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-semibold text-slate-900"
                   >
-                    QR Dashboard
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setActiveWorkspace("short-links")}
-                    className={`rounded-2xl border px-4 py-3 text-left text-sm font-semibold transition ${activeWorkspace === "short-links" ? "border-slate-950 bg-slate-950 text-white shadow-sm" : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50"}`}
-                  >
-                    Short URLs
-                  </button>
+                    {ANALYSIS_TYPE_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="inline-flex w-full overflow-hidden rounded-2xl border border-slate-900 shadow-sm">
+                    <button
+                      type="button"
+                      onClick={() => updateAnalysisView(analysisType, "single")}
+                      className={`flex-1 px-4 py-3 text-sm font-semibold transition ${analysisMode === "single" ? "bg-slate-950 text-white" : "bg-white text-slate-900 hover:bg-slate-50"}`}
+                    >
+                      Single
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => updateAnalysisView(analysisType, "bulk")}
+                      className={`flex-1 border-l border-slate-900 px-4 py-3 text-sm font-semibold transition ${analysisMode === "bulk" ? "bg-slate-950 text-white" : "bg-white text-slate-900 hover:bg-slate-50"}`}
+                    >
+                      Bulk
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1074,31 +1128,53 @@ export default function Dashboard() {
 
           <div className="space-y-6">
         <div className="flex flex-wrap gap-3 xl:hidden">
-          <button
-            type="button"
-            onClick={() => setActiveWorkspace("qr")}
-            className={`rounded-2xl border px-4 py-3 text-sm font-semibold transition ${activeWorkspace === "qr" ? "border-slate-950 bg-slate-950 text-white shadow-sm" : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50"}`}
+          <select
+            value={analysisType}
+            onChange={(e) => updateAnalysisView(e.target.value, "single")}
+            className="h-12 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-900"
           >
-            QR Dashboard
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveWorkspace("short-links")}
-            className={`rounded-2xl border px-4 py-3 text-sm font-semibold transition ${activeWorkspace === "short-links" ? "border-slate-950 bg-slate-950 text-white shadow-sm" : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50"}`}
-          >
-            Short URLs
-          </button>
+            {ANALYSIS_TYPE_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+          <div className="inline-flex overflow-hidden rounded-2xl border border-slate-900 shadow-sm">
+            <button
+              type="button"
+              onClick={() => updateAnalysisView(analysisType, "single")}
+              className={`px-4 py-3 text-sm font-semibold transition ${analysisMode === "single" ? "bg-slate-950 text-white" : "bg-white text-slate-900 hover:bg-slate-50"}`}
+            >
+              Single
+            </button>
+            <button
+              type="button"
+              onClick={() => updateAnalysisView(analysisType, "bulk")}
+              className={`border-l border-slate-900 px-4 py-3 text-sm font-semibold transition ${analysisMode === "bulk" ? "bg-slate-950 text-white" : "bg-white text-slate-900 hover:bg-slate-50"}`}
+            >
+              Bulk
+            </button>
+          </div>
         </div>
         <>
             <section id="qr-dashboard" className={`flex flex-col gap-5 rounded-[2rem] border border-slate-200 bg-gradient-to-br from-white to-slate-100 p-8 shadow-sm lg:flex-row lg:items-end lg:justify-between${activeWorkspace !== "qr" ? " hidden" : ""}`}>
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-500">Control Center</p>
-            <h1 className="mt-3 text-4xl font-semibold tracking-tight text-slate-950">Analytics Dashboard</h1>
-            {user && <p className="mt-3 max-w-4xl text-slate-600">Welcome back, {user.name || user.email}. Open analysis on any created QR to inspect generation quality, scan behavior, response depth, and expiry health in one focused dashboard.</p>}
+            <h1 className="mt-3 text-4xl font-semibold tracking-tight text-slate-950">Analysis Workspace</h1>
+            {user && <p className="mt-3 max-w-4xl text-slate-600">Welcome back, {user.name || user.email}. Review analysis by type and mode so the Analysis screen follows the same structure as Generate.</p>}
           </div>
             </section>
 
-            <section className={`overflow-hidden rounded-[1.75rem] border border-slate-200 bg-white shadow-sm${activeWorkspace !== "qr" ? " hidden" : ""}`}>
+            {(analysisType === "barcode" || analysisType === "label") && (
+              <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                <EmptyState
+                  title={`${ANALYSIS_TYPE_OPTIONS.find((option) => option.value === analysisType)?.label || "This type"} analysis is not connected yet`}
+                  body={`The ${analysisMode} ${analysisType === "barcode" ? "barcode" : "label"} workflow is available in Generate, but it does not save analysis records to the dashboard yet. Once those generators persist jobs and usage data, this section can show the related analysis here.`}
+                />
+              </section>
+            )}
+
+            <section className={`overflow-hidden rounded-[1.75rem] border border-slate-200 bg-white shadow-sm${activeWorkspace !== "qr" || analysisType !== "qr" ? " hidden" : ""}`}>
           <div className="sticky top-20 z-20 border-b border-slate-200 bg-white/95 px-4 pt-4 pb-3 backdrop-blur">
             <div className="flex flex-col gap-3 xl:flex-row xl:items-end">
             <label className="text-[12px] font-semibold uppercase tracking-[0.14em] text-slate-500 xl:min-w-[11rem]">
@@ -1166,10 +1242,10 @@ export default function Dashboard() {
           </div>
         </section>
 
-        {activeWorkspace === "qr" && isLoading && <p className="text-slate-600">Loading dashboard...</p>}
-        {activeWorkspace === "qr" && !isLoading && error && <p className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-rose-700">{error}</p>}
+        {activeWorkspace === "qr" && analysisType === "qr" && isLoading && <p className="text-slate-600">Loading analysis...</p>}
+        {activeWorkspace === "qr" && analysisType === "qr" && !isLoading && error && <p className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-rose-700">{error}</p>}
 
-        {activeWorkspace === "qr" && !isLoading && (
+        {activeWorkspace === "qr" && analysisType === "qr" && !isLoading && (
             <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm md:p-6">
               {!filteredJobs.length && (
                 <EmptyState
@@ -1826,12 +1902,12 @@ export default function Dashboard() {
         )}
         </>
 
-        <div className={activeWorkspace === "short-links" ? "" : "hidden"}>
+        <div className={activeWorkspace === "short-links" && analysisType === "short-url" ? "" : "hidden"}>
             <section className="mb-6 flex flex-col gap-5 rounded-[2rem] border border-slate-200 bg-gradient-to-br from-white to-slate-100 p-8 shadow-sm lg:flex-row lg:items-end lg:justify-between">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-500">Control Center</p>
-                <h1 className="mt-3 text-4xl font-semibold tracking-tight text-slate-950">Short URL Dashboard</h1>
-                {user && <p className="mt-3 max-w-4xl text-slate-600">Welcome back, {user.name || user.email}. Open analysis on each saved short URL to review clicks, visitors, expiry status, and related link performance in one focused dashboard.</p>}
+                <h1 className="mt-3 text-4xl font-semibold tracking-tight text-slate-950">Short URL Analysis</h1>
+                {user && <p className="mt-3 max-w-4xl text-slate-600">Welcome back, {user.name || user.email}. Review short URL analysis here. The Single and Bulk structure is available in the UI, although saved short links are not yet tagged separately by creation mode.</p>}
               </div>
             </section>
             <section id="short-links-dashboard" className="overflow-hidden rounded-[1.75rem] border border-slate-200 bg-white shadow-sm">

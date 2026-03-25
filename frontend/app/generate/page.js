@@ -44,32 +44,12 @@ export default function GeneratePage() {
     return null
   }
 
-  const typeOptions = [
-    { value: "qr", label: "QR Code" },
-    { value: "short-url", label: "Short URL" },
-    { value: "barcode", label: "Barcode" },
-    { value: "label", label: "Label" },
-  ]
-
-  const currentTypeLabel = typeOptions.find((option) => option.value === generatorType)?.label || "QR Code"
-
   return (
     <div className="min-h-screen">
       <Navbar />
       <main className="mx-auto max-w-[90rem] px-5 pt-8 md:px-6 xl:px-8">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div className="flex flex-wrap items-center gap-3">
-            <select
-              value={generatorType}
-              onChange={(event) => handleModeChange("single", event.target.value)}
-              className="rounded-2xl border border-slate-900 bg-white px-4 py-2.5 text-sm font-semibold text-slate-900 shadow-sm"
-            >
-              {typeOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
             <div className="inline-flex overflow-hidden rounded-2xl border border-slate-900 shadow-sm">
               <button
                 type="button"
@@ -87,12 +67,6 @@ export default function GeneratePage() {
               </button>
             </div>
             <div className="hidden h-10 w-24 rounded-2xl bg-gradient-to-r from-slate-100 via-white to-slate-100 md:block" />
-          </div>
-
-          <div className="flex flex-wrap items-center gap-3">
-            <span className="rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-semibold text-slate-700">
-              {currentTypeLabel}
-            </span>
           </div>
         </div>
       </main>
