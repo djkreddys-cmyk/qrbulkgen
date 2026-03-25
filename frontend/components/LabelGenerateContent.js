@@ -105,7 +105,30 @@ export default function LabelGenerateContent() {
     window.print()
   }
 
-  const labelWidthClass = labelSize === "2x1" ? "max-w-[24rem]" : labelSize === "3x2" ? "max-w-[30rem]" : "max-w-[36rem]"
+  const labelLayout =
+    labelSize === "2x1"
+      ? {
+          widthClass: "max-w-[26rem]",
+          gridClass: "grid-cols-1",
+          qrBoxClass: "min-h-[150px]",
+          titleClass: "text-xl",
+          metaColsClass: "grid-cols-2",
+        }
+      : labelSize === "3x2"
+        ? {
+            widthClass: "max-w-[32rem]",
+            gridClass: "md:grid-cols-[1.2fr_0.8fr]",
+            qrBoxClass: "min-h-[170px]",
+            titleClass: "text-2xl",
+            metaColsClass: "grid-cols-2",
+          }
+        : {
+            widthClass: "max-w-[38rem]",
+            gridClass: "md:grid-cols-[1.35fr_0.85fr]",
+            qrBoxClass: "min-h-[188px]",
+            titleClass: "text-[1.85rem]",
+            metaColsClass: "grid-cols-2",
+          }
 
   return (
     <main className="mx-auto max-w-[90rem] px-4 py-10 md:px-5">
@@ -190,39 +213,47 @@ export default function LabelGenerateContent() {
 
           <div className="rounded-3xl border border-slate-200 bg-slate-50 p-6">
             <div
-              className={`mx-auto rounded-[1.75rem] border border-slate-200 p-6 shadow-sm ${labelWidthClass}`}
+              className={`mx-auto overflow-hidden rounded-[1.75rem] border border-slate-200 shadow-sm ${labelLayout.widthClass}`}
               style={{ backgroundColor, borderTop: `8px solid ${accentColor}` }}
             >
-              <div className="grid gap-6 md:grid-cols-[1.1fr_0.9fr]">
-                <div>
+              <div className={`grid gap-0 ${labelLayout.gridClass}`}>
+                <div className="p-6">
                   <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Product Label</p>
-                  <h3 className="mt-3 text-2xl font-black leading-tight text-slate-950">{title || "Label Title"}</h3>
+                  <h3 className={`mt-3 font-black leading-tight text-slate-950 ${labelLayout.titleClass}`}>
+                    {title || "Label Title"}
+                  </h3>
                   <p className="mt-2 text-sm text-slate-600">{subtitle || "Supporting subtitle"}</p>
 
-                  <div className="mt-5 grid gap-3 sm:grid-cols-2">
-                    <div className="rounded-2xl bg-slate-50 px-4 py-3">
+                  <div className={`mt-5 grid gap-3 ${labelLayout.metaColsClass}`}>
+                    <div className="rounded-2xl bg-slate-50 px-4 py-3 shadow-sm">
                       <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">SKU</p>
                       <p className="mt-1 font-semibold text-slate-900">{sku || "-"}</p>
                     </div>
-                    <div className="rounded-2xl bg-slate-50 px-4 py-3">
+                    <div className="rounded-2xl bg-slate-50 px-4 py-3 shadow-sm">
                       <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Price</p>
                       <p className="mt-1 font-semibold text-slate-900">{price || "-"}</p>
                     </div>
                   </div>
 
-                  <div className="mt-5 overflow-auto rounded-2xl border border-slate-200 bg-white p-4">
+                  <div className="mt-5 overflow-auto rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                     <div dangerouslySetInnerHTML={{ __html: barcodeSvg }} />
                   </div>
                 </div>
 
-                <div className="flex flex-col items-center justify-between rounded-3xl bg-slate-50 p-5">
-                  <div
-                    className="flex min-h-[188px] w-full items-center justify-center rounded-2xl bg-white p-3"
-                    ref={qrPreviewRef}
-                  />
-                  <p className="mt-4 text-center text-xs text-slate-500">
-                    Scan for product info, support, warranty, menu, or campaign destination.
-                  </p>
+                <div className="border-t border-slate-200 bg-slate-50 p-6 md:border-l md:border-t-0">
+                  <div className="rounded-3xl bg-white p-4 shadow-sm">
+                    <div
+                      className={`flex w-full items-center justify-center rounded-2xl bg-slate-50 p-3 ${labelLayout.qrBoxClass}`}
+                      ref={qrPreviewRef}
+                    />
+                    <p className="mt-4 text-center text-xs leading-5 text-slate-500">
+                      Scan for product info, support, warranty, menu, or campaign destination.
+                    </p>
+                  </div>
+                  <div className="mt-4 rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-3 text-[11px] uppercase tracking-[0.18em] text-slate-500">
+                    Scannable Product Link
+                  </div>
+                  <p className="mt-2 text-xs font-semibold text-slate-700">{barcodeValue || "Barcode value"}</p>
                 </div>
               </div>
             </div>

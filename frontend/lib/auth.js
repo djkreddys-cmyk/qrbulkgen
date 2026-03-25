@@ -1,11 +1,30 @@
 const AUTH_STORAGE_KEY = "qrbulkgen.auth";
+const AUTH_IDLE_TIMEOUT_MS = 30 * 60 * 1000;
+
+function isSessionExpired(session) {
+  if (!session || typeof session !== "object") {
+    return true;
+  }
+
+  const lastActivityAt = Number(session.lastActivityAt || session.lastActiveAt || 0);
+  if (!lastActivityAt) {
+    return false;
+  }
+
+  return Date.now() - lastActivityAt > AUTH_IDLE_TIMEOUT_MS;
+}
 
 export function saveAuthSession(session) {
   if (typeof window === "undefined") {
     return;
   }
 
-  window.localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(session));
+  const nextSession =
+    session && typeof session === "object"
+      ? { ...session, lastActivityAt: Date.now() }
+      : session;
+
+  window.localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(nextSession));
 }
 
 export function loadAuthSession() {
@@ -20,7 +39,12 @@ export function loadAuthSession() {
   }
 
   try {
-    return JSON.parse(raw);
+    const session = JSON.parse(raw);
+    if (isSessionExpired(session)) {
+      clearAuthSession();
+      return null;
+    }
+    return session;
   } catch {
     return null;
   }
@@ -32,6 +56,29 @@ export function clearAuthSession() {
   }
 
   window.localStorage.removeItem(AUTH_STORAGE_KEY);
+}
+
+export function markAuthActivity() {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  const session = loadAuthSession();
+  if (!session) {
+    return;
+  }
+
+  window.localStorage.setItem(
+    AUTH_STORAGE_KEY,
+    JSON.stringify({
+      ...session,
+      lastActivityAt: Date.now(),
+    }),
+  );
+}
+
+export function getAuthIdleTimeoutMs() {
+  return AUTH_IDLE_TIMEOUT_MS;
 }
 
 export function getAuthToken() {

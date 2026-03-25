@@ -4,7 +4,14 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
 
-import { clearAuthSession, getAuthUser, isAuthenticated, loadAuthSession } from "../lib/auth"
+import {
+  clearAuthSession,
+  getAuthIdleTimeoutMs,
+  getAuthUser,
+  isAuthenticated,
+  loadAuthSession,
+  markAuthActivity,
+} from "../lib/auth"
 
 const MOBILE_APP_INSTALL_URL = process.env.NEXT_PUBLIC_ANDROID_APP_URL || ""
 const marketingLinks = [
@@ -36,6 +43,54 @@ export default function Navbar() {
       }
     }
   }, [])
+
+  useEffect(() => {
+    if (!authed || typeof window === "undefined") {
+      return undefined
+    }
+
+    const activityEvents = ["click", "keydown", "mousemove", "scroll", "touchstart"]
+    let timeoutId = null
+
+    function handleAutoLogout() {
+      clearAuthSession()
+      setSession(null)
+      router.push("/login")
+    }
+
+    function scheduleLogout() {
+      const activeSession = loadAuthSession()
+      const lastActivityAt = Number(activeSession?.lastActivityAt || 0)
+      const remainingMs = lastActivityAt
+        ? Math.max(getAuthIdleTimeoutMs() - (Date.now() - lastActivityAt), 0)
+        : getAuthIdleTimeoutMs()
+
+      if (timeoutId) {
+        window.clearTimeout(timeoutId)
+      }
+      timeoutId = window.setTimeout(handleAutoLogout, remainingMs)
+    }
+
+    function handleActivity() {
+      markAuthActivity()
+      scheduleLogout()
+    }
+
+    scheduleLogout()
+
+    activityEvents.forEach((eventName) => {
+      window.addEventListener(eventName, handleActivity, { passive: true })
+    })
+
+    return () => {
+      if (timeoutId) {
+        window.clearTimeout(timeoutId)
+      }
+      activityEvents.forEach((eventName) => {
+        window.removeEventListener(eventName, handleActivity)
+      })
+    }
+  }, [authed, router])
 
   function handleLogout() {
     clearAuthSession()
