@@ -16,25 +16,66 @@ function downloadFile(contents, filename, mimeType) {
   URL.revokeObjectURL(url)
 }
 
+function normalizeBoolean(value, fallback = true) {
+  const source = String(value ?? "").trim().toLowerCase()
+  if (!source) {
+    return fallback
+  }
+  return ["true", "yes", "1", "on"].includes(source)
+}
+
+function renderBarcode(row, defaults = {}) {
+  return buildBarcodeSvg(row.value || defaults.value || "ITEM-001", {
+    barHeight: Number(row.height || defaults.height || 110),
+    labelFontSize: Number(row.labelFontSize || defaults.labelFontSize || 16),
+    quietZone: Number(row.margin || defaults.margin || 18),
+    wideBar: Number(row.wideBar || defaults.wideBar || 4),
+    narrowBar: Number(row.narrowBar || defaults.narrowBar || 2),
+    fillColor: row.lineColor || defaults.lineColor || "#0f172a",
+    backgroundColor: row.backgroundColor || defaults.backgroundColor || "#ffffff",
+    label: normalizeBoolean(row.showText, defaults.showText) ? row.label || row.value || defaults.label || defaults.value : "",
+  })
+}
+
 export default function BarcodeGenerateContent({ mode = "single" }) {
   const [barcodeType, setBarcodeType] = useState("Code 128")
   const [value, setValue] = useState("QRBULKGEN-001")
+  const [productName, setProductName] = useState("Premium Coffee Beans")
+  const [sku, setSku] = useState("SKU-COF-250")
   const [label, setLabel] = useState("QRBULKGEN-001")
   const [filename, setFilename] = useState("barcode")
-  const [height, setHeight] = useState(132)
+  const [widthPreset, setWidthPreset] = useState("medium")
+  const [height, setHeight] = useState(116)
+  const [margin, setMargin] = useState(18)
+  const [lineColor, setLineColor] = useState("#0f172a")
+  const [backgroundColor, setBackgroundColor] = useState("#ffffff")
+  const [showText, setShowText] = useState(true)
+  const [textPosition, setTextPosition] = useState("bottom")
   const [bulkRows, setBulkRows] = useState([])
   const [bulkError, setBulkError] = useState("")
+
+  const widthValues = {
+    compact: { wideBar: 2.8, narrowBar: 1.4, labelFontSize: 13 },
+    medium: { wideBar: 4, narrowBar: 2, labelFontSize: 16 },
+    wide: { wideBar: 5.2, narrowBar: 2.6, labelFontSize: 18 },
+  }
+
+  const widthConfig = widthValues[widthPreset] || widthValues.medium
 
   const barcodeSvg = useMemo(
     () =>
       buildBarcodeSvg(value, {
-        quietZone: 18,
+        quietZone: margin,
         barHeight: height,
-        labelFontSize: 18,
-        wideBar: 4,
-        narrowBar: 2,
-      }).replace(value, label || value),
-    [height, label, value],
+        labelFontSize: widthConfig.labelFontSize,
+        wideBar: widthConfig.wideBar,
+        narrowBar: widthConfig.narrowBar,
+        fillColor: lineColor,
+        backgroundColor,
+        label: showText ? label || value : "",
+        textPosition,
+      }),
+    [backgroundColor, height, label, lineColor, margin, showText, textPosition, value, widthConfig],
   )
 
   function handleBulkCsvChange(event) {
@@ -58,10 +99,30 @@ export default function BarcodeGenerateContent({ mode = "single" }) {
   function downloadSampleCsv() {
     downloadCsv(
       "barcode-bulk-sample.csv",
-      ["value", "label", "filename"],
+      ["value", "productName", "sku", "label", "barcodeType", "width", "height", "showText", "filename"],
       [
-        { value: "QRBULKGEN-001", label: "QRBULKGEN-001", filename: "barcode-001" },
-        { value: "QRBULKGEN-002", label: "QRBULKGEN-002", filename: "barcode-002" },
+        {
+          value: "890123456789",
+          productName: "Premium Coffee Beans",
+          sku: "SKU-COF-250",
+          label: "890123456789",
+          barcodeType: "EAN-13",
+          width: "wide",
+          height: "124",
+          showText: "yes",
+          filename: "coffee-beans-ean13",
+        },
+        {
+          value: "QRBULKGEN-001",
+          productName: "Warehouse Asset",
+          sku: "AST-001",
+          label: "AST-001",
+          barcodeType: "Code 128",
+          width: "medium",
+          height: "110",
+          showText: "yes",
+          filename: "asset-001",
+        },
       ],
     )
   }
@@ -71,32 +132,54 @@ export default function BarcodeGenerateContent({ mode = "single" }) {
       <main className="mx-auto max-w-[90rem] px-4 py-10 md:px-5">
         <h1 className="text-3xl font-bold">Bulk Barcode Upload</h1>
 
-        <div className="mt-8 grid grid-cols-1 gap-6 xl:grid-cols-[0.9fr_1.1fr]">
-          <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="mt-8 grid grid-cols-1 gap-6 xl:grid-cols-[0.92fr_1.08fr]">
+          <section className="space-y-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">CSV upload</p>
               <h2 className="mt-2 text-xl font-semibold text-slate-900">Upload barcode rows</h2>
               <p className="mt-1 text-sm text-slate-500">
-                Add a CSV with `value`, `label`, and `filename` so teams can prepare many barcode assets in one pass.
+                Import spreadsheet rows for barcodes with value, SKU, type, size, and output file names.
               </p>
             </div>
 
-            <input type="file" accept=".csv" onChange={handleBulkCsvChange} className="w-full border p-2" />
-            <button type="button" onClick={downloadSampleCsv} className="rounded-xl border px-4 py-3 text-sm font-semibold text-slate-900">
-              Download Sample CSV
-            </button>
+            <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4">
+              <input type="file" accept=".csv" onChange={handleBulkCsvChange} className="w-full border p-2" />
+              <div className="mt-4 flex flex-wrap gap-3">
+                <button type="button" onClick={downloadSampleCsv} className="rounded-xl border px-4 py-3 text-sm font-semibold text-slate-900">
+                  Download Sample CSV
+                </button>
+                <button type="button" className="rounded-xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white">
+                  Generate Bulk Barcodes
+                </button>
+              </div>
+            </div>
+
+            <div className="grid gap-4 rounded-2xl bg-slate-50 p-4 text-sm text-slate-600">
+              <div>
+                <p className="font-semibold text-slate-900">Expected columns</p>
+                <p className="mt-1">`value`, `productName`, `sku`, `label`, `barcodeType`, `width`, `height`, `showText`, `filename`</p>
+              </div>
+              <div>
+                <p className="font-semibold text-slate-900">Best use cases</p>
+                <p className="mt-1">Inventory tags, retail product lists, asset sheets, warehouse bins, and packaging prep.</p>
+              </div>
+            </div>
+
             {!!bulkError && <p className="text-sm text-rose-600">{bulkError}</p>}
           </section>
 
           <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            <div className="flex items-center justify-between gap-3">
+            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Preview rows</p>
                 <h2 className="mt-2 text-xl font-semibold text-slate-900">Bulk barcode preview</h2>
               </div>
-              <span className="rounded-full bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-700">
-                {bulkRows.length} rows
-              </span>
+              <div className="flex flex-wrap gap-2 text-sm">
+                <span className="rounded-full bg-slate-100 px-3 py-2 font-semibold text-slate-700">{bulkRows.length} rows</span>
+                <span className="rounded-full bg-emerald-100 px-3 py-2 font-semibold text-emerald-800">
+                  {bulkRows.filter((row) => row.value).length} valid
+                </span>
+              </div>
             </div>
 
             {!bulkRows.length ? (
@@ -105,11 +188,30 @@ export default function BarcodeGenerateContent({ mode = "single" }) {
               <div className="mt-6 grid gap-4">
                 {bulkRows.slice(0, 5).map((row, index) => (
                   <div key={`${row.filename || row.value || "row"}-${index}`} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                    <p className="text-sm font-semibold text-slate-900">{row.label || row.value || `Row ${index + 1}`}</p>
-                    <p className="mt-1 text-xs text-slate-500">{row.filename || "barcode-file"}.svg</p>
+                    <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <p className="text-sm font-semibold text-slate-900">{row.productName || row.label || row.value || `Row ${index + 1}`}</p>
+                        <p className="mt-1 text-xs text-slate-500">
+                          {[row.barcodeType || barcodeType, row.sku || "No SKU", `${row.filename || "barcode-file"}.svg`].join(" • ")}
+                        </p>
+                      </div>
+                      <span className="rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-slate-700">
+                        {row.width || "medium"} / {row.height || "110"}px
+                      </span>
+                    </div>
                     <div
                       className="mt-3 overflow-auto rounded-xl border border-slate-200 bg-white p-3"
-                      dangerouslySetInnerHTML={{ __html: buildBarcodeSvg(row.value || "", { quietZone: 18, barHeight: 80, labelFontSize: 14 }) }}
+                      dangerouslySetInnerHTML={{
+                        __html: renderBarcode(row, {
+                          height,
+                          margin,
+                          lineColor,
+                          backgroundColor,
+                          showText,
+                          value,
+                          label,
+                        }),
+                      }}
                     />
                   </div>
                 ))}
@@ -125,37 +227,72 @@ export default function BarcodeGenerateContent({ mode = "single" }) {
     <main className="mx-auto max-w-[90rem] px-4 py-10 md:px-5">
       <h1 className="text-3xl font-bold">Barcode Generator</h1>
 
-      <div className="mt-8 grid grid-cols-1 gap-6 xl:grid-cols-3">
-        <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+      <div className="mt-8 grid grid-cols-1 gap-6 xl:grid-cols-[0.92fr_1.08fr]">
+        <section className="space-y-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Barcode setup</p>
-            <h2 className="mt-2 text-xl font-semibold text-slate-900">Create a barcode screen</h2>
+            <h2 className="mt-2 text-xl font-semibold text-slate-900">Create a production-ready barcode</h2>
             <p className="mt-1 text-sm text-slate-500">
-              Configure the barcode value, visible label, height, and file name for operational labeling workflows.
+              Choose the barcode standard, tune the display, and keep the label metadata ready for label printing.
             </p>
           </div>
 
-          <div>
-            <label className="mb-1 block text-sm">Barcode Type</label>
-            <select value={barcodeType} onChange={(e) => setBarcodeType(e.target.value)} className="w-full border p-2">
-              <option>Code 128</option>
-              <option>Code 39</option>
-              <option>EAN-13</option>
-              <option>UPC-A</option>
-            </select>
+          <div className="grid gap-4 md:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-sm">Barcode Type</label>
+              <select value={barcodeType} onChange={(e) => setBarcodeType(e.target.value)} className="w-full rounded-xl border p-2.5">
+                <option>Code 128</option>
+                <option>Code 39</option>
+                <option>EAN-13</option>
+                <option>UPC-A</option>
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-sm">Filename</label>
+              <input value={filename} onChange={(e) => setFilename(e.target.value)} className="w-full rounded-xl border p-2.5" />
+            </div>
           </div>
 
           <div>
             <label className="mb-1 block text-sm">Barcode Value</label>
-            <input value={value} onChange={(e) => setValue(e.target.value)} className="w-full border p-2" />
+            <input value={value} onChange={(e) => setValue(e.target.value)} className="w-full rounded-xl border p-2.5" />
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-sm">Product Name</label>
+              <input value={productName} onChange={(e) => setProductName(e.target.value)} className="w-full rounded-xl border p-2.5" />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm">SKU</label>
+              <input value={sku} onChange={(e) => setSku(e.target.value)} className="w-full rounded-xl border p-2.5" />
+            </div>
           </div>
 
           <div>
             <label className="mb-1 block text-sm">Display Label</label>
-            <input value={label} onChange={(e) => setLabel(e.target.value)} className="w-full border p-2" />
+            <input value={label} onChange={(e) => setLabel(e.target.value)} className="w-full rounded-xl border p-2.5" />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid gap-4 md:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-sm">Width</label>
+              <select value={widthPreset} onChange={(e) => setWidthPreset(e.target.value)} className="w-full rounded-xl border p-2.5">
+                <option value="compact">Compact</option>
+                <option value="medium">Medium</option>
+                <option value="wide">Wide</option>
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-sm">Text Position</label>
+              <select value={textPosition} onChange={(e) => setTextPosition(e.target.value)} className="w-full rounded-xl border p-2.5">
+                <option value="bottom">Bottom</option>
+                <option value="top">Top</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
             <div>
               <label className="mb-1 block text-sm">Height</label>
               <input
@@ -170,39 +307,89 @@ export default function BarcodeGenerateContent({ mode = "single" }) {
               <p className="mt-1 text-xs text-slate-500">{height}px</p>
             </div>
             <div>
-              <label className="mb-1 block text-sm">Filename</label>
-              <input value={filename} onChange={(e) => setFilename(e.target.value)} className="w-full border p-2" />
+              <label className="mb-1 block text-sm">Margin</label>
+              <input
+                type="range"
+                min="8"
+                max="30"
+                step="2"
+                value={margin}
+                onChange={(e) => setMargin(Number(e.target.value))}
+                className="w-full"
+              />
+              <p className="mt-1 text-xs text-slate-500">{margin}px</p>
             </div>
           </div>
 
-          <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-            <p className="font-semibold">Screen added inside Generate</p>
-            <p className="mt-1">
-              This gives your app a dedicated barcode workflow tab. We can connect it to backend barcode standards next if you want downloadable production formats by type.
-            </p>
+          <div className="grid gap-4 md:grid-cols-3">
+            <label className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm">
+              <span className="mb-2 block font-semibold text-slate-900">Show Text</span>
+              <select value={showText ? "yes" : "no"} onChange={(e) => setShowText(e.target.value === "yes")} className="w-full rounded-xl border p-2.5">
+                <option value="yes">Yes</option>
+                <option value="no">No</option>
+              </select>
+            </label>
+            <label className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm">
+              <span className="mb-2 block font-semibold text-slate-900">Line Color</span>
+              <input type="color" value={lineColor} onChange={(e) => setLineColor(e.target.value)} className="h-11 w-full rounded-xl border p-1" />
+            </label>
+            <label className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm">
+              <span className="mb-2 block font-semibold text-slate-900">Background</span>
+              <input type="color" value={backgroundColor} onChange={(e) => setBackgroundColor(e.target.value)} className="h-11 w-full rounded-xl border p-1" />
+            </label>
           </div>
         </section>
 
-        <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm xl:col-span-2">
+        <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Preview</p>
               <h2 className="mt-2 text-xl font-semibold text-slate-900">{barcodeType} preview</h2>
             </div>
-            <button
-              type="button"
-              onClick={() => downloadFile(barcodeSvg, `${filename || "barcode"}.svg`, "image/svg+xml")}
-              className="rounded-xl bg-black px-4 py-3 text-sm font-semibold text-white"
-            >
-              Download Barcode SVG
-            </button>
+            <div className="flex flex-wrap gap-3">
+              <button
+                type="button"
+                onClick={() => downloadFile(barcodeSvg, `${filename || "barcode"}.svg`, "image/svg+xml")}
+                className="rounded-xl bg-black px-4 py-3 text-sm font-semibold text-white"
+              >
+                Download SVG
+              </button>
+              <button type="button" className="rounded-xl border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-900">
+                Use in Label
+              </button>
+            </div>
           </div>
 
           <div className="rounded-3xl border border-slate-200 bg-slate-50 p-6">
-            <div
-              className="overflow-auto rounded-2xl bg-white p-6 shadow-inner"
-              dangerouslySetInnerHTML={{ __html: barcodeSvg }}
-            />
+            <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Product</p>
+                  <h3 className="mt-2 text-2xl font-black text-slate-950">{productName || "Product Name"}</h3>
+                  <p className="mt-1 text-sm text-slate-500">{sku || "SKU"}</p>
+                </div>
+                <div className="rounded-full bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-700">{barcodeType}</div>
+              </div>
+              <div
+                className="mt-6 overflow-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-inner"
+                dangerouslySetInnerHTML={{ __html: barcodeSvg }}
+              />
+            </div>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-3">
+            <div className="rounded-2xl bg-slate-50 p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Best for</p>
+              <p className="mt-2 text-sm text-slate-700">Inventory tags, retail SKUs, warehouse bins, and asset labels.</p>
+            </div>
+            <div className="rounded-2xl bg-slate-50 p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Text mode</p>
+              <p className="mt-2 text-sm text-slate-700">{showText ? `Visible ${textPosition}` : "Hidden from preview and download"}</p>
+            </div>
+            <div className="rounded-2xl bg-slate-50 p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Next step</p>
+              <p className="mt-2 text-sm text-slate-700">Move this barcode into label printing when the code is ready.</p>
+            </div>
           </div>
         </section>
       </div>

@@ -30,11 +30,20 @@ export function buildBarcodeSvg(value, options = {}) {
     labelFontSize = 12,
     wideBar = 3,
     narrowBar = 2,
+    fillColor = "#0f172a",
+    backgroundColor = "#ffffff",
+    label = value,
+    textPosition = "bottom",
   } = options;
 
   const bars = buildBarcodePattern(value, wideBar, narrowBar);
   const totalBarsWidth = bars.reduce((sum, item) => sum + item, 0);
+  const showLabel = String(label || "").trim().length > 0;
+  const textBand = showLabel ? labelFontSize + 14 : 0;
   const width = quietZone * 2 + totalBarsWidth;
+  const totalHeight = barHeight + textBand;
+  const textY = textPosition === "top" ? labelFontSize + 4 : barHeight + labelFontSize + 2;
+  const barsY = textPosition === "top" && showLabel ? textBand : 0;
   let x = quietZone;
   let paintBar = true;
 
@@ -45,15 +54,15 @@ export function buildBarcodeSvg(value, options = {}) {
       const shouldPaint = paintBar;
       paintBar = !paintBar;
       if (!shouldPaint) return "";
-      return `<rect x="${currentX}" y="0" width="${barWidth}" height="${barHeight}" fill="#0f172a" />`;
+      return `<rect x="${currentX}" y="${barsY}" width="${barWidth}" height="${barHeight}" fill="${escapeXml(fillColor)}" />`;
     })
     .filter(Boolean)
     .join("");
 
   return `<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${barHeight + 24}" viewBox="0 0 ${width} ${barHeight + 24}" role="img" aria-label="${escapeXml(value)}">
-  <rect width="${width}" height="${barHeight + 24}" fill="#ffffff" />
+<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${totalHeight}" viewBox="0 0 ${width} ${totalHeight}" role="img" aria-label="${escapeXml(value)}">
+  <rect width="${width}" height="${totalHeight}" fill="${escapeXml(backgroundColor)}" />
   ${rects}
-  <text x="${width / 2}" y="${barHeight + 18}" text-anchor="middle" font-family="monospace" font-size="${labelFontSize}" letter-spacing="1.5" fill="#0f172a">${escapeXml(value)}</text>
+  ${showLabel ? `<text x="${width / 2}" y="${textY}" text-anchor="middle" font-family="monospace" font-size="${labelFontSize}" letter-spacing="1.5" fill="${escapeXml(fillColor)}">${escapeXml(label)}</text>` : ""}
 </svg>`;
 }

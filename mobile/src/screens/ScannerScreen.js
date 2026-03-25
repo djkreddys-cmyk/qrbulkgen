@@ -8,6 +8,45 @@ import { useAuth } from "../context/AuthContext";
 import { apiRequest } from "../lib/api";
 import { buildQrContent, looksLikeUrl, parseScannedQrDraft } from "../lib/qr";
 
+const SUPPORTED_BARCODE_TYPES = [
+  "qr",
+  "code128",
+  "code39",
+  "code93",
+  "ean13",
+  "ean8",
+  "upc_a",
+  "upc_e",
+  "itf14",
+  "codabar",
+  "pdf417",
+  "aztec",
+  "datamatrix",
+];
+
+function formatDetectedType(type) {
+  const raw = String(type || "").trim().toLowerCase();
+  if (!raw) return "Unknown";
+
+  const labels = {
+    qr: "QR Code",
+    code128: "Code 128",
+    code39: "Code 39",
+    code93: "Code 93",
+    ean13: "EAN-13",
+    ean8: "EAN-8",
+    upc_a: "UPC-A",
+    upc_e: "UPC-E",
+    itf14: "ITF-14",
+    codabar: "Codabar",
+    pdf417: "PDF417",
+    aztec: "Aztec",
+    datamatrix: "Data Matrix",
+  };
+
+  return labels[raw] || raw.toUpperCase();
+}
+
 function isManagedWrapperUrl(value) {
   const raw = String(value || "").trim();
   if (!/^https?:\/\//i.test(raw)) return false;
@@ -238,10 +277,12 @@ export function ScannerScreen() {
   const [permission, requestPermission] = useCameraPermissions();
   const [scannedValue, setScannedValue] = useState("");
   const [displayValue, setDisplayValue] = useState("");
+  const [detectedType, setDetectedType] = useState("");
   const [lastScanAt, setLastScanAt] = useState(0);
   const [fileScanMessage, setFileScanMessage] = useState("");
   const [scanError, setScanError] = useState("");
   const [isResolvingScan, setIsResolvingScan] = useState(false);
+  const [torchEnabled, setTorchEnabled] = useState(false);
   const scanLockRef = useRef(false);
 
   async function trackManagedScan(link, resolvedTarget) {
@@ -348,24 +389,26 @@ export function ScannerScreen() {
         return;
       }
 
-      const scans = await Camera.scanFromURLAsync(uri, ["qr"]);
+      const scans = await Camera.scanFromURLAsync(uri, SUPPORTED_BARCODE_TYPES);
       const first = scans?.[0]?.data ? String(scans[0].data) : "";
+      const firstType = scans?.[0]?.type ? String(scans[0].type) : "";
       if (!first) {
-        setFileScanMessage("No QR code was found in that image.");
+        setFileScanMessage("No supported QR or barcode was found in that image.");
         return;
       }
 
       const resolved = await resolveScannedValue(first.trim());
       setScannedValue(resolved);
       setDisplayValue(getScannedDisplayValue(resolved));
+      setDetectedType(firstType);
       setLastScanAt(Date.now());
-      setFileScanMessage("Saved QR scanned successfully.");
+      setFileScanMessage(`${formatDetectedType(firstType)} scanned successfully from image.`);
     } catch (_error) {
       setFileScanMessage("Unable to scan that image right now.");
     }
   }
 
-  async function handleBarcodeScanned({ data }) {
+  async function handleBarcodeScanned({ data, type }) {
     const now = Date.now();
     if (scanLockRef.current || isResolvingScan || now - lastScanAt < 1800) {
       return;
@@ -386,8 +429,9 @@ export function ScannerScreen() {
       const resolved = await resolveScannedValue(rawValue);
       setScannedValue(resolved);
       setDisplayValue(getScannedDisplayValue(resolved));
+      setDetectedType(String(type || ""));
     } catch (_error) {
-      setScanError("Unable to read this QR code right now.");
+      setScanError("Unable to read this code right now.");
     } finally {
       setIsResolvingScan(false);
     }
@@ -396,7 +440,7 @@ export function ScannerScreen() {
   if (!permission) {
     return (
       <Card>
-        <Text style={{ fontSize: 22, fontWeight: "700", color: "#0f172a" }}>QR Scanner</Text>
+        <Text style={{ fontSize: 22, fontWeight: "700", color: "#0f172a" }}>Smart Scanner</Text>
         <Text style={{ color: "#64748b" }}>Preparing camera permissions...</Text>
       </Card>
     );
@@ -405,9 +449,9 @@ export function ScannerScreen() {
   if (!permission.granted) {
     return (
       <Card>
-        <Text style={{ fontSize: 22, fontWeight: "700", color: "#0f172a" }}>QR Scanner</Text>
+        <Text style={{ fontSize: 22, fontWeight: "700", color: "#0f172a" }}>Smart Scanner</Text>
         <Text style={{ color: "#64748b", lineHeight: 22 }}>
-          Allow camera access to scan any QR code from another screen, paper print, or live scanner.
+          Allow camera access to scan QR codes and supported barcodes from paper labels, screens, and product packaging.
         </Text>
         <TouchableOpacity
           onPress={requestPermission}
@@ -424,18 +468,35 @@ export function ScannerScreen() {
   return (
     <View style={{ gap: 16, paddingBottom: 36 }}>
       <Card>
-        <Text style={{ fontSize: 24, fontWeight: "700", color: "#0f172a" }}>QR Scanner</Text>
+        <Text style={{ fontSize: 24, fontWeight: "700", color: "#0f172a" }}>Smart Scanner</Text>
         <Text style={{ color: "#64748b", lineHeight: 22 }}>
-          Scan any QR code, inspect the result, then open it or send it into the single generator.
+          Auto-detect QR codes plus supported barcode formats, inspect the result, then open it or send it into the generator.
         </Text>
-        <TouchableOpacity
-          onPress={handlePickSavedQr}
-          style={{ backgroundColor: "#e2e8f0", paddingVertical: 14, borderRadius: 16 }}
-        >
-          <Text style={{ color: "#0f172a", textAlign: "center", fontWeight: "700" }}>
-            Open Saved QR
-          </Text>
-        </TouchableOpacity>
+        <View style={{ flexDirection: "row", gap: 12 }}>
+          <TouchableOpacity
+            onPress={handlePickSavedQr}
+            style={{ flex: 1, backgroundColor: "#e2e8f0", paddingVertical: 14, borderRadius: 16 }}
+          >
+            <Text style={{ color: "#0f172a", textAlign: "center", fontWeight: "700" }}>
+              Open Saved Code
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => setTorchEnabled((current) => !current)}
+            style={{
+              flex: 1,
+              backgroundColor: torchEnabled ? "#0f172a" : "#fff7ed",
+              borderWidth: 1,
+              borderColor: torchEnabled ? "#0f172a" : "#fdba74",
+              paddingVertical: 14,
+              borderRadius: 16,
+            }}
+          >
+            <Text style={{ color: torchEnabled ? "#ffffff" : "#9a3412", textAlign: "center", fontWeight: "700" }}>
+              {torchEnabled ? "Flashlight On" : "Flashlight Off"}
+            </Text>
+          </TouchableOpacity>
+        </View>
         {!!fileScanMessage && <Text style={{ color: "#475569", lineHeight: 20 }}>{fileScanMessage}</Text>}
       </Card>
 
@@ -444,7 +505,8 @@ export function ScannerScreen() {
           <CameraView
             style={{ height: 320 }}
             facing="back"
-            barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
+            enableTorch={torchEnabled}
+            barcodeScannerSettings={{ barcodeTypes: SUPPORTED_BARCODE_TYPES }}
             onBarcodeScanned={scannedValue ? undefined : handleBarcodeScanned}
           />
         </View>
@@ -452,6 +514,7 @@ export function ScannerScreen() {
           onPress={() => {
             setScannedValue("");
             setDisplayValue("");
+            setDetectedType("");
             setLastScanAt(0);
             setScanError("");
             setFileScanMessage("");
@@ -461,18 +524,33 @@ export function ScannerScreen() {
           style={{ backgroundColor: "#e2e8f0", paddingVertical: 14, borderRadius: 16 }}
         >
           <Text style={{ color: "#0f172a", textAlign: "center", fontWeight: "700" }}>
-            Scan Another QR
+            Scan Another Code
           </Text>
         </TouchableOpacity>
         {isResolvingScan ? (
-          <Text style={{ color: "#475569", lineHeight: 20 }}>Processing scanned QR...</Text>
+          <Text style={{ color: "#475569", lineHeight: 20 }}>Processing scanned code...</Text>
         ) : null}
       </Card>
 
       <Card>
         <Text style={{ fontSize: 20, fontWeight: "700", color: "#0f172a" }}>Scanned Result</Text>
+        {detectedType ? (
+          <View
+            style={{
+              alignSelf: "flex-start",
+              backgroundColor: "#eff6ff",
+              borderWidth: 1,
+              borderColor: "#bfdbfe",
+              borderRadius: 999,
+              paddingHorizontal: 12,
+              paddingVertical: 6,
+            }}
+          >
+            <Text style={{ color: "#1d4ed8", fontWeight: "700" }}>{formatDetectedType(detectedType)} detected</Text>
+          </View>
+        ) : null}
         <Text style={{ color: scannedValue ? "#0f172a" : "#64748b", lineHeight: 22 }}>
-          {displayValue || scannedValue || "Scan a QR code to see its content here."}
+          {displayValue || scannedValue || "Scan a QR code or supported barcode to see its content here."}
         </Text>
         {scanError ? <Text style={{ color: "#b00020", lineHeight: 20 }}>{scanError}</Text> : null}
         <View style={{ flexDirection: "row", gap: 12 }}>
@@ -487,7 +565,7 @@ export function ScannerScreen() {
             }}
           >
             <Text style={{ color: "#ffffff", textAlign: "center", fontWeight: "700" }}>
-              Use In Single QR
+              Use In Generator
             </Text>
           </TouchableOpacity>
           <TouchableOpacity

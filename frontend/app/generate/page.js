@@ -48,7 +48,7 @@ export default function GeneratePage() {
     { value: "qr", label: "QR Code" },
     { value: "short-url", label: "Short URL" },
     { value: "barcode", label: "Barcode" },
-    { value: "label", label: "Label" },
+    { value: "label", label: "Label Printing" },
   ]
 
   const currentTypeLabel = typeOptions.find((option) => option.value === generatorType)?.label || "QR Code"
