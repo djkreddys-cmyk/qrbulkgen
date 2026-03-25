@@ -39,6 +39,17 @@ function previewCardLabel(contentType) {
   return "QR + barcode label"
 }
 
+function getDisplayValue(value, maxLength = 42) {
+  const source = String(value || "").trim()
+  if (!source) {
+    return "No destination set"
+  }
+  if (source.length <= maxLength) {
+    return source
+  }
+  return `${source.slice(0, maxLength - 3)}...`
+}
+
 export default function LabelGenerateContent({ mode = "single" }) {
   const qrPreviewRef = useRef(null)
   const qrCodeRef = useRef(null)
@@ -185,8 +196,8 @@ export default function LabelGenerateContent({ mode = "single" }) {
             qrSectionClass: "grid-cols-[118px_1fr]",
           }
         : {
-            widthClass: "max-w-[44rem]",
-            shellClass: "md:grid-cols-[1.4fr_0.95fr]",
+            widthClass: "w-full max-w-[48rem]",
+            shellClass: "md:grid-cols-[1.5fr_0.82fr]",
             infoColsClass: "grid-cols-2",
             textClass: "text-[1.95rem]",
             qrSectionClass: "grid-cols-1",
@@ -341,7 +352,7 @@ export default function LabelGenerateContent({ mode = "single" }) {
     <main className="mx-auto max-w-[90rem] px-4 py-10 md:px-5">
       <h1 className="text-3xl font-bold">Label Printing</h1>
 
-      <div className="mt-8 grid grid-cols-1 gap-6 xl:grid-cols-[0.95fr_1.05fr]">
+      <div className="mt-8 grid grid-cols-1 gap-6 xl:grid-cols-[0.88fr_1.12fr]">
         <section className="space-y-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Label setup</p>
@@ -505,9 +516,9 @@ export default function LabelGenerateContent({ mode = "single" }) {
             </div>
           </div>
 
-          <div className="rounded-3xl border border-slate-200 bg-slate-50 p-6">
+          <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4 md:p-5">
             <div
-              className={`mx-auto overflow-hidden rounded-[1.75rem] border border-slate-200 shadow-sm ${labelLayout.widthClass}`}
+              className={`overflow-hidden rounded-[1.75rem] border border-slate-200 shadow-sm ${labelLayout.widthClass}`}
               style={{ backgroundColor, borderTop: `8px solid ${accentColor}` }}
             >
               <div className={`grid gap-0 ${labelLayout.shellClass}`}>
@@ -583,10 +594,15 @@ export default function LabelGenerateContent({ mode = "single" }) {
                       <p className="mt-3 px-2 text-center text-xs leading-5 text-slate-500">
                         Scan for product info, support, menu, setup instructions, or campaign destination.
                       </p>
-                      <p className="mt-3 break-all text-center text-xs font-semibold text-slate-700">
-                        {showQr ? qrValue : barcodeValue}
+                      <div className="mt-3 rounded-2xl bg-white px-4 py-3 text-center">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Destination</p>
+                        <p className="mt-2 break-words text-xs font-semibold leading-5 text-slate-700">
+                          {showQr ? getDisplayValue(qrValue, labelSize === "4x3" ? 52 : 34) : getDisplayValue(barcodeValue, 28)}
+                        </p>
+                      </div>
+                      <p className="mt-3 text-center text-xs text-slate-500">
+                        {copies} {copies === 1 ? "copy" : "copies"} ready for print
                       </p>
-                      <p className="mt-3 text-center text-xs text-slate-500">{copies} {copies === 1 ? "copy" : "copies"} ready for print</p>
                     </div>
                   </div>
                 </div>
