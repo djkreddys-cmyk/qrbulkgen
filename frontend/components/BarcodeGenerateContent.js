@@ -35,6 +35,22 @@ function toDownloadName(value) {
   return normalized || "barcode"
 }
 
+const A4_PRESET_DIMENSIONS = {
+  "38x21": { minHeight: "4.6rem", padding: "0.35rem", innerPadding: "0.2rem" },
+  "48x25": { minHeight: "5.4rem", padding: "0.45rem", innerPadding: "0.3rem" },
+  "64x34": { minHeight: "6.4rem", padding: "0.55rem", innerPadding: "0.4rem" },
+  "99x38": { minHeight: "7.2rem", padding: "0.65rem", innerPadding: "0.45rem" },
+  custom: { minHeight: "6rem", padding: "0.5rem", innerPadding: "0.35rem" },
+}
+
+const ROLL_WIDTH_DIMENSIONS = {
+  "40": { width: "12rem", innerPadding: "0.4rem" },
+  "50": { width: "14rem", innerPadding: "0.5rem" },
+  "75": { width: "18rem", innerPadding: "0.65rem" },
+  "100": { width: "22rem", innerPadding: "0.8rem" },
+  custom: { width: "22rem", innerPadding: "0.7rem" },
+}
+
 function getBarcodeRequirements(barcodeType) {
   if (barcodeType === "EAN-13") {
     return {
@@ -218,6 +234,9 @@ export default function BarcodeGenerateContent({ mode = "single" }) {
       }),
     [printItems, rollGap, rollLabelHeight],
   )
+
+  const activeA4PresetDimensions = A4_PRESET_DIMENSIONS[a4Preset] || A4_PRESET_DIMENSIONS.custom
+  const activeRollDimensions = ROLL_WIDTH_DIMENSIONS[rollWidth] || ROLL_WIDTH_DIMENSIONS.custom
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -423,14 +442,27 @@ export default function BarcodeGenerateContent({ mode = "single" }) {
       textPosition,
     })
     const compact = variant === "sheet"
+    const compactStyle = compact
+      ? {
+          minHeight: activeA4PresetDimensions.minHeight,
+          padding: activeA4PresetDimensions.padding,
+        }
+      : undefined
+    const innerStyle = compact
+      ? {
+          padding: activeA4PresetDimensions.innerPadding,
+        }
+      : undefined
 
     return (
       <div
         key={key}
         className={`border border-slate-200 bg-white ${compact ? "min-h-[7rem] rounded-2xl p-3" : "rounded-3xl p-4 shadow-sm"}`}
+        style={compactStyle}
       >
         <div
           className={`overflow-auto border border-slate-200 bg-white ${compact ? "rounded-xl p-2" : "rounded-2xl p-4 shadow-inner"} ${itemMatrixMode ? "flex justify-center" : ""}`}
+          style={innerStyle}
           dangerouslySetInnerHTML={{ __html: itemSvg }}
         />
       </div>
@@ -830,7 +862,7 @@ export default function BarcodeGenerateContent({ mode = "single" }) {
                     <div
                       className="rounded-[2rem] border border-slate-300 bg-slate-50 p-4 shadow-inner"
                       style={{
-                        width: rollWidth === "custom" ? "22rem" : `${Math.max(12, Number(rollWidth) / 4)}rem`,
+                        width: activeRollDimensions.width,
                         paddingTop: `${rollTopOffset}px`,
                         paddingLeft: `${rollLeftMargin}px`,
                       }}
@@ -838,7 +870,9 @@ export default function BarcodeGenerateContent({ mode = "single" }) {
                       <div className={`grid gap-3 ${rollAlignment === "center" ? "justify-items-center" : "justify-items-start"}`}>
                         {rollLayout.items.map((item, index) => (
                           <div key={item.__printKey || `barcode-roll-${index}`} className="w-full">
-                            {renderBarcodePrintCard(item, item.__printKey || `barcode-roll-card-${index}`)}
+                            <div style={{ padding: activeRollDimensions.innerPadding }}>
+                              {renderBarcodePrintCard(item, item.__printKey || `barcode-roll-card-${index}`)}
+                            </div>
                             <div className="mt-2 border-t border-dashed border-slate-300 pt-2 text-center text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
                               Cut line
                             </div>
