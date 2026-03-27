@@ -1,12 +1,14 @@
 import Link from "next/link"
 
 import Navbar from "./Navbar"
+import PublicPageTracker from "./PublicPageTracker"
 
 export function MarketingShell({ children }) {
   const currentYear = new Date().getFullYear()
 
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top,#fff9ed_0%,#f6f7fb_42%,#eef2ff_100%)] text-slate-950">
+      <PublicPageTracker />
       <Navbar />
       {children}
       <footer className="border-t border-slate-200/70 bg-white/80">
