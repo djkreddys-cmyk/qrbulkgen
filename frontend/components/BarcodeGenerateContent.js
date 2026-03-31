@@ -36,19 +36,19 @@ function toDownloadName(value) {
 }
 
 const A4_PRESET_DIMENSIONS = {
-  "38x21": { minHeight: "4.6rem", padding: "0.35rem", innerPadding: "0.2rem" },
-  "48x25": { minHeight: "5.4rem", padding: "0.45rem", innerPadding: "0.3rem" },
-  "64x34": { minHeight: "6.4rem", padding: "0.55rem", innerPadding: "0.4rem" },
-  "99x38": { minHeight: "7.2rem", padding: "0.65rem", innerPadding: "0.45rem" },
-  custom: { minHeight: "6rem", padding: "0.5rem", innerPadding: "0.35rem" },
+  "38x21": { aspectRatio: "1.81", padding: "0.3rem", innerPadding: "0.16rem" },
+  "48x25": { aspectRatio: "1.92", padding: "0.38rem", innerPadding: "0.2rem" },
+  "64x34": { aspectRatio: "1.88", padding: "0.46rem", innerPadding: "0.26rem" },
+  "99x38": { aspectRatio: "2.61", padding: "0.55rem", innerPadding: "0.32rem" },
+  custom: { aspectRatio: "2", padding: "0.4rem", innerPadding: "0.24rem" },
 }
 
 const ROLL_WIDTH_DIMENSIONS = {
-  "40": { width: "12rem", innerPadding: "0.4rem" },
-  "50": { width: "14rem", innerPadding: "0.5rem" },
-  "75": { width: "18rem", innerPadding: "0.65rem" },
-  "100": { width: "22rem", innerPadding: "0.8rem" },
-  custom: { width: "22rem", innerPadding: "0.7rem" },
+  "40": { width: "11rem", innerPadding: "0.28rem" },
+  "50": { width: "13rem", innerPadding: "0.34rem" },
+  "75": { width: "17rem", innerPadding: "0.45rem" },
+  "100": { width: "21rem", innerPadding: "0.55rem" },
+  custom: { width: "21rem", innerPadding: "0.45rem" },
 }
 
 function getBarcodeRequirements(barcodeType) {
@@ -444,24 +444,27 @@ export default function BarcodeGenerateContent({ mode = "single" }) {
     const compact = variant === "sheet"
     const compactStyle = compact
       ? {
-          minHeight: activeA4PresetDimensions.minHeight,
+          aspectRatio: activeA4PresetDimensions.aspectRatio,
           padding: activeA4PresetDimensions.padding,
+          display: "flex",
         }
       : undefined
     const innerStyle = compact
       ? {
           padding: activeA4PresetDimensions.innerPadding,
+          height: "100%",
+          width: "100%",
         }
       : undefined
 
     return (
       <div
         key={key}
-        className={`border border-slate-200 bg-white ${compact ? "min-h-[7rem] rounded-2xl p-3" : "rounded-3xl p-4 shadow-sm"}`}
+        className={`border border-slate-200 bg-white ${compact ? "rounded-2xl" : "rounded-3xl p-4 shadow-sm"}`}
         style={compactStyle}
       >
         <div
-          className={`overflow-auto border border-slate-200 bg-white ${compact ? "rounded-xl p-2" : "rounded-2xl p-4 shadow-inner"} ${itemMatrixMode ? "flex justify-center" : ""}`}
+          className={`barcode-render-surface overflow-auto border border-slate-200 bg-white ${compact ? "barcode-render-surface--sheet rounded-xl" : "barcode-render-surface--full rounded-2xl p-4 shadow-inner"} ${itemMatrixMode ? "flex justify-center" : ""}`}
           style={innerStyle}
           dangerouslySetInnerHTML={{ __html: itemSvg }}
         />

@@ -45,6 +45,27 @@ button {
   color: #0f172a;
 }
 
+.barcode-render-surface svg {
+  display: block;
+  max-width: 100%;
+}
+
+.barcode-render-surface--sheet {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.barcode-render-surface--sheet svg {
+  width: 100%;
+  height: 100%;
+}
+
+.barcode-render-surface--full svg {
+  width: 100%;
+  height: auto;
+}
+
 @media print {
   body.label-print-mode {
     background: #ffffff !important;
