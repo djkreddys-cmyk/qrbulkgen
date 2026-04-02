@@ -269,7 +269,7 @@ export const BULK_SAMPLE_ROWS_BY_TYPE = {
     expiresAt: "30-04-2026",
   },
   "Social Media": {
-    content: "Instagram: https://instagram.com/yourbrand\nTwitter: https://x.com/yourbrand",
+    content: "https://www.qrbulkgen.com/social?s=eyJ0aXRsZSI6IkZvbGxvdyB1cyIsImxpbmtzIjpbeyJsYWJlbCI6Ikluc3RhZ3JhbSIsInVybCI6Imh0dHBzOi8vaW5zdGFncmFtLmNvbS95b3VyYnJhbmQifSx7ImxhYmVsIjoiVHdpdHRlciIsInVybCI6Imh0dHBzOi8veC5jb20veW91cmJyYW5kIn1dfQ%3D%3D",
     filename: "qr-social-1",
     expiresAt: "",
   },

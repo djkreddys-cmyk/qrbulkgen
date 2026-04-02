@@ -182,6 +182,26 @@ function encodePayload(value) {
   return utf8ToBase64(JSON.stringify(value));
 }
 
+function getNormalizedSocialLinks(socialLinks) {
+  return socialLinks
+    .map((item) => {
+      const platform = item.platform === "Custom" ? item.customPlatform : item.platform;
+      const label = String(platform || "").trim();
+      const rawUrl = String(item.url || "").trim();
+      if (!label || !rawUrl) return null;
+      const withProtocol = /^https?:\/\//i.test(rawUrl) ? rawUrl : `https://${rawUrl}`;
+      try {
+        return {
+          label,
+          url: new URL(withProtocol).toString(),
+        };
+      } catch (_error) {
+        return null;
+      }
+    })
+    .filter(Boolean);
+}
+
 export function supportsExpiry(qrType, content) {
   if (["PDF", "Image Gallery", "Rating", "Feedback"].includes(qrType)) {
     return true;
@@ -363,17 +383,11 @@ export function buildQrContent(qrType, fields, options = {}) {
       return getUsableHostedId(ids.pdfLinkId)
         ? `${appOrigin}/pdf/${getUsableHostedId(ids.pdfLinkId)}`
         : String(fields.pdfUrl || "").trim();
-    case "Social Media":
-      return socialLinks
-        .map((item) => {
-          const platform = item.platform === "Custom" ? item.customPlatform : item.platform;
-          const label = String(platform || "").trim();
-          const url = String(item.url || "").trim();
-          if (!label || !url) return "";
-          return `${label}: ${url}`;
-        })
-        .filter(Boolean)
-        .join("\n");
+    case "Social Media": {
+      const links = getNormalizedSocialLinks(socialLinks);
+      if (!links.length) return "";
+      return `${appOrigin}/social?s=${encodeURIComponent(encodePayload({ title: "Follow us", links }))}`;
+    }
     case "App Store":
       return String(fields.appStoreUrl || "").trim();
     case "Image Gallery":

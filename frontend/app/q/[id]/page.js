@@ -29,7 +29,7 @@ function normalizeKind(qrType, content) {
   if (qrType === "Location") {
     return "location"
   }
-  if (["vCard", "WIFI", "Text", "Social Media"].includes(qrType)) {
+  if (["vCard", "WIFI", "Text"].includes(qrType)) {
     return "content"
   }
   return /^https?:\/\//i.test(String(content || "").trim()) ? "url" : "content"

@@ -36,6 +36,7 @@ const RESERVED_SLUGS = new Set([
   "reset-password",
   "short-links",
   "single-qr-codes",
+  "social",
   "upload",
   "use-cases",
 ])

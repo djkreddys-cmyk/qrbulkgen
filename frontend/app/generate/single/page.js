@@ -334,6 +334,26 @@ function getUsableHostedId(value) {
   return raw
 }
 
+function getNormalizedSocialLinks(socialLinks) {
+  return socialLinks
+    .map((item) => {
+      const platform = item.platform === "Custom" ? item.customPlatform : item.platform
+      const label = String(platform || "").trim()
+      const rawUrl = String(item.url || "").trim()
+      if (!label || !rawUrl) return null
+      const withProtocol = /^https?:\/\//i.test(rawUrl) ? rawUrl : `https://${rawUrl}`
+      try {
+        return {
+          label,
+          url: new URL(withProtocol).toString(),
+        }
+      } catch {
+        return null
+      }
+    })
+    .filter(Boolean)
+}
+
 function buildQrContent(type, fields, appOrigin, ids, socialLinks, expiryDate) {
   switch (type) {
     case "URL":
@@ -388,17 +408,11 @@ function buildQrContent(type, fields, appOrigin, ids, socialLinks, expiryDate) {
       ].join("\n")
     case "PDF":
       return getUsableHostedId(ids.pdfLinkId) ? `${appOrigin}/pdf/${getUsableHostedId(ids.pdfLinkId)}` : fields.pdfUrl.trim()
-    case "Social Media":
-      return socialLinks
-        .map((item) => {
-          const platform = item.platform === "Custom" ? item.customPlatform : item.platform
-          const label = String(platform || "").trim()
-          const url = String(item.url || "").trim()
-          if (!label || !url) return ""
-          return `${label}: ${url}`
-        })
-        .filter(Boolean)
-        .join("\n")
+    case "Social Media": {
+      const links = getNormalizedSocialLinks(socialLinks)
+      if (!links.length) return ""
+      return `${appOrigin}/social?s=${encodeURIComponent(encodePayload({ title: "Follow us", links }))}`
+    }
     case "App Store":
       return fields.appStoreUrl.trim()
     case "Image Gallery":
