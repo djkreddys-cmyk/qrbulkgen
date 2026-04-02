@@ -16,7 +16,7 @@ function decodePayload(value) {
 function normalizeExternalUrl(value) {
   const raw = String(value || "").trim()
   if (!raw) return ""
-  const withProtocol = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`
+  const withProtocol = /^(https?:\/\/|whatsapp:\/\/)/i.test(raw) ? raw : `https://${raw}`
   try {
     return new URL(withProtocol).toString()
   } catch {
@@ -37,10 +37,27 @@ export default function SocialLinksClientPage() {
     ? payload.links
         .map((item) => ({
           label: String(item?.label || "").trim(),
+          platform: String(item?.platform || "").trim(),
           url: normalizeExternalUrl(item?.url),
+          appUrl: normalizeExternalUrl(item?.appUrl),
         }))
         .filter((item) => item.label && item.url)
     : []
+
+  function handleOpen(item) {
+    if (typeof window === "undefined") return
+    const appUrl = String(item?.appUrl || "").trim()
+    const webUrl = String(item?.url || "").trim()
+    if (!appUrl || appUrl === webUrl) {
+      window.location.assign(webUrl)
+      return
+    }
+    const fallback = window.setTimeout(() => {
+      window.location.assign(webUrl)
+    }, 700)
+    window.location.assign(appUrl)
+    window.setTimeout(() => window.clearTimeout(fallback), 1200)
+  }
 
   return (
     <main className="min-h-screen bg-slate-50 px-4 py-10">
@@ -58,16 +75,15 @@ export default function SocialLinksClientPage() {
         ) : links.length ? (
           <div className="mt-8 grid gap-3">
             {links.map((item) => (
-              <a
+              <button
                 key={`${item.label}-${item.url}`}
-                href={item.url}
-                target="_blank"
-                rel="noreferrer"
+                type="button"
+                onClick={() => handleOpen(item)}
                 className="rounded-2xl border border-slate-200 px-5 py-4 text-left transition hover:border-slate-300 hover:bg-slate-50"
               >
                 <p className="font-semibold text-slate-900">{item.label}</p>
                 <p className="mt-1 break-all text-sm text-slate-500">{item.url}</p>
-              </a>
+              </button>
             ))}
           </div>
         ) : (

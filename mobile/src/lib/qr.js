@@ -185,15 +185,48 @@ function encodePayload(value) {
 function getNormalizedSocialLinks(socialLinks) {
   return socialLinks
     .map((item) => {
-      const platform = item.platform === "Custom" ? item.customPlatform : item.platform;
+      const selectedPlatform = String(item.platform || "").trim();
+      const platform = selectedPlatform === "Custom" ? item.customPlatform : selectedPlatform;
       const label = String(platform || "").trim();
       const rawUrl = String(item.url || "").trim();
       if (!label || !rawUrl) return null;
-      const withProtocol = /^https?:\/\//i.test(rawUrl) ? rawUrl : `https://${rawUrl}`;
+      const canonicalPlatform = selectedPlatform || label;
+      const normalizedLabel = canonicalPlatform === "Twitter" ? "X" : label;
+      let webUrl = rawUrl;
+
+      if (canonicalPlatform === "WhatsApp") {
+        const digits = rawUrl.replace(/[^\d]/g, "");
+        if (/^(https?:\/\/|whatsapp:\/\/)/i.test(rawUrl)) {
+          webUrl = rawUrl;
+        } else if (digits) {
+          webUrl = `https://wa.me/${digits}`;
+        }
+      } else if (canonicalPlatform === "Instagram" && /^@?[a-z0-9._]+$/i.test(rawUrl)) {
+        webUrl = `https://instagram.com/${rawUrl.replace(/^@/, "")}`;
+      } else if (canonicalPlatform === "Facebook" && /^@?[a-z0-9.]+$/i.test(rawUrl)) {
+        webUrl = `https://facebook.com/${rawUrl.replace(/^@/, "")}`;
+      } else if ((canonicalPlatform === "Twitter" || canonicalPlatform === "X") && /^@?[a-z0-9_]+$/i.test(rawUrl)) {
+        webUrl = `https://x.com/${rawUrl.replace(/^@/, "")}`;
+      } else if (canonicalPlatform === "LinkedIn" && !/^https?:\/\//i.test(rawUrl) && !/^linkedin\.com\//i.test(rawUrl)) {
+        webUrl = `https://linkedin.com/in/${rawUrl.replace(/^@/, "")}`;
+      } else if (canonicalPlatform === "Telegram" && /^@?[a-z0-9_]+$/i.test(rawUrl)) {
+        webUrl = `https://t.me/${rawUrl.replace(/^@/, "")}`;
+      } else if (canonicalPlatform === "YouTube" && /^@?[a-z0-9._-]+$/i.test(rawUrl)) {
+        webUrl = `https://youtube.com/${rawUrl.startsWith("@") ? rawUrl : `@${rawUrl}`}`;
+      }
+
+      const withProtocol = /^(https?:\/\/|whatsapp:\/\/)/i.test(webUrl) ? webUrl : `https://${webUrl}`;
       try {
+        const normalizedUrl = new URL(withProtocol).toString();
+        const digits = rawUrl.replace(/[^\d]/g, "");
         return {
-          label,
-          url: new URL(withProtocol).toString(),
+          label: normalizedLabel,
+          platform: canonicalPlatform,
+          url: normalizedUrl,
+          appUrl:
+            canonicalPlatform === "WhatsApp" && digits
+              ? `whatsapp://send?phone=${digits}`
+              : normalizedUrl,
         };
       } catch (_error) {
         return null;
