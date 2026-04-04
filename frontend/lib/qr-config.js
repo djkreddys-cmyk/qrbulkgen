@@ -269,7 +269,12 @@ export const BULK_SAMPLE_ROWS_BY_TYPE = {
     expiresAt: "30-04-2026",
   },
   "Social Media": {
-    content: "https://www.qrbulkgen.com/social?s=eyJ0aXRsZSI6IkZvbGxvdyB1cyIsImxpbmtzIjpbeyJsYWJlbCI6Ikluc3RhZ3JhbSIsInVybCI6Imh0dHBzOi8vaW5zdGFncmFtLmNvbS95b3VyYnJhbmQifSx7ImxhYmVsIjoiVHdpdHRlciIsInVybCI6Imh0dHBzOi8veC5jb20veW91cmJyYW5kIn1dfQ%3D%3D",
+    title: "Follow us",
+    instagram: "yourbrand",
+    linkedin: "your-company",
+    whatsapp: "919876543210",
+    customPlatform1: "Website",
+    customUrl1: "https://www.qrbulkgen.com",
     filename: "qr-social-1",
     expiresAt: "",
   },
@@ -321,7 +326,7 @@ export const BULK_REQUIRED_COLUMNS_BY_TYPE = {
   WIFI: ["ssid", "password", "wifiType", "hidden", "filename"],
   Event: ["title", "start", "end", "location", "description", "filename"],
   PDF: ["url", "filename"],
-  "Social Media": ["content", "filename"],
+  "Social Media": ["filename"],
   "App Store": ["url", "filename"],
   "Image Gallery": ["url", "filename"],
   Rating: ["title", "style", "scale", "filename"],
@@ -329,7 +334,31 @@ export const BULK_REQUIRED_COLUMNS_BY_TYPE = {
 };
 
 export const BULK_OPTIONAL_COLUMNS_BY_TYPE = Object.fromEntries(
-  QR_TYPES.map((type) => [type, ["expiresAt"]]),
+  QR_TYPES.map((type) => [
+    type,
+    type === "Social Media"
+      ? [
+          "title",
+          "facebook",
+          "instagram",
+          "linkedin",
+          "pinterest",
+          "snapchat",
+          "telegram",
+          "twitter",
+          "whatsapp",
+          "youtube",
+          "customPlatform1",
+          "customUrl1",
+          "customPlatform2",
+          "customUrl2",
+          "customPlatform3",
+          "customUrl3",
+          "content",
+          "expiresAt",
+        ]
+      : ["expiresAt"],
+  ]),
 );
 
 export function supportsTrackingModeSelection(qrType) {

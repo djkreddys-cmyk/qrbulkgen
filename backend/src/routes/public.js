@@ -402,6 +402,9 @@ function resolveManagedLinkDestination(row) {
     case "Location":
       return buildLocationHref(fields.mapsUrl || rawContent);
     case "Social Media": {
+      if (isHttpUrl(rawContent)) {
+        return ensureExternalUrl(rawContent);
+      }
       const firstUrl = socialLinks.find((item) => String(item?.url || "").trim())?.url;
       return ensureExternalUrl(firstUrl || extractFirstUrl(rawContent) || rawContent);
     }

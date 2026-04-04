@@ -59,6 +59,10 @@ function encodeFeedbackPayload(payload) {
   return Buffer.from(JSON.stringify(payload), "utf8").toString("base64");
 }
 
+function encodePayload(payload) {
+  return Buffer.from(JSON.stringify(payload), "utf8").toString("base64");
+}
+
 function appendManagedLinkIdToUrl(value, linkId) {
   const raw = String(value || "").trim();
   const managedId = String(linkId || "").trim();
@@ -120,6 +124,112 @@ function getExpiryForRow(row) {
     toExpiryIso(getCell(row, "expiresAt") || getCell(row, "expiry") || getCell(row, "expiryDate")) ||
     addMonths(new Date(), 6).toISOString()
   );
+}
+
+function getNormalizedBulkSocialLinks(row) {
+  const platformColumns = [
+    ["Facebook", "facebook"],
+    ["Instagram", "instagram"],
+    ["LinkedIn", "linkedin"],
+    ["Pinterest", "pinterest"],
+    ["Snapchat", "snapchat"],
+    ["Telegram", "telegram"],
+    ["Twitter", "twitter"],
+    ["WhatsApp", "whatsapp"],
+    ["YouTube", "youtube"],
+  ];
+
+  const links = [];
+
+  for (const [label, column] of platformColumns) {
+    const rawValue = getCell(row, column);
+    if (!rawValue) continue;
+    const selectedPlatform = label;
+    const normalizedLabel = selectedPlatform === "Twitter" ? "X" : label;
+    let webUrl = rawValue;
+
+    if (selectedPlatform === "WhatsApp") {
+      const digits = rawValue.replace(/[^\d]/g, "");
+      if (/^(https?:\/\/|whatsapp:\/\/)/i.test(rawValue)) {
+        webUrl = rawValue;
+      } else if (digits) {
+        webUrl = `https://wa.me/${digits}`;
+      }
+    } else if (selectedPlatform === "Instagram" && /^@?[a-z0-9._]+$/i.test(rawValue)) {
+      webUrl = `https://instagram.com/${rawValue.replace(/^@/, "")}`;
+    } else if (selectedPlatform === "Facebook" && /^@?[a-z0-9.]+$/i.test(rawValue)) {
+      webUrl = `https://facebook.com/${rawValue.replace(/^@/, "")}`;
+    } else if (selectedPlatform === "Twitter" && /^@?[a-z0-9_]+$/i.test(rawValue)) {
+      webUrl = `https://x.com/${rawValue.replace(/^@/, "")}`;
+    } else if (selectedPlatform === "LinkedIn" && !/^https?:\/\//i.test(rawValue) && !/^linkedin\.com\//i.test(rawValue)) {
+      webUrl = `https://linkedin.com/in/${rawValue.replace(/^@/, "")}`;
+    } else if (selectedPlatform === "Telegram" && /^@?[a-z0-9_]+$/i.test(rawValue)) {
+      webUrl = `https://t.me/${rawValue.replace(/^@/, "")}`;
+    } else if (selectedPlatform === "YouTube" && /^@?[a-z0-9._-]+$/i.test(rawValue)) {
+      webUrl = `https://youtube.com/${rawValue.startsWith("@") ? rawValue : `@${rawValue}`}`;
+    }
+
+    const withProtocol = /^(https?:\/\/|whatsapp:\/\/)/i.test(webUrl) ? webUrl : `https://${webUrl}`;
+    try {
+      const normalizedUrl = new URL(withProtocol).toString();
+      const digits = rawValue.replace(/[^\d]/g, "");
+      links.push({
+        label: normalizedLabel,
+        platform: selectedPlatform,
+        url: normalizedUrl,
+        appUrl: selectedPlatform === "WhatsApp" && digits ? `whatsapp://send?phone=${digits}` : normalizedUrl,
+      });
+    } catch {
+      // Ignore invalid values so the row can still use other valid columns.
+    }
+  }
+
+  for (let index = 1; index <= 3; index += 1) {
+    const label = getCell(row, `customplatform${index}`) || getCell(row, `customlabel${index}`);
+    const rawUrl = getCell(row, `customurl${index}`);
+    if (!label || !rawUrl) continue;
+    const withProtocol = /^(https?:\/\/|whatsapp:\/\/)/i.test(rawUrl) ? rawUrl : `https://${rawUrl}`;
+    try {
+      const normalizedUrl = new URL(withProtocol).toString();
+      links.push({
+        label,
+        platform: "Custom",
+        url: normalizedUrl,
+        appUrl: normalizedUrl,
+      });
+    } catch {
+      // Ignore invalid custom URLs.
+    }
+  }
+
+  return links;
+}
+
+function getLegacyBulkSocialLinks(content) {
+  return String(content || "")
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const match = line.match(/^\s*([^:]+):\s*(.+)\s*$/);
+      if (!match) return null;
+      const label = String(match[1] || "").trim();
+      const rawUrl = String(match[2] || "").trim();
+      if (!label || !rawUrl) return null;
+      const withProtocol = /^(https?:\/\/|whatsapp:\/\/)/i.test(rawUrl) ? rawUrl : `https://${rawUrl}`;
+      try {
+        const normalizedUrl = new URL(withProtocol).toString();
+        return {
+          label,
+          platform: label,
+          url: normalizedUrl,
+          appUrl: normalizedUrl,
+        };
+      } catch {
+        return null;
+      }
+    })
+    .filter(Boolean);
 }
 
 function buildBulkTargetPayload(qrType, row, content) {
@@ -188,20 +298,17 @@ function buildBulkTargetPayload(qrType, row, content) {
         },
       };
     case "Social Media": {
-      const socialLinks = String(content || "")
-        .split(/\r?\n/)
-        .map((line) => line.trim())
-        .filter(Boolean)
-        .map((line) => {
-          const [platformPart, ...rest] = line.split(":");
-          const url = rest.join(":").trim();
-          return {
-            platform: String(platformPart || "").trim(),
-            url,
-          };
-        })
-        .filter((item) => item.url);
-      return { qrType, trackingMode, socialLinks };
+      const socialLinks = getNormalizedBulkSocialLinks(row);
+      if (socialLinks.length) {
+        return {
+          qrType,
+          trackingMode,
+          fields: {},
+          socialLinks,
+          expiresAt: getExpiryForRow(row),
+        };
+      }
+      return { qrType, trackingMode, fields: {}, socialLinks: getLegacyBulkSocialLinks(content), expiresAt: getExpiryForRow(row) };
     }
     default:
       return { qrType, trackingMode, fields: {} };
@@ -275,8 +382,15 @@ function buildBulkContent(qrType, row) {
         "END:VCALENDAR",
       ].join("\n");
     }
-    case "Social Media":
+    case "Social Media": {
+      const title = getCell(row, "title") || "Follow us";
+      const socialLinks = getNormalizedBulkSocialLinks(row);
+      if (socialLinks.length) {
+        const encoded = encodeURIComponent(encodePayload({ title, links: socialLinks }));
+        return `${frontendBaseUrl}/social?s=${encoded}`;
+      }
       return getCell(row, "content");
+    }
     case "Rating": {
       const title = encodeURIComponent(getCell(row, "title") || "Rate your experience");
       const style = getCell(row, "style") === "numbers" ? "numbers" : "stars";

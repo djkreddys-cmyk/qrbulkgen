@@ -442,6 +442,11 @@ export function BulkGenerateContent({ embedded = false }) {
                   Use the <code>url</code> column with a public <code>http://</code> or <code>https://</code> link. Local drive paths are not supported for bulk PDF or Image Gallery jobs.
                 </p>
               )}
+              {qrType === "Social Media" && (
+                <p className="mt-2 text-xs text-gray-600">
+                  For bulk social pages, use columns like <code>instagram</code>, <code>linkedin</code>, <code>whatsapp</code>, and optional <code>customPlatform1</code> + <code>customUrl1</code>. The legacy <code>content</code> column still works if you already have a prebuilt social page URL.
+                </p>
+              )}
               <div className="mt-3 p-3 border rounded bg-gray-50">
                 <p className="text-xs font-semibold text-gray-800">Required CSV columns for {qrType}</p>
                 <div className="mt-2 flex flex-wrap gap-2">
@@ -453,7 +458,9 @@ export function BulkGenerateContent({ embedded = false }) {
                 </div>
                 {!!BULK_OPTIONAL_COLUMNS_BY_TYPE[qrType]?.length && (
                   <>
-                    <p className="mt-3 text-xs font-semibold text-gray-800">Optional validity column</p>
+                    <p className="mt-3 text-xs font-semibold text-gray-800">
+                      {qrType === "Social Media" ? "Optional social and validity columns" : "Optional validity column"}
+                    </p>
                     <div className="mt-2 flex flex-wrap gap-2">
                       {BULK_OPTIONAL_COLUMNS_BY_TYPE[qrType].map((column) => (
                         <span key={column} className="rounded-full bg-amber-100 px-2 py-1 text-[11px] font-semibold text-amber-700">
@@ -461,9 +468,15 @@ export function BulkGenerateContent({ embedded = false }) {
                         </span>
                       ))}
                     </div>
-                    <p className="text-xs text-gray-700 mt-2">
-                      Use <code>DD-MM-YYYY</code>. If you leave it blank, the QR defaults to 6 months from creation and stays valid until the end of the selected day.
-                    </p>
+                    {qrType === "Social Media" ? (
+                      <p className="text-xs text-gray-700 mt-2">
+                        Add one or more social columns per row. Use <code>expiresAt</code> in <code>DD-MM-YYYY</code> format if you want the social page QR to expire.
+                      </p>
+                    ) : (
+                      <p className="text-xs text-gray-700 mt-2">
+                        Use <code>DD-MM-YYYY</code>. If you leave it blank, the QR defaults to 6 months from creation and stays valid until the end of the selected day.
+                      </p>
+                    )}
                   </>
                 )}
                 <div className="mt-4 rounded-xl border border-dashed border-slate-300 bg-white p-3">
