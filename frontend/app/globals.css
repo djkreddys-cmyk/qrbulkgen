@@ -67,13 +67,16 @@ button {
 }
 
 .roll-label-card svg,
-.roll-label-qr canvas {
+.roll-label-qr canvas,
+.sheet-label-card svg,
+.sheet-label-qr canvas {
   display: block;
   max-width: 100%;
   height: auto !important;
 }
 
-.roll-label-qr canvas {
+.roll-label-qr canvas,
+.sheet-label-qr canvas {
   width: 100% !important;
 }
 

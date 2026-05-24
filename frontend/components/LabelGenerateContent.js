@@ -191,6 +191,7 @@ export default function LabelGenerateContent({ mode = "single" }) {
   const rollWidthMm = rollWidth === "custom" ? 75 : Math.max(1, Number(rollWidth) || 50)
   const rollLabelHeightMm = Math.max(20, Number(rollLabelHeight) || 30)
   const rollPaperWidth = `${rollWidthMm}mm`
+  const sheetLabelAspectRatio = labelSize === "2x1" ? "2 / 1" : labelSize === "3x2" ? "3 / 2" : "4 / 3"
 
   useEffect(() => {
     if (!qrPreviewRef.current || !showQr || !qrValue.trim()) {
@@ -198,7 +199,7 @@ export default function LabelGenerateContent({ mode = "single" }) {
       return
     }
 
-    const qrSize = printFormat === "roll" ? 72 : labelSize === "2x1" ? 92 : labelSize === "3x2" ? 118 : 148
+    const qrSize = printFormat === "roll" ? 72 : labelSize === "2x1" ? 56 : labelSize === "3x2" ? 68 : 92
     const options = {
       width: qrSize,
       height: qrSize,
@@ -532,6 +533,94 @@ export default function LabelGenerateContent({ mode = "single" }) {
               <p className="text-[7px] font-semibold uppercase tracking-[0.1em] text-slate-500">Destination</p>
               <p className="mt-0.5 break-words text-[7px] font-semibold leading-3 text-slate-700">
                 {showQr ? getDisplayValue(previewQrValue, 18) : getDisplayValue(previewBarcodeValue, 18)}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  function renderSheetLabelCard(previewKey, previewData = {}, attachQrRef = false) {
+    const previewTitle = previewData.productName || previewData.title || title
+    const previewSubtitle = previewData.subtitle || subtitle
+    const previewSku = previewData.sku || sku
+    const previewPrice = previewData.price || price
+    const previewBatch = previewData.batch || batch
+    const previewExpiry = previewData.expiry || expiry
+    const previewBarcodeType = previewData.barcodeType || barcodeType
+    const previewBarcodeValue = previewData.barcodeValue || previewData.barcode || barcodeValue
+    const previewQrValue = previewData.qrValue || qrValue
+    const previewBarcodeSvg = buildBarcodeSvg(previewBarcodeValue, {
+      barcodeType: previewBarcodeType,
+      label: showBarcode ? previewBarcodeValue : "",
+      fillColor: accentColor,
+      backgroundColor,
+      barHeight: labelSize === "2x1" ? 24 : labelSize === "3x2" ? 32 : 42,
+      quietZone: 5,
+      labelFontSize: 8,
+    })
+
+    return (
+      <div
+        key={previewKey}
+        className={`sheet-label-card overflow-hidden rounded-xl ${labelBorderClass} ${labelSurfaceClass}`}
+        style={{
+          aspectRatio: sheetLabelAspectRatio,
+          backgroundColor,
+          borderTop: showBorders ? `4px solid ${accentColor}` : undefined,
+        }}
+      >
+        <div className="grid h-full grid-cols-[1fr_auto] gap-1.5 p-2">
+          <div className="min-w-0">
+            <p className="text-[7px] font-semibold uppercase tracking-[0.14em] text-slate-500">{activeTemplate.kicker}</p>
+            {showTitle ? (
+              <h3 className="mt-0.5 line-clamp-2 text-[11px] font-black leading-tight text-slate-950">
+                {previewTitle || "Label Title"}
+              </h3>
+            ) : null}
+            <p className="mt-0.5 truncate text-[8px] text-slate-600">{previewSubtitle || "Supporting subtitle"}</p>
+
+            <div className="mt-1.5 grid grid-cols-2 gap-1">
+              {showSku ? (
+                <div className="min-w-0 rounded-md bg-slate-50 px-1.5 py-1">
+                  <p className="text-[6px] font-semibold uppercase tracking-[0.1em] text-slate-500">SKU</p>
+                  <p className="truncate text-[7px] font-semibold text-slate-900">{previewSku || "-"}</p>
+                </div>
+              ) : null}
+              {showPrice ? (
+                <div className="min-w-0 rounded-md bg-slate-50 px-1.5 py-1">
+                  <p className="text-[6px] font-semibold uppercase tracking-[0.1em] text-slate-500">Price</p>
+                  <p className="truncate text-[7px] font-semibold text-slate-900">{previewPrice || "-"}</p>
+                </div>
+              ) : null}
+              <div className="min-w-0 rounded-md bg-slate-50 px-1.5 py-1">
+                <p className="text-[6px] font-semibold uppercase tracking-[0.1em] text-slate-500">Batch</p>
+                <p className="truncate text-[7px] font-semibold text-slate-900">{previewBatch || "-"}</p>
+              </div>
+              <div className="min-w-0 rounded-md bg-slate-50 px-1.5 py-1">
+                <p className="text-[6px] font-semibold uppercase tracking-[0.1em] text-slate-500">Expiry</p>
+                <p className="truncate text-[7px] font-semibold text-slate-900">{previewExpiry || "-"}</p>
+              </div>
+            </div>
+
+            {showBarcode ? (
+              <div className="mt-1.5 overflow-hidden rounded-md border border-slate-200 bg-white p-1" dangerouslySetInnerHTML={{ __html: previewBarcodeSvg }} />
+            ) : null}
+          </div>
+
+          <div className="flex w-[42px] flex-col gap-1">
+            {showQr ? (
+              <div className="sheet-label-qr flex h-[42px] w-[42px] items-center justify-center overflow-hidden rounded-md border border-slate-200 bg-white p-1" ref={attachQrRef ? qrPreviewRef : null} />
+            ) : (
+              <div className="flex h-[42px] w-[42px] items-center justify-center rounded-md border border-dashed border-slate-200 bg-white text-[7px] font-semibold uppercase text-slate-500">
+                Code
+              </div>
+            )}
+            <div className="min-h-0 rounded-md bg-slate-50 px-1 py-0.5 text-center">
+              <p className="text-[6px] font-semibold uppercase tracking-[0.08em] text-slate-500">Link</p>
+              <p className="break-words text-[6px] font-semibold leading-2 text-slate-700">
+                {showQr ? getDisplayValue(previewQrValue, 14) : getDisplayValue(previewBarcodeValue, 14)}
               </p>
             </div>
           </div>
@@ -1040,7 +1129,7 @@ export default function LabelGenerateContent({ mode = "single" }) {
                           }}
                         >
                           {page.map((row, index) =>
-                            renderSingleLabelCard(`a4-preview-${pageIndex}-${index}`, row, pageIndex === 0 && index === 0),
+                            renderSheetLabelCard(`a4-preview-${pageIndex}-${index}`, row, pageIndex === 0 && index === 0),
                           )}
                         </div>
                       </div>
