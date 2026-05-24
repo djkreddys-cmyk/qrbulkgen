@@ -188,6 +188,9 @@ export default function LabelGenerateContent({ mode = "single" }) {
 
   const previewA4Pages = a4Layout.pages
   const previewRollItems = rollLayout.items
+  const rollWidthMm = rollWidth === "custom" ? 75 : Math.max(1, Number(rollWidth) || 50)
+  const rollLabelHeightMm = Math.max(20, Number(rollLabelHeight) || 30)
+  const rollPaperWidth = `${rollWidthMm}mm`
 
   useEffect(() => {
     if (!qrPreviewRef.current || !showQr || !qrValue.trim()) {
@@ -195,7 +198,7 @@ export default function LabelGenerateContent({ mode = "single" }) {
       return
     }
 
-    const qrSize = labelSize === "2x1" ? 92 : labelSize === "3x2" ? 118 : 148
+    const qrSize = printFormat === "roll" ? 72 : labelSize === "2x1" ? 92 : labelSize === "3x2" ? 118 : 148
     const options = {
       width: qrSize,
       height: qrSize,
@@ -216,7 +219,7 @@ export default function LabelGenerateContent({ mode = "single" }) {
     }
 
     qrCodeRef.current.update(options)
-  }, [accentColor, backgroundColor, labelSize, qrValue, showQr])
+  }, [accentColor, backgroundColor, labelSize, printFormat, qrValue, showQr])
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -438,6 +441,98 @@ export default function LabelGenerateContent({ mode = "single" }) {
                   </p>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  function renderRollLabelCard(previewKey, previewData = {}, attachQrRef = false) {
+    const previewTitle = previewData.productName || previewData.title || title
+    const previewSubtitle = previewData.subtitle || subtitle
+    const previewSku = previewData.sku || sku
+    const previewPrice = previewData.price || price
+    const previewBatch = previewData.batch || batch
+    const previewExpiry = previewData.expiry || expiry
+    const previewDescription = previewData.description || description
+    const previewBarcodeType = previewData.barcodeType || barcodeType
+    const previewBarcodeValue = previewData.barcodeValue || previewData.barcode || barcodeValue
+    const previewQrValue = previewData.qrValue || qrValue
+    const previewBarcodeSvg = buildBarcodeSvg(previewBarcodeValue, {
+      barcodeType: previewBarcodeType,
+      label: showBarcode ? previewBarcodeValue : "",
+      fillColor: accentColor,
+      backgroundColor,
+      barHeight: 34,
+      quietZone: 6,
+      labelFontSize: 9,
+    })
+
+    return (
+      <div
+        key={previewKey}
+        className={`roll-label-card overflow-hidden rounded-xl ${labelBorderClass} ${labelSurfaceClass}`}
+        style={{
+          backgroundColor,
+          borderTop: showBorders ? `5px solid ${accentColor}` : undefined,
+          minHeight: `${rollLabelHeightMm}mm`,
+        }}
+      >
+        <div className="grid h-full grid-cols-[1fr_auto] gap-2 p-2.5">
+          <div className="min-w-0">
+            <p className="text-[8px] font-semibold uppercase tracking-[0.16em] text-slate-500">{activeTemplate.kicker}</p>
+            {showTitle ? (
+              <h3 className="mt-1 line-clamp-2 text-[15px] font-black leading-tight text-slate-950">
+                {previewTitle || "Label Title"}
+              </h3>
+            ) : null}
+            <p className="mt-1 truncate text-[9px] text-slate-600">{previewSubtitle || "Supporting subtitle"}</p>
+
+            <div className="mt-2 grid grid-cols-2 gap-1.5">
+              {showSku ? (
+                <div className="min-w-0 rounded-lg bg-slate-50 px-2 py-1">
+                  <p className="text-[7px] font-semibold uppercase tracking-[0.12em] text-slate-500">SKU</p>
+                  <p className="truncate text-[8px] font-semibold text-slate-900">{previewSku || "-"}</p>
+                </div>
+              ) : null}
+              {showPrice ? (
+                <div className="min-w-0 rounded-lg bg-slate-50 px-2 py-1">
+                  <p className="text-[7px] font-semibold uppercase tracking-[0.12em] text-slate-500">Price</p>
+                  <p className="truncate text-[8px] font-semibold text-slate-900">{previewPrice || "-"}</p>
+                </div>
+              ) : null}
+              <div className="min-w-0 rounded-lg bg-slate-50 px-2 py-1">
+                <p className="text-[7px] font-semibold uppercase tracking-[0.12em] text-slate-500">Batch</p>
+                <p className="truncate text-[8px] font-semibold text-slate-900">{previewBatch || "-"}</p>
+              </div>
+              <div className="min-w-0 rounded-lg bg-slate-50 px-2 py-1">
+                <p className="text-[7px] font-semibold uppercase tracking-[0.12em] text-slate-500">Expiry</p>
+                <p className="truncate text-[8px] font-semibold text-slate-900">{previewExpiry || "-"}</p>
+              </div>
+            </div>
+
+            {showBarcode ? (
+              <div className="mt-2 overflow-hidden rounded-lg border border-slate-200 bg-white p-1" dangerouslySetInnerHTML={{ __html: previewBarcodeSvg }} />
+            ) : null}
+            {showDescription ? (
+              <p className="mt-1 line-clamp-2 text-[8px] leading-3 text-slate-600">{previewDescription || "Short description"}</p>
+            ) : null}
+          </div>
+
+          <div className="flex w-[46px] flex-col gap-1.5">
+            {showQr ? (
+              <div className="roll-label-qr flex h-[46px] w-[46px] items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-white p-1" ref={attachQrRef ? qrPreviewRef : null} />
+            ) : (
+              <div className="flex h-[46px] w-[46px] items-center justify-center rounded-lg border border-dashed border-slate-200 bg-white text-[8px] font-semibold uppercase text-slate-500">
+                Code
+              </div>
+            )}
+            <div className="rounded-lg bg-slate-50 px-1 py-1 text-center">
+              <p className="text-[7px] font-semibold uppercase tracking-[0.1em] text-slate-500">Destination</p>
+              <p className="mt-0.5 break-words text-[7px] font-semibold leading-3 text-slate-700">
+                {showQr ? getDisplayValue(previewQrValue, 18) : getDisplayValue(previewBarcodeValue, 18)}
+              </p>
             </div>
           </div>
         </div>
@@ -969,7 +1064,7 @@ export default function LabelGenerateContent({ mode = "single" }) {
                     <div
                       className="rounded-[2rem] border border-slate-300 bg-slate-50 p-4 shadow-inner"
                       style={{
-                        width: rollWidth === "custom" ? "22rem" : `${Math.max(12, Number(rollWidth) / 4)}rem`,
+                        width: rollPaperWidth,
                         paddingTop: `${rollTopOffset}px`,
                         paddingLeft: `${rollLeftMargin}px`,
                       }}
@@ -979,7 +1074,7 @@ export default function LabelGenerateContent({ mode = "single" }) {
                       >
                         {previewRollItems.map((row, index) => (
                           <div key={row.__printKey || `roll-preview-${index}`} className="w-full">
-                            {renderSingleLabelCard(`roll-preview-${index}`, row, index === 0)}
+                            {renderRollLabelCard(`roll-preview-${index}`, row, index === 0)}
                             <div className="mt-2 border-t border-dashed border-slate-300 pt-2 text-center text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
                               Cut line
                             </div>

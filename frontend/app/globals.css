@@ -66,6 +66,17 @@ button {
   height: auto;
 }
 
+.roll-label-card svg,
+.roll-label-qr canvas {
+  display: block;
+  max-width: 100%;
+  height: auto !important;
+}
+
+.roll-label-qr canvas {
+  width: 100% !important;
+}
+
 @media print {
   body.label-print-mode {
     background: #ffffff !important;
