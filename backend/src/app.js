@@ -36,6 +36,11 @@ function createApp() {
       if (host.endsWith(".vercel.app")) {
         return true;
       }
+
+      // Allow local app and Flutter Web debugging against the live API.
+      if (host === "localhost" || host === "127.0.0.1" || host === "::1") {
+        return true;
+      }
     } catch {
       return false;
     }
