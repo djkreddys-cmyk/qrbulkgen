@@ -14,6 +14,7 @@ import {
   supportsTrackingModeSelection,
   TRACKING_MODE_OPTIONS,
 } from "../../lib/qr-config"
+import { downloadCsv, parseCsvDetailed } from "../../lib/csv"
 
 function withAuthHeader() {
   const token = getAuthToken()
@@ -27,6 +28,146 @@ function previewFromSampleType(qrType) {
   const row = BULK_SAMPLE_ROWS_BY_TYPE[qrType] || BULK_SAMPLE_ROWS_BY_TYPE.URL
   const firstKey = Object.keys(row)[0]
   return String(row[firstKey] || "https://example.com")
+}
+
+function normalizeHeader(header) {
+  return String(header || "").trim().toLowerCase()
+}
+
+function isHttpUrl(value) {
+  return /^https?:\/\//i.test(String(value || "").trim())
+}
+
+function isValidEmail(value) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || "").trim())
+}
+
+function isValidExpiryInput(value) {
+  const raw = String(value || "").trim()
+  return !raw || /^\d{2}-\d{2}-\d{4}$/.test(raw)
+}
+
+function validateBulkCsvText(text, qrType) {
+  const { headers, rows } = parseCsvDetailed(text)
+  const normalizedHeaders = headers.map((header) => normalizeHeader(header))
+  const requiredHeaders = (BULK_REQUIRED_COLUMNS_BY_TYPE[qrType] || ["content", "filename"]).map((header) =>
+    normalizeHeader(header),
+  )
+  const missingHeaders = requiredHeaders.filter((header) => !normalizedHeaders.includes(header))
+  const socialColumns = ["facebook", "instagram", "linkedin", "pinterest", "snapchat", "telegram", "twitter", "whatsapp", "youtube"]
+  const invalidRowDetails = []
+
+  for (const row of rows) {
+    const rowErrors = []
+    const getValue = (key) => {
+      const actualKey = headers.find((header) => normalizeHeader(header) === normalizeHeader(key))
+      return String(actualKey ? row[actualKey] || "" : "").trim()
+    }
+
+    for (const requiredHeader of requiredHeaders) {
+      if (!getValue(requiredHeader)) {
+        rowErrors.push(`Missing ${requiredHeader}`)
+      }
+    }
+
+    if (getValue("expiresAt") && !isValidExpiryInput(getValue("expiresAt"))) {
+      rowErrors.push("expiresAt must use DD-MM-YYYY")
+    }
+
+    switch (qrType) {
+      case "URL":
+      case "Youtube":
+      case "App Store":
+        if (getValue("content") && !isHttpUrl(getValue("content")) && qrType === "URL") {
+          rowErrors.push("content must start with http:// or https://")
+        }
+        if (getValue("url") && !isHttpUrl(getValue("url"))) {
+          rowErrors.push("url must start with http:// or https://")
+        }
+        break
+      case "PDF":
+      case "Image Gallery":
+        if (getValue("url") && !isHttpUrl(getValue("url"))) {
+          rowErrors.push("url must start with http:// or https://")
+        }
+        break
+      case "Email":
+        if (getValue("email") && !isValidEmail(getValue("email"))) {
+          rowErrors.push("email is invalid")
+        }
+        break
+      case "Phone":
+      case "SMS":
+      case "WhatsApp":
+        if (getValue("phone") && !/[0-9]{6,}/.test(getValue("phone").replace(/[^\d]/g, ""))) {
+          rowErrors.push("phone must contain at least 6 digits")
+        }
+        break
+      case "Location":
+        if (getValue("latitude") && Number.isNaN(Number(getValue("latitude")))) {
+          rowErrors.push("latitude must be numeric")
+        }
+        if (getValue("longitude") && Number.isNaN(Number(getValue("longitude")))) {
+          rowErrors.push("longitude must be numeric")
+        }
+        break
+      case "Event":
+        if (getValue("start") && Number.isNaN(new Date(getValue("start")).getTime())) {
+          rowErrors.push("start must be a valid date or date-time")
+        }
+        if (getValue("end") && Number.isNaN(new Date(getValue("end")).getTime())) {
+          rowErrors.push("end must be a valid date or date-time")
+        }
+        break
+      case "Social Media": {
+        const hasStructuredSocial = socialColumns.some((column) => getValue(column))
+        const hasCustomSocial =
+          ["1", "2", "3"].some((index) => getValue(`customPlatform${index}`) && getValue(`customUrl${index}`))
+        const hasLegacyContent = Boolean(getValue("content"))
+
+        if (!hasStructuredSocial && !hasCustomSocial && !hasLegacyContent) {
+          rowErrors.push("add at least one social column, custom link pair, or legacy content URL")
+        }
+
+        for (const index of ["1", "2", "3"]) {
+          const label = getValue(`customPlatform${index}`)
+          const url = getValue(`customUrl${index}`)
+          if ((label && !url) || (!label && url)) {
+            rowErrors.push(`customPlatform${index} and customUrl${index} must both be filled`)
+          }
+          if (url && !isHttpUrl(url)) {
+            rowErrors.push(`customUrl${index} must start with http:// or https://`)
+          }
+        }
+        if (hasLegacyContent && !isHttpUrl(getValue("content"))) {
+          rowErrors.push("legacy content must start with http:// or https://")
+        }
+        break
+      }
+      default:
+        break
+    }
+
+    if (rowErrors.length) {
+      invalidRowDetails.push({
+        rowNumber: row.__rowNumber,
+        errors: rowErrors,
+        ...Object.fromEntries(headers.map((header) => [header, String(row[header] || "")])),
+      })
+    }
+  }
+
+  return {
+    headers,
+    rowCount: rows.length,
+    missingHeaders,
+    validRowCount: rows.length - invalidRowDetails.length,
+    invalidRowCount: invalidRowDetails.length,
+    invalidRowDetails,
+    previewRows: rows.slice(0, 5).map((row) =>
+      Object.fromEntries(headers.map((header) => [header, String(row[header] || "")])),
+    ),
+  }
 }
 
 export function BulkGenerateContent({ embedded = false }) {
@@ -60,6 +201,8 @@ export function BulkGenerateContent({ embedded = false }) {
   const [analysisLoading, setAnalysisLoading] = useState(false)
   const [expiryOverride, setExpiryOverride] = useState("")
   const [trackingMode, setTrackingMode] = useState(getDefaultTrackingMode("URL"))
+  const [csvValidation, setCsvValidation] = useState(null)
+  const [csvValidationLoading, setCsvValidationLoading] = useState(false)
 
   function formatExpiryDateForInput(value) {
     const raw = String(value || "").trim()
@@ -78,6 +221,7 @@ export function BulkGenerateContent({ embedded = false }) {
       setFile(null)
       setTrackingMode(getDefaultTrackingMode(qrType))
       setUploadStatus("")
+      setCsvValidation(null)
     }
     setActiveBulkJobId("")
     setError("")
@@ -299,6 +443,10 @@ export function BulkGenerateContent({ embedded = false }) {
       setError("Please select a CSV file.")
       return
     }
+    if (file && csvValidation && (csvValidation.missingHeaders.length || csvValidation.invalidRowCount > 0)) {
+      setError("Fix the CSV issues shown below before starting bulk generation.")
+      return
+    }
     try {
       setIsSubmitting(true)
       setUploadStatus(editingJobId ? "Uploading updated bulk settings..." : `Uploading ${file.name}...`)
@@ -350,10 +498,54 @@ export function BulkGenerateContent({ embedded = false }) {
     }
   }
 
-  function handleCsvChange(event) {
+  async function handleCsvChange(event) {
     const nextFile = event.target.files?.[0] || null
     setFile(nextFile)
     setUploadStatus(nextFile ? `Selected CSV: ${nextFile.name}` : "")
+    setCsvValidation(null)
+    if (!nextFile) {
+      return
+    }
+
+    try {
+      setCsvValidationLoading(true)
+      const text = await nextFile.text()
+      const validation = validateBulkCsvText(text, qrType)
+      setCsvValidation(validation)
+      if (!validation.rowCount) {
+        setUploadStatus(`Selected CSV: ${nextFile.name} - no data rows found`)
+      } else if (validation.missingHeaders.length || validation.invalidRowCount > 0) {
+        setUploadStatus(
+          `Selected CSV: ${nextFile.name} - ${validation.invalidRowCount} invalid row${validation.invalidRowCount === 1 ? "" : "s"}`,
+        )
+      } else {
+        setUploadStatus(`Selected CSV: ${nextFile.name} - ${validation.validRowCount} row${validation.validRowCount === 1 ? "" : "s"} ready`)
+      }
+    } catch {
+      setCsvValidation({
+        headers: [],
+        rowCount: 0,
+        missingHeaders: [],
+        validRowCount: 0,
+        invalidRowCount: 1,
+        invalidRowDetails: [{ rowNumber: "-", errors: ["Unable to read this CSV file"] }],
+        previewRows: [],
+      })
+      setUploadStatus(`Selected CSV: ${nextFile.name} - unable to parse`)
+    } finally {
+      setCsvValidationLoading(false)
+    }
+  }
+
+  function downloadValidationReport() {
+    if (!csvValidation?.invalidRowDetails?.length) return
+    const headers = ["rowNumber", "errors", ...(csvValidation.headers || [])]
+    const rows = csvValidation.invalidRowDetails.map((row) => ({
+      rowNumber: row.rowNumber,
+      errors: row.errors.join(" | "),
+      ...Object.fromEntries((csvValidation.headers || []).map((header) => [header, row[header] || ""])),
+    }))
+    downloadCsv(`bulk-validation-${qrType.toLowerCase().replace(/\s+/g, "-")}.csv`, headers, rows)
   }
 
   function downloadSampleCsv() {
@@ -447,6 +639,87 @@ export function BulkGenerateContent({ embedded = false }) {
                   For bulk social pages, use columns like <code>instagram</code>, <code>linkedin</code>, <code>whatsapp</code>, and optional <code>customPlatform1</code> + <code>customUrl1</code>. The legacy <code>content</code> column still works if you already have a prebuilt social page URL.
                 </p>
               )}
+              {csvValidationLoading ? (
+                <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                  Validating CSV rows...
+                </div>
+              ) : null}
+              {csvValidation ? (
+                <div className="mt-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">CSV Preflight</p>
+                      <p className="mt-1 text-sm text-slate-700">
+                        {csvValidation.validRowCount} valid row{csvValidation.validRowCount === 1 ? "" : "s"}
+                        {csvValidation.rowCount ? ` out of ${csvValidation.rowCount}` : ""}
+                        {csvValidation.invalidRowCount ? ` - ${csvValidation.invalidRowCount} need attention` : " - ready to upload"}
+                      </p>
+                    </div>
+                    {csvValidation.invalidRowCount ? (
+                      <button type="button" onClick={downloadValidationReport} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700">
+                        Download Validation Report
+                      </button>
+                    ) : null}
+                  </div>
+
+                  {csvValidation.missingHeaders.length ? (
+                    <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                      Missing required columns: {csvValidation.missingHeaders.join(", ")}
+                    </div>
+                  ) : null}
+
+                  {!!csvValidation.previewRows.length && (
+                    <div className="mt-4">
+                      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Preview Rows</p>
+                      <div className="mt-2 overflow-hidden rounded-xl border border-slate-200">
+                        <div className="max-h-64 overflow-auto">
+                          <table className="min-w-full text-left text-xs">
+                            <thead className="bg-slate-50 text-slate-500">
+                              <tr>
+                                {(csvValidation.headers || []).map((header) => (
+                                  <th key={header} className="border-b border-slate-200 px-3 py-2 font-semibold uppercase tracking-[0.12em]">
+                                    {header}
+                                  </th>
+                                ))}
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {csvValidation.previewRows.map((row, rowIndex) => (
+                                <tr key={rowIndex} className="odd:bg-white even:bg-slate-50/60">
+                                  {(csvValidation.headers || []).map((header) => (
+                                    <td key={`${rowIndex}-${header}`} className="border-b border-slate-100 px-3 py-2 align-top text-slate-700">
+                                      <span className="break-all">{row[header] || "-"}</span>
+                                    </td>
+                                  ))}
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {!!csvValidation.invalidRowDetails.length && (
+                    <div className="mt-4">
+                      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Row Issues</p>
+                      <div className="mt-2 space-y-2">
+                        {csvValidation.invalidRowDetails.slice(0, 6).map((row) => (
+                          <div key={`issue-${row.rowNumber}`} className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                            <p className="font-semibold">Row {row.rowNumber}</p>
+                            <p className="mt-1">{row.errors.join(" | ")}</p>
+                          </div>
+                        ))}
+                        {csvValidation.invalidRowDetails.length > 6 ? (
+                          <p className="text-xs text-slate-500">
+                            Showing first 6 invalid rows. Download the validation report to review the full list.
+                          </p>
+                        ) : null}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : null}
               <div className="mt-3 p-3 border rounded bg-gray-50">
                 <p className="text-xs font-semibold text-gray-800">Required CSV columns for {qrType}</p>
                 <div className="mt-2 flex flex-wrap gap-2">

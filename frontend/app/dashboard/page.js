@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import Navbar from "../../components/Navbar"
 import { apiRequest, API_BASE_URL } from "../../lib/api"
 import { clearAuthSession, getAuthToken } from "../../lib/auth"
+import { downloadCsv } from "../../lib/csv"
 
 function toAbsoluteDownloadUrl(filePath) {
   if (!filePath) return ""
@@ -368,6 +369,7 @@ export default function Dashboard() {
   const [shortLinksPage, setShortLinksPage] = useState(1)
   const [analysisType, setAnalysisType] = useState("qr")
   const [analysisMode, setAnalysisMode] = useState("single")
+  const [websiteAnalytics, setWebsiteAnalytics] = useState(null)
 
   const queryString = useMemo(() => buildQuery(filters), [filters])
 
@@ -389,14 +391,16 @@ export default function Dashboard() {
 
     try {
       const headers = { Authorization: `Bearer ${token}` }
-      const [meData, jobsData, shortLinksData] = await Promise.all([
+      const [meData, jobsData, shortLinksData, websiteAnalyticsData] = await Promise.all([
         apiRequest("/auth/me", { headers }),
         apiRequest(`/qr/jobs?limit=36${activeQuery ? `&${activeQuery.slice(1)}` : ""}`, { headers }),
         apiRequest("/short-links?includeArchived=true", { headers }),
+        apiRequest("/public/website-visits/overview", { headers }).catch(() => ({ analytics: null })),
       ])
       setUser(meData.user)
       setJobs(jobsData.jobs || [])
       setShortLinks(shortLinksData.links || [])
+      setWebsiteAnalytics(websiteAnalyticsData.analytics || null)
       setError("")
     } catch (requestError) {
       if (requestError?.status === 401) {
@@ -1083,6 +1087,44 @@ export default function Dashboard() {
     }
   }
 
+  function exportWebsiteVisitsReport() {
+    if (!websiteAnalytics) return
+    const summaryRows = [
+      {
+        section: "Summary",
+        totalVisits: websiteAnalytics.summary?.totalVisits || 0,
+        uniqueVisitors: websiteAnalytics.summary?.uniqueVisitors || 0,
+        visitsLast7Days: websiteAnalytics.summary?.visitsLast7Days || 0,
+        uniqueLast7Days: websiteAnalytics.summary?.uniqueLast7Days || 0,
+        trackedPages: websiteAnalytics.summary?.trackedPages || 0,
+        lastVisitAt: websiteAnalytics.summary?.lastVisitAt || "",
+      },
+    ]
+    const pageRows = (websiteAnalytics.topPages || []).map((page) => ({
+      section: "Top Page",
+      title: page.title || "",
+      targetUrl: page.targetUrl || "",
+      targetKind: page.targetKind || "",
+      visitCount: page.visitCount || 0,
+      uniqueVisitors: page.uniqueVisitors || 0,
+      lastVisitedAt: page.lastVisitedAt || "",
+    }))
+    const recentRows = (websiteAnalytics.recentVisits || []).map((visit) => ({
+      section: "Recent Visit",
+      title: visit.title || "",
+      targetUrl: visit.targetUrl || "",
+      targetKind: visit.targetKind || "",
+      location: visit.location || "",
+      createdAt: visit.createdAt || "",
+    }))
+
+    downloadCsv(
+      "website-visits-report.csv",
+      ["section", "title", "targetUrl", "targetKind", "visitCount", "uniqueVisitors", "lastVisitedAt", "location", "createdAt", "totalVisits", "visitsLast7Days", "uniqueLast7Days", "trackedPages"],
+      [...summaryRows, ...pageRows, ...recentRows],
+    )
+  }
+
   return (
     <div className="min-h-screen bg-slate-50">
       <Navbar />
@@ -1164,6 +1206,116 @@ export default function Dashboard() {
             {user && <p className="mt-3 max-w-4xl text-slate-600">Welcome back, {user.name || user.email}. Review analysis by type and mode so the Analysis screen follows the same structure as Generate.</p>}
           </div>
             </section>
+
+            {activeWorkspace === "qr" ? (
+              <section className="rounded-[1.75rem] border border-slate-200 bg-white p-6 shadow-sm">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Website Visitors</p>
+                    <h2 className="mt-2 text-2xl font-semibold text-slate-950">Public site traffic</h2>
+                    <p className="mt-2 max-w-3xl text-sm text-slate-600">
+                      Track visits to your marketing pages alongside QR and short-link activity so the dashboard reflects the full funnel.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={exportWebsiteVisitsReport}
+                    disabled={!websiteAnalytics}
+                    className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Export Website Report
+                  </button>
+                </div>
+
+                {websiteAnalytics ? (
+                  <div className="mt-5 space-y-6">
+                    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+                      <AnalysisStat label="Total Visits" value={websiteAnalytics.summary?.totalVisits || 0} tone="accent" />
+                      <AnalysisStat label="Unique Visitors" value={websiteAnalytics.summary?.uniqueVisitors || 0} tone="success" />
+                      <AnalysisStat label="Last 7 Days" value={websiteAnalytics.summary?.visitsLast7Days || 0} />
+                      <AnalysisStat label="Unique 7 Days" value={websiteAnalytics.summary?.uniqueLast7Days || 0} />
+                      <AnalysisStat label="Tracked Pages" value={websiteAnalytics.summary?.trackedPages || 0} />
+                    </div>
+
+                    <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+                      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Visit Trend</p>
+                            <p className="mt-1 text-sm text-slate-600">Last 14 days of public page visits.</p>
+                          </div>
+                          <MetricPill label="Last Visit" value={formatDateTime(websiteAnalytics.summary?.lastVisitAt)} tone="accent" />
+                        </div>
+                        <div className="mt-4">
+                          <Sparkline points={(websiteAnalytics.trend || []).map((point) => ({ label: point.label, count: point.visitCount }))} />
+                        </div>
+                      </div>
+
+                      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Top Pages</p>
+                        <div className="mt-4 space-y-3">
+                          {(websiteAnalytics.topPages || []).length ? (
+                            websiteAnalytics.topPages.map((page, index) => (
+                              <div key={`${page.targetUrl}-${index}`} className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
+                                <div className="flex flex-wrap items-center justify-between gap-3">
+                                  <div>
+                                    <p className="font-semibold text-slate-900">{page.title || "Untitled page"}</p>
+                                    <p className="mt-1 break-all text-xs text-slate-500">{page.targetUrl}</p>
+                                  </div>
+                                  <div className="text-right">
+                                    <p className="text-sm font-semibold text-slate-900">{page.visitCount} visits</p>
+                                    <p className="text-xs text-slate-500">{page.uniqueVisitors} unique</p>
+                                  </div>
+                                </div>
+                              </div>
+                            ))
+                          ) : (
+                            <p className="text-sm text-slate-500">No public page visits recorded yet.</p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+                      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Recent Visits</p>
+                      <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-white">
+                        {(websiteAnalytics.recentVisits || []).length ? (
+                          <div className="max-h-80 overflow-auto">
+                            <table className="min-w-full text-left text-sm">
+                              <thead className="bg-slate-50 text-slate-500">
+                                <tr>
+                                  <th className="border-b border-slate-200 px-4 py-3 font-semibold uppercase tracking-[0.12em]">Page</th>
+                                  <th className="border-b border-slate-200 px-4 py-3 font-semibold uppercase tracking-[0.12em]">Kind</th>
+                                  <th className="border-b border-slate-200 px-4 py-3 font-semibold uppercase tracking-[0.12em]">Location</th>
+                                  <th className="border-b border-slate-200 px-4 py-3 font-semibold uppercase tracking-[0.12em]">Visited</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {websiteAnalytics.recentVisits.map((visit, index) => (
+                                  <tr key={`${visit.targetUrl}-${visit.createdAt}-${index}`} className="odd:bg-white even:bg-slate-50/60">
+                                    <td className="border-b border-slate-100 px-4 py-3 align-top">
+                                      <p className="font-medium text-slate-900">{visit.title || "Untitled page"}</p>
+                                      <p className="mt-1 break-all text-xs text-slate-500">{visit.targetUrl}</p>
+                                    </td>
+                                    <td className="border-b border-slate-100 px-4 py-3 text-slate-600">{visit.targetKind || "marketing-page"}</td>
+                                    <td className="border-b border-slate-100 px-4 py-3 text-slate-600">{visit.location || "Unknown"}</td>
+                                    <td className="border-b border-slate-100 px-4 py-3 text-slate-600">{formatDateTime(visit.createdAt)}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        ) : (
+                          <div className="px-4 py-5 text-sm text-slate-500">No recent public site visits yet.</div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="mt-4 text-sm text-slate-500">Loading public website analytics...</p>
+                )}
+              </section>
+            ) : null}
 
             {(analysisType === "barcode" || analysisType === "label") && (
               <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">

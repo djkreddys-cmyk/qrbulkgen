@@ -12,3 +12,5 @@ mobile/.expo/
 **/.expo/
 mobile/android/.gradle/
 *.log
+.idea/
+*.iml

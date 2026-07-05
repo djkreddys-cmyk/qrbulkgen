@@ -838,6 +838,109 @@ publicRouter.post("/track-view", async (req, res, next) => {
   }
 });
 
+publicRouter.get("/website-visits/overview", requireAuth, async (_req, res, next) => {
+  try {
+    const [summaryResult, topPagesResult, recentVisitsResult, trendResult] = await Promise.all([
+      query(
+        `SELECT
+           COUNT(*)::int AS total_visits,
+           COUNT(DISTINCT COALESCE(metadata->>'visitorKey', id::text))::int AS unique_visitors,
+           COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '7 days')::int AS visits_last_7_days,
+           COUNT(DISTINCT COALESCE(metadata->>'visitorKey', id::text)) FILTER (WHERE created_at >= NOW() - INTERVAL '7 days')::int AS unique_last_7_days,
+           COUNT(DISTINCT NULLIF(COALESCE(metadata->>'targetUrl', ''), ''))::int AS tracked_pages,
+           MAX(created_at) AS last_visit_at
+         FROM analytics_events
+         WHERE event_type = 'site.public.visit'`,
+      ),
+      query(
+        `SELECT
+           COALESCE(metadata->>'targetUrl', '') AS target_url,
+           COALESCE(NULLIF(metadata->>'title', ''), 'Untitled page') AS title,
+           COALESCE(NULLIF(metadata->>'targetKind', ''), 'marketing-page') AS target_kind,
+           COUNT(*)::int AS visit_count,
+           COUNT(DISTINCT COALESCE(metadata->>'visitorKey', id::text))::int AS unique_visitors,
+           MAX(created_at) AS last_visited_at
+         FROM analytics_events
+         WHERE event_type = 'site.public.visit'
+         GROUP BY 1, 2, 3
+         ORDER BY visit_count DESC, last_visited_at DESC
+         LIMIT 8`,
+      ),
+      query(
+        `SELECT
+           COALESCE(metadata->>'targetUrl', '') AS target_url,
+           COALESCE(NULLIF(metadata->>'title', ''), 'Untitled page') AS title,
+           COALESCE(NULLIF(metadata->>'targetKind', ''), 'marketing-page') AS target_kind,
+           COALESCE(NULLIF(metadata->>'location', ''), '') AS location,
+           COALESCE(NULLIF(metadata->>'deviceType', ''), '') AS device_type,
+           created_at
+         FROM analytics_events
+         WHERE event_type = 'site.public.visit'
+         ORDER BY created_at DESC
+         LIMIT 20`,
+      ),
+      query(
+        `WITH days AS (
+           SELECT generate_series(
+             date_trunc('day', NOW() - INTERVAL '13 days'),
+             date_trunc('day', NOW()),
+             INTERVAL '1 day'
+           ) AS day
+         )
+         SELECT
+           to_char(days.day, 'DD Mon') AS label,
+           COALESCE(COUNT(ae.id), 0)::int AS visit_count,
+           COALESCE(COUNT(DISTINCT COALESCE(ae.metadata->>'visitorKey', ae.id::text)), 0)::int AS unique_visitors
+         FROM days
+         LEFT JOIN analytics_events ae
+           ON ae.event_type = 'site.public.visit'
+          AND ae.created_at >= days.day
+          AND ae.created_at < days.day + INTERVAL '1 day'
+         GROUP BY days.day
+         ORDER BY days.day ASC`,
+      ),
+    ]);
+
+    const summary = summaryResult.rows[0] || {};
+
+    res.json({
+      analytics: {
+        summary: {
+          totalVisits: Number(summary.total_visits || 0),
+          uniqueVisitors: Number(summary.unique_visitors || 0),
+          visitsLast7Days: Number(summary.visits_last_7_days || 0),
+          uniqueLast7Days: Number(summary.unique_last_7_days || 0),
+          trackedPages: Number(summary.tracked_pages || 0),
+          lastVisitAt: summary.last_visit_at || null,
+        },
+        topPages: topPagesResult.rows.map((row) => ({
+          targetUrl: row.target_url || "",
+          title: row.title || "Untitled page",
+          targetKind: row.target_kind || "marketing-page",
+          visitCount: Number(row.visit_count || 0),
+          uniqueVisitors: Number(row.unique_visitors || 0),
+          lastVisitedAt: row.last_visited_at || null,
+        })),
+        recentVisits: recentVisitsResult.rows.map((row) => ({
+          targetUrl: row.target_url || "",
+          title: row.title || "Untitled page",
+          targetKind: row.target_kind || "marketing-page",
+          location: row.location || "",
+          deviceType: row.device_type || "",
+          createdAt: row.created_at || null,
+        })),
+        trend: trendResult.rows.map((row) => ({
+          label: row.label,
+          visitCount: Number(row.visit_count || 0),
+          uniqueVisitors: Number(row.unique_visitors || 0),
+        })),
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 publicRouter.get("/qr-links/:id", async (req, res, next) => {
   try {
     const id = String(req.params.id || "").trim();

@@ -1,4 +1,4 @@
-export function parseCsv(text) {
+export function parseCsvDetailed(text) {
   const rows = [];
   let current = "";
   let row = [];
@@ -48,16 +48,31 @@ export function parseCsv(text) {
   }
 
   if (!rows.length) {
-    return [];
+    return {
+      headers: [],
+      rows: [],
+    };
   }
 
   const headers = rows[0].map((cell) => String(cell || "").trim());
-  return rows.slice(1).map((values) =>
-    headers.reduce((acc, header, index) => {
-      acc[header] = String(values[index] || "").trim();
-      return acc;
-    }, {}),
+  const parsedRows = rows.slice(1).map((values, index) =>
+    headers.reduce(
+      (acc, header, valueIndex) => {
+        acc[header] = String(values[valueIndex] || "").trim();
+        return acc;
+      },
+      { __rowNumber: index + 2 },
+    ),
   );
+
+  return {
+    headers,
+    rows: parsedRows,
+  };
+}
+
+export function parseCsv(text) {
+  return parseCsvDetailed(text).rows;
 }
 
 export function downloadCsv(filename, headers, rows) {
