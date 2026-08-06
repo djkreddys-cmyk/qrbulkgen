@@ -94,6 +94,44 @@ function drawRoundedRect(ctx, x, y, width, height, radius) {
   ctx.closePath()
 }
 
+async function buildStyledQrDownloadUrl({
+  content,
+  size,
+  foregroundColor,
+  backgroundColor,
+  dotStyle,
+  cornerSquareStyle,
+  cornerDotStyle,
+  errorCorrectionLevel,
+  logoDataUrl,
+}) {
+  const qrCode = new QRCodeStyling({
+    width: size,
+    height: size,
+    type: "canvas",
+    data: content,
+    image: logoDataUrl || undefined,
+    dotsOptions: { color: foregroundColor, type: dotStyle },
+    backgroundOptions: { color: backgroundColor },
+    cornersSquareOptions: { color: foregroundColor, type: cornerSquareStyle },
+    cornersDotOptions: { color: foregroundColor, type: cornerDotStyle },
+    qrOptions: { errorCorrectionLevel },
+    imageOptions: { hideBackgroundDots: true, imageSize: 0.35, margin: 4, crossOrigin: "anonymous" },
+  })
+
+  const blob = await qrCode.getRawData("png")
+  if (!blob) {
+    return ""
+  }
+
+  return await new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(String(reader.result || ""))
+    reader.onerror = reject
+    reader.readAsDataURL(blob)
+  })
+}
+
 async function extractBrandPalette(dataUrl) {
   if (!dataUrl || typeof window === "undefined") {
     return null
@@ -1070,15 +1108,34 @@ export function SingleGenerateContent({ embedded = false, brandMode = false }) {
 
     let finalDownloadUrl = dataUrl
     const finalFileName = data?.artifact?.fileName || `${(filenamePrefix || "qr").replace(/[^a-zA-Z0-9-_]/g, "") || "qr"}.png`
+    const exportSize = Number(downloadResolution) || 1024
+
+    if (!brandMode && logoDataUrl) {
+      const styledDownloadUrl = await buildStyledQrDownloadUrl({
+        content: generatedContent,
+        size: exportSize,
+        foregroundColor,
+        backgroundColor,
+        dotStyle,
+        cornerSquareStyle,
+        cornerDotStyle,
+        errorCorrectionLevel,
+        logoDataUrl,
+      })
+
+      if (styledDownloadUrl) {
+        finalDownloadUrl = styledDownloadUrl
+      }
+    }
 
     if (brandMode && logoDataUrl && qrCodeRef.current) {
       const composedCanvas = document.createElement("canvas")
-      composedCanvas.width = downloadResolution
-      composedCanvas.height = downloadResolution
+      composedCanvas.width = exportSize
+      composedCanvas.height = exportSize
       const ctx = composedCanvas.getContext("2d")
       if (ctx) {
         ctx.fillStyle = "#ffffff"
-        ctx.fillRect(0, 0, downloadResolution, downloadResolution)
+        ctx.fillRect(0, 0, exportSize, exportSize)
 
         const backgroundImage = new window.Image()
         backgroundImage.src = logoDataUrl
@@ -1087,20 +1144,20 @@ export function SingleGenerateContent({ embedded = false, brandMode = false }) {
           backgroundImage.onerror = reject
         })
 
-        const logoBox = downloadResolution * brandBackgroundCoverage
-        const logoX = (downloadResolution - logoBox) / 2
-        const logoY = (downloadResolution - logoBox) / 2
+        const logoBox = exportSize * brandBackgroundCoverage
+        const logoX = (exportSize - logoBox) / 2
+        const logoY = (exportSize - logoBox) / 2
         ctx.save()
         ctx.globalAlpha = brandBackgroundOpacity
         ctx.drawImage(backgroundImage, logoX, logoY, logoBox, logoBox)
         ctx.restore()
 
-        const maskSize = downloadResolution * centerMaskSize
-        const maskX = (downloadResolution - maskSize) / 2
-        const maskY = (downloadResolution - maskSize) / 2
+        const maskSize = exportSize * centerMaskSize
+        const maskX = (exportSize - maskSize) / 2
+        const maskY = (exportSize - maskSize) / 2
         ctx.save()
         ctx.fillStyle = `rgba(255, 255, 255, ${centerMaskOpacity})`
-        drawRoundedRect(ctx, maskX, maskY, maskSize, maskSize, downloadResolution * 0.035)
+        drawRoundedRect(ctx, maskX, maskY, maskSize, maskSize, exportSize * 0.035)
         ctx.fill()
         ctx.restore()
 
@@ -1113,7 +1170,7 @@ export function SingleGenerateContent({ embedded = false, brandMode = false }) {
             qrImage.onload = resolve
             qrImage.onerror = reject
           })
-          ctx.drawImage(qrImage, 0, 0, downloadResolution, downloadResolution)
+          ctx.drawImage(qrImage, 0, 0, exportSize, exportSize)
           URL.revokeObjectURL(qrObjectUrl)
         }
 
