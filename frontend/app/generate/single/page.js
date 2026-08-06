@@ -128,7 +128,8 @@ async function composeLogoQrDownloadUrl({
   ctx.fillRect(0, 0, exportSize, exportSize)
   ctx.drawImage(qrImage, 0, 0, exportSize, exportSize)
 
-  const plateSize = exportSize * 0.24
+  const maxLogoSize = exportSize * 0.18 + 3
+  const plateSize = maxLogoSize + exportSize * 0.06
   const plateX = (exportSize - plateSize) / 2
   const plateY = (exportSize - plateSize) / 2
   ctx.save()
@@ -137,7 +138,6 @@ async function composeLogoQrDownloadUrl({
   ctx.fill()
   ctx.restore()
 
-  const maxLogoSize = exportSize * 0.18
   const logoRatio = logoImage.width && logoImage.height ? logoImage.width / logoImage.height : 1
   const logoWidth = logoRatio >= 1 ? maxLogoSize : maxLogoSize * logoRatio
   const logoHeight = logoRatio >= 1 ? maxLogoSize / logoRatio : maxLogoSize
