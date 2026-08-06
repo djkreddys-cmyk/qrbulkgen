@@ -94,42 +94,58 @@ function drawRoundedRect(ctx, x, y, width, height, radius) {
   ctx.closePath()
 }
 
-async function buildStyledQrDownloadUrl({
-  content,
+function loadImageForCanvas(src) {
+  return new Promise((resolve, reject) => {
+    const image = new window.Image()
+    image.onload = () => resolve(image)
+    image.onerror = reject
+    image.src = src
+  })
+}
+
+async function composeLogoQrDownloadUrl({
+  qrDataUrl,
   size,
-  foregroundColor,
   backgroundColor,
-  dotStyle,
-  cornerSquareStyle,
-  cornerDotStyle,
-  errorCorrectionLevel,
   logoDataUrl,
 }) {
-  const qrCode = new QRCodeStyling({
-    width: size,
-    height: size,
-    type: "canvas",
-    data: content,
-    image: logoDataUrl || undefined,
-    dotsOptions: { color: foregroundColor, type: dotStyle },
-    backgroundOptions: { color: backgroundColor },
-    cornersSquareOptions: { color: foregroundColor, type: cornerSquareStyle },
-    cornersDotOptions: { color: foregroundColor, type: cornerDotStyle },
-    qrOptions: { errorCorrectionLevel },
-    imageOptions: { hideBackgroundDots: true, imageSize: 0.35, margin: 4, crossOrigin: "anonymous" },
-  })
-
-  const blob = await qrCode.getRawData("png")
-  if (!blob) {
+  if (!qrDataUrl || !logoDataUrl || typeof window === "undefined") {
     return ""
   }
 
-  return await new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => resolve(String(reader.result || ""))
-    reader.onerror = reject
-    reader.readAsDataURL(blob)
-  })
+  const exportSize = Number(size) || 1024
+  const [qrImage, logoImage] = await Promise.all([
+    loadImageForCanvas(qrDataUrl),
+    loadImageForCanvas(logoDataUrl),
+  ])
+  const canvas = document.createElement("canvas")
+  canvas.width = exportSize
+  canvas.height = exportSize
+  const ctx = canvas.getContext("2d")
+  if (!ctx) return ""
+
+  ctx.fillStyle = backgroundColor || "#ffffff"
+  ctx.fillRect(0, 0, exportSize, exportSize)
+  ctx.drawImage(qrImage, 0, 0, exportSize, exportSize)
+
+  const plateSize = exportSize * 0.24
+  const plateX = (exportSize - plateSize) / 2
+  const plateY = (exportSize - plateSize) / 2
+  ctx.save()
+  ctx.fillStyle = "#ffffff"
+  drawRoundedRect(ctx, plateX, plateY, plateSize, plateSize, exportSize * 0.035)
+  ctx.fill()
+  ctx.restore()
+
+  const maxLogoSize = exportSize * 0.18
+  const logoRatio = logoImage.width && logoImage.height ? logoImage.width / logoImage.height : 1
+  const logoWidth = logoRatio >= 1 ? maxLogoSize : maxLogoSize * logoRatio
+  const logoHeight = logoRatio >= 1 ? maxLogoSize / logoRatio : maxLogoSize
+  const logoX = (exportSize - logoWidth) / 2
+  const logoY = (exportSize - logoHeight) / 2
+  ctx.drawImage(logoImage, logoX, logoY, logoWidth, logoHeight)
+
+  return canvas.toDataURL("image/png")
 }
 
 async function extractBrandPalette(dataUrl) {
@@ -1111,15 +1127,10 @@ export function SingleGenerateContent({ embedded = false, brandMode = false }) {
     const exportSize = Number(downloadResolution) || 1024
 
     if (!brandMode && logoDataUrl) {
-      const styledDownloadUrl = await buildStyledQrDownloadUrl({
-        content: generatedContent,
+      const styledDownloadUrl = await composeLogoQrDownloadUrl({
+        qrDataUrl: dataUrl,
         size: exportSize,
-        foregroundColor,
         backgroundColor,
-        dotStyle,
-        cornerSquareStyle,
-        cornerDotStyle,
-        errorCorrectionLevel,
         logoDataUrl,
       })
 
