@@ -72,6 +72,8 @@ export default function LabelGenerateContent({ mode = "single" }) {
   const [accentColor, setAccentColor] = useState("#0f172a")
   const [backgroundColor, setBackgroundColor] = useState("#ffffff")
   const [showLogo, setShowLogo] = useState(false)
+  const [logoDataUrl, setLogoDataUrl] = useState("")
+  const [logoFileName, setLogoFileName] = useState("")
   const [showTitle, setShowTitle] = useState(true)
   const [showSku, setShowSku] = useState(true)
   const [showPrice, setShowPrice] = useState(true)
@@ -254,6 +256,57 @@ export default function LabelGenerateContent({ mode = "single" }) {
     openPrintDialog()
   }
 
+  function handleLogoChange(event) {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    if (!String(file.type || "").startsWith("image/")) {
+      setLogoDataUrl("")
+      setLogoFileName("")
+      setShowLogo(false)
+      return
+    }
+
+    const reader = new FileReader()
+    reader.onload = () => {
+      setLogoDataUrl(String(reader.result || ""))
+      setLogoFileName(file.name || "Uploaded logo")
+      setShowLogo(true)
+    }
+    reader.readAsDataURL(file)
+  }
+
+  function clearLogo() {
+    setLogoDataUrl("")
+    setLogoFileName("")
+    setShowLogo(false)
+  }
+
+  function renderLogoBox(size = "default") {
+    if (!showLogo) return null
+
+    const sizeClass =
+      size === "sheet"
+        ? "h-8 w-8 rounded-md p-0.5"
+        : size === "roll"
+          ? "h-9 w-9 rounded-lg p-0.5"
+          : "h-14 w-14 rounded-2xl p-1"
+
+    if (logoDataUrl) {
+      return (
+        <div className={`shrink-0 overflow-hidden border border-slate-200 bg-white ${sizeClass}`}>
+          <img src={logoDataUrl} alt="Label logo" className="h-full w-full object-contain" />
+        </div>
+      )
+    }
+
+    return (
+      <div className={`shrink-0 border border-dashed border-slate-300 bg-white text-center text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500 ${sizeClass}`}>
+        <span className="flex h-full items-center justify-center">Logo</span>
+      </div>
+    )
+  }
+
   function handleBulkCsvChange(event) {
     const file = event.target.files?.[0]
     if (!file) return
@@ -370,11 +423,7 @@ export default function LabelGenerateContent({ mode = "single" }) {
                 ) : null}
                 <p className="mt-2 text-sm text-slate-600">{previewSubtitle || "Supporting subtitle"}</p>
               </div>
-              {showLogo ? (
-                <div className="rounded-2xl border border-dashed border-slate-300 px-4 py-3 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-                  Logo
-                </div>
-              ) : null}
+              {renderLogoBox()}
             </div>
 
             <div className={`mt-5 grid gap-3 ${labelLayout.infoColsClass}`}>
@@ -522,6 +571,7 @@ export default function LabelGenerateContent({ mode = "single" }) {
           </div>
 
           <div className="flex w-[46px] flex-col gap-1.5">
+            {renderLogoBox("roll")}
             {showQr ? (
               <div className="roll-label-qr flex h-[46px] w-[46px] items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-white p-1" ref={attachQrRef ? qrPreviewRef : null} />
             ) : (
@@ -610,6 +660,7 @@ export default function LabelGenerateContent({ mode = "single" }) {
           </div>
 
           <div className="flex w-[42px] flex-col gap-1">
+            {renderLogoBox("sheet")}
             {showQr ? (
               <div className="sheet-label-qr flex h-[42px] w-[42px] items-center justify-center overflow-hidden rounded-md border border-slate-200 bg-white p-1" ref={attachQrRef ? qrPreviewRef : null} />
             ) : (
@@ -1039,10 +1090,21 @@ export default function LabelGenerateContent({ mode = "single" }) {
           </div>
 
           <div className="grid gap-3 md:grid-cols-2">
-            <label className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
-              <input type="checkbox" checked={showLogo} onChange={(e) => setShowLogo(e.target.checked)} />
-              Show logo placeholder
-            </label>
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+              <label className="flex items-center gap-3">
+                <input type="checkbox" checked={showLogo} onChange={(e) => setShowLogo(e.target.checked)} />
+                Show logo
+              </label>
+              <div className="mt-3 flex flex-wrap items-center gap-3">
+                <input type="file" accept="image/*" onChange={handleLogoChange} className="max-w-full text-sm" />
+                {logoDataUrl ? (
+                  <button type="button" onClick={clearLogo} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700">
+                    Remove
+                  </button>
+                ) : null}
+              </div>
+              {logoFileName ? <p className="mt-2 truncate text-xs text-slate-500">{logoFileName}</p> : null}
+            </div>
             <label className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
               <input type="checkbox" checked={showTitle} onChange={(e) => setShowTitle(e.target.checked)} />
               Show product name
